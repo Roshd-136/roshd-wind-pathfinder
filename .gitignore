@@ -28,3 +28,4 @@ Thumbs.db
 
 # Local task artifacts
 *.pdf
+.github/workflows/ci.yml
