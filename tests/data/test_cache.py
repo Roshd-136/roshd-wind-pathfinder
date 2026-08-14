@@ -7,7 +7,7 @@ import tempfile
 import time
 import unittest
 
-from roshd_wind_pathfinder.data.cache import WindDataCache
+from data.cache import WindDataCache
 
 
 class TestWindDataCache(unittest.TestCase):
