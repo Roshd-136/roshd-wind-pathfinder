@@ -83,7 +83,7 @@ class TestWindDataCache(unittest.TestCase):
         """Test exporting cache data to pandas DataFrame."""
         # Skip this test if pandas is not available
         try:
-            import pandas
+            import pandas  # noqa: F401
         except ImportError:
             self.skipTest("pandas not available")
 
