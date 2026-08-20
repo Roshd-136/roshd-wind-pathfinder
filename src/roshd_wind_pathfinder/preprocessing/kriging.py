@@ -98,7 +98,6 @@ class EmpiricalVariogram:
         """محاسبه واریوگرام تجربی با ساختار بازه‌های یکنواخت (equal-bin)."""
         from scipy.spatial.distance import pdist, squareform
 
-        n = self.coords.shape[0]
         dist_mat = squareform(pdist(self.coords))
         np.fill_diagonal(dist_mat, np.nan)
 
@@ -328,9 +327,6 @@ class KrigingInterpolator:
 
         # ماتریس کوواریانس نقاط هدف با نقاط منبع: (n_target, n_source)
         c_T = self._build_covariance(target, self.coords)
-
-        # ماتریس کوواریانس خود به خود نقاط هدف: (n_target,)
-        c_0 = np.diag(self._build_covariance(target, target))
 
         # حل سیستم خطی برای هر نقطه هدف
         results = np.empty(n_target, dtype=np.float64)
