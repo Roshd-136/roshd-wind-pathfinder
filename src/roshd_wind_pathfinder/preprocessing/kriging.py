@@ -2,8 +2,9 @@
 درونیابی Kriging با محاسبه واریوگرام تجربی و برازش مدل.
 (.Variogram) برای تخمین دقیق‌تر میدان باد"""
 
-import numpy as np
 from dataclasses import dataclass
+
+import numpy as np
 from numpy.typing import NDArray
 
 
