@@ -334,7 +334,7 @@ class KrigingInterpolator:
 
         for i in range(n_target):
             c_i = c_T[i, :].reshape(1, n_source)  # (1, n_source)
-            mu = float(m @ c_i.T)
+            mu = float((m @ c_i.T)[0, 0])
             results[i] = mu
 
         return results
