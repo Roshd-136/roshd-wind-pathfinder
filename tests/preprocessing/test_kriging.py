@@ -129,8 +129,10 @@ class TestAccuracyComparison(unittest.TestCase):
     """۵. مقایسه دقت Kriging با IDW."""
 
     def setUp(self):
+        # تعداد نمونه کافی تا تست از seed مستقل و پایدار باشد
+        # (با n_train کم، نقاط تست بیرونِ محدوده train می‌افتند و IDW ضعیف می‌شود)
         np.random.seed(7)
-        n_train = 30
+        n_train = 100
         n_test = 10
         self.train_coords = np.random.rand(n_train, 2) * 10.0
         linear = 2.5 * self.train_coords[:, 0] + 1.0 * self.train_coords[:, 1]

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Wind Data Quality Control (QC) Module — AEROPATH
 =================================================
@@ -32,14 +31,11 @@ to_markdown ذخیره کرد.
 from __future__ import annotations
 
 import json
-import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional
 
 import numpy as np
 import pandas as pd
-
 
 # ─────────────────────────────────────────────────────────────────────────
 # ۱) تنظیمات و آستانه‌ها (Config & Thresholds)
@@ -114,7 +110,7 @@ FLAG_MISSING = "MISSING_VALUE"
 class WindQualityControl:
     """اجرای کامل خط لوله‌ی کنترل کیفیت روی یک DataFrame داده‌ی باد."""
 
-    def __init__(self, config: Optional[QCConfig] = None):
+    def __init__(self, config: QCConfig | None = None):
         self.config = config or QCConfig()
         self.report: dict = {}
 
@@ -260,7 +256,7 @@ class WindQualityControl:
         cfg = self.config
         r = cfg.spatial_neighbor_radius_deg
 
-        for t, group in df.groupby("time"):
+        for _t, group in df.groupby("time"):
             valid_group = group[group["speed"].notna()]
             if len(valid_group) < cfg.min_neighbors_required + 1:
                 continue  # داده‌ی کافی برای مقایسه‌ی همسایگی نیست
