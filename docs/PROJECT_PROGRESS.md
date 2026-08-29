@@ -27,3 +27,14 @@
 - **تست:** pytest و ruff نتیجه واقعی
 - **PR:** لینک PR (merge فقط توسط آرمان)
 ```
+
+---
+## [2026-08-29] Wind Data Quality Control Module Implementation
+- **Author:** Mohammad Mahdi Dastgir / AI Agent
+- **Status:** Completed
+- **Changes:**
+  - Designed and implemented `src/wind_qc.py` including `QCConfig` and `WindQualityControl`.
+  - Supports conversion from `(u, v)` components to speed and direction.
+  - Added physical range checks, missing value flags, statistical outlier filtering, temporal continuity checks, and spatial consistency checks.
+  - Added unit test suite in `tests/test_wind_qc.py` covering value ranges, UV conversion, and temporal jumps.
+  - Verified tests (`pytest -q`) and formatting/linting (`ruff check .`).
