@@ -120,3 +120,41 @@ tests/
 - Create folder structure for future tasks
 - Set up GitHub branch protection
 - Open PR for review
+
+
+## 2025-08-30 — Git Enforcement: Rulesets, Ownership and PR-only Workflow
+
+**Agent:** Hermes (AI)
+**Branch:** main (via PRs)
+**PRs:** #8, #9 (docs), #10 (CODEOWNERS)
+
+### Summary
+Implemented GitHub enforcement so that only the owner (lawbr3aker) can write to the base branch, all collaborators must merge via pull request, and agent/owner files are protected by code-owner review.
+
+### Changes Made
+- Ruleset main-owner-only (branch ruleset, active) targeting refs/heads/main:
+  - update, deletion, non_fast_forward blocked: no direct pushes / force-pushes / deletion of main.
+  - required_status_checks: Lint and Test (strict), so CI must pass before any merge.
+  - pull_request: requires 1 approving review plus code-owner review; stale reviews dismissed.
+  - Bypass list = only lawbr3aker (User id 69733196, mode always): the sole actor who can merge/act without review.
+- Added .github/CODEOWNERS: * @lawbr3aker, so all files are owned by the project owner and any collaborator PR touching owned files needs the owner explicit review to merge.
+- Downgraded MOHAMADCONSTANTINE from org admin to write collaborator (no longer bypasses rulesets).
+- Removed redundant classic branch protection (ruleset is now the single source of truth).
+- Externalized the owner bypass from role-based (OrganizationAdmin) to per-user (User:69733196) so no other org admin can bypass.
+
+### Resulting Access Model
+| Actor | Can push to main directly? | Can merge a PR? |
+|---|---|---|
+| lawbr3aker (owner) | No (must PR) but bypasses all review rules | Yes, instantly (bypass) |
+| MOHAMADCONSTANTINE (write) | No | No: PR needs owner review |
+| Bradarabdol (write) | No | No: PR needs owner review |
+| AI agents (as above) | No | No: must open PR; owner merges |
+
+### Verification
+- PR #10 (CODEOWNERS) merged to main via the PR plus bypass flow.
+- Lint and Test green on main.
+- Ruleset active; classic protection removed.
+- Only lawbr3aker is org admin; others are write collaborators.
+
+### Next Steps
+- (Optional) Apply an org-level ruleset for all repos in Roshd-136 (needs owner token with admin:org).
