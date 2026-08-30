@@ -8,7 +8,7 @@
 
 ## خلاصه پیادهسازی
 
-ماژول `WindDataCache` در مسیر `src/roshd_wind_pathfinder/data/cache.py` پیادهسازی شده است که وظایف زیر را انجام میدهد:
+ماژول `WindDataCache` در مسیر `src/data/cache.py` پیادهسازی شده است که وظایف زیر را انجام میدهد:
 
 1. **پایگاه داده محلی SQLite** برای ذخیرهسازی دادههای باد
 2. **استراتژی کش** با مدیریت TTL (زمان انقضا)
@@ -32,7 +32,7 @@
 ## خروجیهای تولیدشده
 
 ### ۱. کد پیادهسازی
-- فایل: [`src/roshd_wind_pathfinder/data/cache.py`](./src/roshd_wind_pathfinder/data/cache.py)
+- فایل: [`src/data/cache.py`](./src/data/cache.py)
 - کلاس: `WindDataCache`
 - قابلیتها:
   - ذخیره و بازیابی دادههای باد
@@ -60,7 +60,7 @@
 ## مثال استفاده
 
 ```python
-from roshd_wind_pathfinder.data.cache import WindDataCache
+from data.cache import WindDataCache
 
 # Initialize cache
 cache = WindDataCache()

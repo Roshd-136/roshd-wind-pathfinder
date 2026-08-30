@@ -2,7 +2,22 @@
 
 پایپلاین پیشپردازش دادههای باد و مسیریابی — پروژه دانشگاهی/تحقیقاتی با تیم فارسیزبان.
 
-## معماری کلی پروژه
+---
+
+## فهرست
+
+- [معماری پروژه](#معماری-پروژه)
+- [مراحل پروژه](#مراحل-پروژه)
+- [ساختار ریپو](#ساختار-ریپو)
+- [شروع کار — برای AI Agent](#شروع-کار--برای-ai-agent)
+- [شروع کار — برای همکار انسانی](#شروع-کار--برای-همکار-انسانی)
+- [قوانین همکاری](#قوانین-همکاری)
+- [توسعه و تست](#توسعه-و-تست)
+- [وضعیت فعلی](#وضعیت-فعلی)
+
+---
+
+## معماری پروژه
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -10,6 +25,7 @@
 ├─────────────────────────────────────────────────────────────────────┤
 │  GitHub: https://github.com/lawbr3aker/roshd-wind-pathfinder       │
 │  ClickUp Workspace: Roshd (Space: Data & Meteorology)              │
+│  استاندارد پرامپت: مراجعه به .github/PROMPT.md                     │
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
@@ -28,56 +44,184 @@
                          └──────────────────┘
 ```
 
+### جریان داده (Data Flow)
+
+```
+داده خام API/Source
+    │
+    ▼
+WindDataCache (src/data/cache.py)
+    │
+    ▼
+QC — کنترل کیفیت (preprocessing/qc.py)
+    │
+    ▼
+IDW / Kriging درونیابی (preprocessing/idw.py, kriging.py)
+    │
+    ▼
+پیوستگی مکانی-زمانی (preprocessing/consistency.py)
+    │
+    ▼
+آمادهسازی داده مسیریابی (preprocessing/data_prep.py)
+    │
+    ▼
+data/khorasan_pathfinding_ready.csv  ──▶  مسیریابی (گام ۳)
+```
+
+---
+
 ## مراحل پروژه
 
 | گام | موضوع | وضعیت | تسکهای کلیدی | ClickUp List |
 |-----|-------|--------|--------------|--------------|
 | **گام ۱** | **منابع داده و کلیدهای API** | ✅ انجام شد | • بررسی و انتخاب سرویسهای هواشناسی (Survey)<br>• دریافت کلیدهای API و تست اتصال (API Keys)<br>• تست اتصال NOMADS/GFS<br>• تست اتصال Open-Meteo<br>• ارزیابی و انتخاب نهایی ECMWF | `Data Sources` |
-| **گام ۲** | **پیشپردازش و درونیابی** | 🔄 **در حال انجام** | • درونیابی IDW (آرمان) ✅
-• درونیابی پیشرفته Kriging (آرمان) ❌
-• کنترل کیفیت دادههای باد (مهدی) ❌
-• بررسی پیوستگی زمانی و مکانی (امیرعلی) ❌
-• آمادهسازی داده ورودی مسیریابی (مهدی) ❌
-• مستندات و گزارش پیشپردازش (امیرعلی) ❌ | `Preprocessing & Interpolation` |
-| **گام ۳+** | **مسیریابی** | 🔮 آینده | • ساخت گراف بادی<br>• الگوریتم A* / Dijkstra<br>• بهینه‌سازی مسیر با جریان باد<br>• UI تحت وب (React + FastAPI) | — |
+| **گام ۲** | **پیشپردازش و درونیابی** | 🔄 **در حال انجام** | • درونیابی IDW (آرمان) ✅<br>• درونیابی پیشرفته Kriging (آرمان) ❌<br>• کنترل کیفیت دادههای باد (مهدی) ❌<br>• بررسی پیوستگی زمانی و مکانی (امیرعلی) ❌<br>• آمادهسازی داده ورودی مسیریابی (مهدی) ❌<br>• مستندات و گزارش پیشپردازش (امیرعلی) ❌ | `Preprocessing & Interpolation` |
+| **گام ۳+** | **مسیریابی** | 🔮 آینده | • ساخت گراف بادی<br>• الگوریتم A* / Dijkstra<br>• بهینهسازی مسیر با جریان باد<br>• UI تحت وب (React + FastAPI) | — |
+
+---
 
 ## ساختار ریپو
 
 ```
 roshd-wind-pathfinder/
-├── AGENTS.md                 # دستورالعمل الزامی برای هر AI agent (خودکار بارگذاری میشود)
+│
+├── AGENTS.md                 # قوانین اجباری برای AI agents (خودکار بارگذاری)
 ├── CONTRIBUTING.md           # راهنمای همکاری برای همکاران انسانی (فارسی)
-├── README.md                 # این فایل — مرجع کامل پروژه
+├── README.md                 # این فایل — نمای کلی پروژه
 ├── pyproject.toml            # تنظیمات Python، وابستگیها، CI
-├── .github/
-│   ├── workflows/
-│   │   └── ci.yml            # GitHub Actions: pytest + ruff روی هر PR
-│   └── PULL_REQUEST_TEMPLATE.md  # قالب PR (همسو با قالب تسک ClickUp)
-├── src/
-│   └── roshd_wind_pathfinder/
-│       ├── __init__.py
-│       └── data/
-│           ├── __init__.py
-│           └── cache.py      # WindDataCache — ذخیرهسازی و کش دادههای باد
-├── tests/
-│   └── data/
-│       └── test_cache_no_pandas.py  # ۵ تست پاس شده
-├── docs/
-│   └── task_data_caching.md  # مستندات کامل تسک گام ۲
 ├── .gitignore
-└── LICENSE
+│
+├── .github/                  # GitHub settings
+│   ├── PROMPT.md             # استاندارد پرامپت برای AI agents
+│   ├── pull_request_template.md  # قالب PR (همسو با قالب تسک ClickUp)
+│   └── workflows/
+│       └── ci.yml            # GitHub Actions: pytest + ruff روی هر PR
+│
+├── docs/                     # مستندات — مرجع واحد پروژه
+│   ├── PROJECT_PROGRESS.md   # ⚡ پیشرفت پروژه — برای هر AI agent الزامی
+│   ├── AGENT_ROUTING.md      # ⚡ راهنمای مسیریابی کد — کجا چه بگذارم؟
+│   ├── task_data_caching.md  # مستندات تسک گام ۲ (انجام شد)
+│   ├── task_idw_interpolation.md          # قالب تسک IDW (آینده)
+│   ├── task_kriging_interpolation.md      # قالب تسک Kriging (آینده)
+│   ├── task_wind_qc.md                    # قالب تسک QC (آینده)
+│   ├── task_spatiotemporal_consistency.md # قالب تسک پیوستگی (آینده)
+│   ├── task_data_prep_pathfinding.md      # قالب تسک آمادهسازی (آینده)
+│   └── task_preprocessing_docs.md         # قالب تسک مستندات (آینده)
+│
+├── tasks/                    # الگو و وضعیت تسکها
+│   ├── templates/
+│   │   └── task_template.md  # الگوی استاندارد مستند تسک
+│   ├── active/               # تسکهای در حال انجام (خالی — جای خالی)
+│   └── completed/            # تسکهای تکمیلشده (خالی — جای خالی)
+│
+├── src/                       # پکیج پایتون (src-layout)
+│   ├── data/                  # گام ۱ — دریافت و کش داده
+│   │   ├── __init__.py
+│   │   └── cache.py           # WindDataCache
+│   ├── preprocessing/         # گام ۲ — پیشپردازش و درونیابی
+│   │   ├── __init__.py
+│   │   ├── idw.py             # IDWInterpolator
+│   │   ├── kriging.py         # KrigingInterpolator
+│   │   ├── qc.py              # WindQualityControl
+│   │   ├── pathfinding_preparation.py
+│   │   └── consistency.py     # (آینده)
+│   └── pathfinding/           # گام ۳ — مسیریابی (آینده)
+│       ├── __init__.py
+│       ├── graph.py           # (آینده)
+│       ├── algorithms.py      # (آینده)
+│       └── routing.py         # (آینده)
+│
+├── tests/                    # تستها
+│   ├── data/
+│   │   ├── test_cache.py
+│   │   └── test_cache_no_pandas.py
+│   ├── preprocessing/        # تستهای پیشپردازش (آینده)
+│   └── pathfinding/          # تستهای مسیریابی (آینده)
+│
+└── data/                     # دادههای نمونه/آزمایشی
+    ├── khorasan_wind_qc_cleaned.csv       # داده QC شده خراسان
+    ├── khorasan_qc_report.json            # گزارش QC
+    └── khorasan_pathfinding_ready.csv     # داده آماده مسیریابی
 ```
 
-## قوانین همکاری (لازم برای هر AI/انسان)
+### راهنمای مسیریابی کد
 
-### ۱. **Bernch Strategy**
-- **هرگز مستقیم روی `main` کار نکنید.**
-- برای هر تسک یک برنچ بسازید: `task/<clickup-task-id>-<short-name>`
+> فایل کامل: [`docs/AGENT_ROUTING.md`](docs/AGENT_ROUTING.md)
+
+برای هر تسک، کد را در **پوشه مشخص** بگذارید. خلاصه:
+
+| تسک | کد `*.py` | تست `test_*.py` | مستند `docs/task_*.md` |
+|-----|-----------|-----------------|------------------------|
+| کش داده | `src/data/cache.py` | `tests/data/test_cache.py` | `task_data_caching.md` |
+| درونیابی IDW | `src/preprocessing/idw.py` | `tests/preprocessing/test_idw.py` | `task_idw_interpolation.md` |
+| درونیابی Kriging | `src/preprocessing/kriging.py` | `tests/preprocessing/test_kriging.py` | `task_kriging_interpolation.md` |
+| کنترل کیفیت | `src/preprocessing/qc.py` | `tests/preprocessing/test_qc.py` | `task_wind_qc.md` |
+| پیوستگی مکانی-زمانی | `src/preprocessing/consistency.py` | `tests/preprocessing/test_consistency.py` | `task_spatiotemporal_consistency.md` |
+| آمادهسازی مسیریابی | `src/preprocessing/data_prep.py` | `tests/preprocessing/test_data_prep.py` | `task_data_prep_pathfinding.md` |
+| ساخت گراف | `src/pathfinding/graph.py` | `tests/pathfinding/test_graph.py` | — |
+| الگوریتمها | `src/pathfinding/algorithms.py` | `tests/pathfinding/test_algorithms.py` | — |
+| بهینهسازی مسیر | `src/pathfinding/routing.py` | `tests/pathfinding/test_routing.py` | — |
+
+---
+
+## شروع کار — برای AI Agent
+
+> اگر شما یک AI agent هستید که تازه به این پروژه اضافه شدهاید، این مراحل را **به ترتیب** انجام دهید:
+
+1. **خودکار:** `AGENTS.md` در کانتکست شما بارگذاری شده — آن را کامل بخوانید.
+2. **ریپو را کلون کنید:**
+   ```bash
+   git clone https://github.com/lawbr3aker/roshd-wind-pathfinder.git
+   cd roshd-wind-pathfinder
+   ```
+3. **معماری را بفهمید:** این `README.md` + `docs/PROJECT_PROGRESS.md` را بخوانید.
+4. **مسیریابی را یاد بگیرید:** `docs/AGENT_ROUTING.md` را بخوانید — کجا کد بگذارید.
+5. **تسک خود را پیدا کنید:** در ClickUp تسک مربوطه را باز کنید و شناسه/لینک را کپی کنید.
+6. **برنچ بسازید:**
+   ```bash
+   git checkout -b task/<task-id>-<short-name>
+   ```
+7. **وابستگیها را نصب کنید:**
+   ```bash
+   python -m pip install -e ".[dev]" --break-system-packages
+   ```
+8. **کد موجود را بررسی کنید:** ماژولهای موجود در `src/` را بخوانید (`src/data/`، `src/preprocessing/`، `src/pathfinding/`).
+9. **تست را ابتدا بنویسید (TDD)** — قرمز، سپس پیادهسازی، سپس سبز.
+10. **پیادهسازی کنید:** طبق چکلیست تسک (Items to Check) در ClickUp.
+11. **تستها را اجرا کنید:** `pytest -q`
+12. **لینتر را اجرا کنید:** `ruff check .` — هر دو باید بدون خطا باشند.
+13. **مستندات را آپدیت کنید:** بخش جدید به `docs/PROJECT_PROGRESS.md` اضافه کنید + مستند تسک در `docs/task_*.md`.
+14. **PR باز کنید:** به `main` با قالب کامل PR (`.github/pull_request_template.md`).
+15. **منتظر تأیید بمانید:** ادغام فقط توسط آرمان انجام میشود. PR خودتان را merge نکنید.
+
+---
+
+## شروع کار — برای همکار انسانی
+
+> فایل کامل: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+
+1. اکانت GitHub بسازید و به پروژه دعوت شوید (Write permission).
+2. **توکن (PAT)** بسازید: Settings → Developer settings → Fine-grained tokens.
+   - Repository access: فقط `roshd-wind-pathfinder`
+   - Permissions: Contents (R/W)، Pull requests (R/W)، Issues (R/W)
+   - Expiration: ۹۰ روز
+3. توکن را به AI model خود بهعنوان متغیر محیطی `GH_TOKEN` بدهید (نه در فایل).
+4. **پرامپت استاندارد** را از `.github/PROMPT.md` کپی کنید، توکن و تسک را بگذارید، به AI بدهید.
+5. AI بر اساس `AGENTS.md`، `docs/PROJECT_PROGRESS.md` و `docs/AGENT_ROUTING.md` کار میکند.
+6. شما PR را باز میکنید، آرمان بررسی و merge میکند.
+
+---
+
+## قوانین همکاری
+
+### ۱. استراتژی Branch
+- **هرگز مستقیم روی `main` کار نکنید** — قفل است و push مستقیم غیرفعال است.
+- برای هر تسک یک برنچ: `task/<task-id>-<short-name>`
 - مثال: `task/86bba36de-idw-interpolation`
 
-### ۲. **Pull Request Workflow**
+### ۲. Pull Request Workflow
 ```
-Developer/AI creates branch
+AI/Developer creates branch
         │
         ▼
 Implement + Test locally (pytest + ruff)
@@ -98,145 +242,70 @@ Project Owner reviews + Approves
 Merge to main (Squash + Merge)
 ```
 
-### ۳. **Definition of Done (هر تسک)**
-- [ ] کد پیادهسازی شده و در `src/` قرار دارد
-- [ ] تستها نوشته شده و در `tests/` پاس میشوند (`pytest -q`)
+### ۳. Definition of Done (هر تسک)
+- [ ] کد پیادهسازی شده و در **پوشه صحیح** است (مطابق `AGENT_ROUTING.md`)
+- [ ] تستها نوشته و پاس میشوند (`pytest -q`)
 - [ ] لینتر بدون خطا (`ruff check .`)
-- [ ] مستندات در `docs/` به‌روزرسانی شده
+- [ ] `docs/PROJECT_PROGRESS.md` آپدیت شده (فقط append — بخشهای قبلی دست نخورده)
+- [ ] مستند تسک در `docs/task_*.md` ایجاد/آپدیت شده
 - [ ] قالب PR تکمیل شده (Purpose, Items, Output, Evidence)
 - [ ] CI سبز است
 - [ ] تسک ClickUp به `Closed` تغییر کرده + چکلیست تکمیل شده
 
-### ۴. **Security**
+### ۴. امنیت
 - **هیچ رازی (Token، API Key، Password) در کد/گیت/مستندات قرار نمیگیرد.**
-- توکنها در Environment Variables یا `.env` (در `.gitignore`) مدیریت میشوند.
+- توکنها در Environment Variables یا GitHub Secrets مدیریت میشوند.
+- اگر تصادفاً رازی ثبت شد، فوراً به آرمان اطلاع دهید — چرخش (rotate) لازم است.
 
-### ۵. **Merge Authority**
-- **فقط مالک پروژه (Arman) میتواند PR را ادغام کند.**
+### ۵. اختیار ادغام (Merge Authority)
+- **فقط مالک پروژه (آرمان) میتواند PR را ادغام کند.**
 - AI agents و همکاران فقط PR باز میکنند، ادغام نمیکنند.
 
-## راهنمای سریع برای AI Agent جدید (بدون حافظه قبلی)
+---
 
-> **اگر شما یک AI agent هستید که تازه به این پروژه اضافه شده‌اید، این مراحل را انجام دهید:**
-
-1. **خودکار:** فایل `AGENTS.md` در کانتکست شما بارگذاری شده — آن را کامل بخوانید.
-2. **ریپو را کلون کنید:** `git clone https://github.com/lawbr3aker/roshd-wind-pathfinder.git`
-3. **معماری را بفهمید:** این `README.md` را بخوانید (معماری، مراحل، قوانین).
-4. **تسک خود را پیدا کنید:**
-   - در ClickUp تسک مربوطه را باز کنید (لیست `Preprocessing & Interpolation` برای گام ۲)
-   - شناسه تسک (مثل `86bba36de`) و لینک آن را کپی کنید
-5. **برنچ بسازید:** `git checkout -b task/<task-id>-<name>`
-6. **وابستگیها را نصب کنید:**
-   ```bash
-   cd roshd-wind-pathfinder
-   python -m pip install -e ".[dev]"
-   ```
-7. **کد موجود را بررسی کنید:** ماژولهای موجود در `src/roshd_wind_pathfinder/` را بخوانید.
-8. **پیادهسازی کنید:** طبق چکلیست تسک (Items to Check) در ClickUp.
-9. **تست بنویسید/اجرا کنید:** `pytest -q tests/`
-10. **لینتر اجرا کنید:** `ruff check .`
-11. **مستندات به‌روزرسانی کنید:** فایل مربوطه در `docs/` را ویرایش کنید.
-12. **PR باز کنید:** به `main` با قالب PR کامل.
-13. **منتظر تأیید بمانید:** مالک پروژه review و merge میکند.
-
-## راهنمای سریع برای همکار انسانی
-
-> فایل کامل: [CONTRIBUTING.md](CONTRIBUTING.md)
-
-1. اکانت GitHub بسازید و به پروژه 초대 شوید (Write permission).
-2. Fine-grained PAT بسازید (Repository access: only this repo, Contents: R/W, PR: R/W).
-3. توکن را به AI model خود بدهید (Environment Variable: `GH_TOKEN`).
-4. AI بر اساس `AGENTS.md` و این `README` کار میکند.
-5. شما PR را باز میکنید، مالک پروژه merge میکند.
-
-## توسعه و اجرای تستها
+## توسعه و تست
 
 ```bash
 # کلون و تنظیم
 git clone https://github.com/lawbr3aker/roshd-wind-pathfinder.git
 cd roshd-wind-pathfinder
 
-# نصب وابستگیها (dev dependencies شامل pytest، ruff، pandas)
-python -m pip install -e ".[dev]"
+# نصب وابستگیها
+python -m pip install -e ".[dev]" --break-system-packages
 
-# اجرای لینتر
+# لینتر
 ruff check .
 
-# اجرای تمام تستها
+# تمام تستها
 pytest -q
 
-# اجرای تستهای خاص ماژول data
+# تست یک ماژول
 pytest -q tests/data/
 
-# اجرای با coverage
-pytest --cov=src/roshd_wind_pathfinder tests/
+# با coverage
+pytest --cov=src tests/
 ```
 
-## CI/CD Pipeline (GitHub Actions)
+---
 
-فایل: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+## وضعیت فعلی
 
-**Triggers:** Push به `main`، Pull Request به `main`
-
-**Jobs:**
-- `quality` — روی `ubuntu-latest`
-  1. Checkout code
-  2. Setup Python 3.10+
-  3. Install dependencies (`pip install -e ".[dev]"`)
-  4. Run `ruff check .` (linter)
-  5. Run `pytest -q` (tests)
-  6. **Required برای merge** (Branch Protection)
-
-**Branch Protection Rules on `main`:**
-- Require PR review (1 approval)
-- Require CI to pass
-- Require branches to be up-to-date
-- No direct pushes
-
-## ClickUp Integration
-
-### Workspace Structure
-```
-Space: Data & Meteorology
-├── Folder: Wind Data
-│   ├── List: Data Sources - Open-Meteo, ECMWF, NOMADS (گام ۱)
-│   └── List: Preprocessing & Interpolation (گام ۲)
-```
-
-### Task Template (v3 — هر تسک)
- هر تسک شامل ۶ بخش است:
-1. **Purpose - هدف**
-2. **Items to Check - موارد بررسی** (شماره‌گذاری ۱-۷)
-3. **Required Output - خروجی مدنظر**
-4. **Deadline - مهلت تحویل** (ساعت ۱۷:۰۰ ایران، `due_date_time: true`)
-5. **Priority - اولویت** (High/Normal)
-6. **Dependencies - وابستگی‌ها** (پیشنیازها + بلاک‌کننده‌ها)
-
-### Automation
-- **GitHub Commit → ClickUp Comment:** هر کامیت با فرمت `feat(data): ... تسک <id>` به تسک ClickUp لینک میشود.
-- **PR Template:** قالب PR در `.github/PULL_REQUEST_TEMPLATE.md` دقیقاً با قالب تسک ClickUp همسو است.
-
-## وضعیت فعلی (به‌روز: ۱۴ آبان ۱۴۰۵ / ۱۴ آگوست ۲۰۲۶)
+> بهروزترین وضعیت در [`docs/PROJECT_PROGRESS.md`](docs/PROJECT_PROGRESS.md)
 
 | ماژول | وضعیت | فایل اصلی | تست | مستندات |
 |-------|--------|-----------|-----|---------|
-| **WindDataCache** (گام ۲) | ✅ کامل | `src/roshd_wind_pathfinder/data/cache.py` | ۵/۵ پاس | `docs/task_data_caching.md` |
-| **IDW Interpolation** | 🔄 در انتظار پیادهسازی | — | — | — |
-| **Kriging Interpolation** | 🔄 در انتظار پیادهسازی | — | — | — |
-| **Wind Data QC** | 🔄 در انتظار پیادهسازی | — | — | — |
-| **Temporal/Spatial Consistency** | 🔄 در انتظار پیادهسازی | — | — | — |
-| **Data Prep for Pathfinding** | 🔄 در انتظار پیادهسازی | — | — | — |
-| **Preprocessing Docs** | 🔄 در انتظار پیادهسازی | — | — | — |
-
-## ملاقات بعدی / Next Steps
-
-1. **گام ۲ — پیادهسازی ۶ تسک باقیمانده** در لیست `Preprocessing & Interpolation`
-2. **هر تسک:** برنچ → پیادهسازی → تست → PR → Review → Merge
-3. **گام ۳ — طراحی معماری مسیریابی** (گراف، الگوریتم، UI)
+| **WindDataCache** | ✅ کامل | `src/data/cache.py` | ✅ ۱۱ پاس | `docs/task_data_caching.md` |
+| **IDW Interpolation** | 🔄 در انتظار | `src/preprocessing/idw.py` | — | `docs/task_idw_interpolation.md` |
+| **Kriging Interpolation** | 🔄 در انتظار | `src/preprocessing/kriging.py` | — | `docs/task_kriging_interpolation.md` |
+| **Wind Data QC** | 🔄 در انتظار | `src/preprocessing/qc.py` | — | `docs/task_wind_qc.md` |
+| **Spatio-temporal Consistency** | 🔄 در انتظار | `src/preprocessing/consistency.py` | — | `docs/task_spatiotemporal_consistency.md` |
+| **Data Prep for Pathfinding** | 🔄 در انتظار | `src/preprocessing/data_prep.py` | — | `docs/task_data_prep_pathfinding.md` |
+| **Preprocessing Docs** | 🔄 در انتظار | `docs/preprocessing_guide.md` | — | `docs/task_preprocessing_docs.md` |
 
 ---
 
 **مالک پروژه:** آرمان احمدی (Arman Ahmadi)  
 **GitHub:** [lawbr3aker](https://github.com/lawbr3aker)  
 **ریپو:** [roshd-wind-pathfinder](https://github.com/lawbr3aker/roshd-wind-pathfinder)  
-**ClickUp:** Roshd Workspace → Space: Data & Meteorology
+**ClickUp:** Roshd Workspace → Space: Data & Meteorology  
+**استاندارد پرامپت AI:** [`.github/PROMPT.md`](.github/PROMPT.md)

@@ -24,6 +24,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["data*", "preprocessing*", "pathfinding*", "qc*"]
 
 [tool.ruff]
 line-length = 100
@@ -35,4 +36,4 @@ ignore = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q --import-mode=append"

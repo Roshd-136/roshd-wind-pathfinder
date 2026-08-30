@@ -1,5 +1,6 @@
 import pandas as pd
-from roshd_wind_pathfinder.preprocessing.pathfinding_preparation import prepare_for_pathfinding
+
+from preprocessing.pathfinding_preparation import prepare_for_pathfinding
 
 
 def test_pathfinding_prep():
