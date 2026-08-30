@@ -1,31 +1,31 @@
-# دفترچه روند پروژه (PROJECT PROGRESS)
+# PROJECT PROGRESS Log
 
-> هر ایجنت AI بعد از تمام کردن تسک، یک بخش جدید اینجا اضافه میکند. بخشهای قبلی دست نخورده باقی میمانند.
-> **قانون:** قبل از شروع هر تسک، این فایل را بخوان.
+> Every AI agent adds a new section here after finishing a task. Previous sections remain untouched.
+> **Rule:** Read this file before starting any task.
 
-## وضعیت کلی (۲۶ مرداد ۱۴۰۵)
-| گام | موضوع | وضعیت |
-|-----|-------|--------|
-| گام ۱ | منابع داده، کش | ✅ تمام |
-| گام ۲ | پیشپردازش | 🟡 در حال انجام (۳/۶ روی main، ۳ ناقص) |
-| گام ۳+ | مسیریابی | ⬜ آینده |
+## Overall Status (26 Aug 2025)
+| Stage | Topic | Status |
+|-------|-------|--------|
+| Stage 1 | Data sources, caching | ✅ Done |
+| Stage 2 | Preprocessing | 🟡 In progress (3/6 on main, 3 incomplete) |
+| Stage 3+ | Pathfinding | ⬜ Future |
 
-## تسک‌های انجام‌شده
-- **گام ۱** — API Keys, Data Caching, Survey → ✅ تمام
-- **گام ۲ (شما)** — IDW Interpolation (PR #1), Kriging (PR #2) → ✅ تمام  
-- **گام ۲ (مهدی)** — Wind Data QC → ⚠️ ناقص (بدون تست، بدون داده واقعی Open-Meteo، مستقیم روی main push شد)
-- **گام ۲ (سایر)** — DataPrep, Consistency, Report → ⬜ هنوز شروع نشده/نیاز به بررسی
+## Completed Tasks
+- **Stage 1** — API Keys, Data Caching, Survey → ✅ Done
+- **Stage 2 (Arman)** — IDW Interpolation (PR #1), Kriging (PR #2) → ✅ Done  
+- **Stage 2 (Mehdi)** — Wind Data QC → ⚠️ Incomplete (no tests, no real Open-Meteo data, pushed directly to main)
+- **Stage 2 (Others)** — DataPrep, Consistency, Report → ⬜ Not started yet / needs review
 
-## قالب بخش جدید (ایجنتها: کپی کنید)
+## New-Section Template (agents: copy this)
 ```markdown
-## تسک: «عنوان» (ClickUp ID: «id») — گام «n»
-- **وضعیت:** انجام شد / در حال انجام  
-- **چه ساختم:** خلاصه ۲-۴ خطی  
-- **ورودی که استفاده کردم:** کدام تسک/ماژول قبلی  
-- **خروجی این تسک:** مسیر دقیق فایلها + نام تابع/کلاس  
-- **برای تسک بعدی:** چه چیزی لازم دارد و چطور استفاده کند  
-- **تست:** pytest و ruff نتیجه واقعی
-- **PR:** لینک PR (merge فقط توسط آرمان)
+## Task: «Title» (ClickUp ID: «id») — Stage «n»
+- **Status:** Done / In progress  
+- **What I built:** 2-4 line summary  
+- **Input I used:** which previous task/module  
+- **Output of this task:** exact file paths + function/class names  
+- **For the next task:** what it needs and how to use it  
+- **Test:** real pytest and ruff result
+- **PR:** PR link (merge only by Arman)
 ```
 
 ---

@@ -1,34 +1,34 @@
-# پرامپت استاندارد — پروژه Roshd Wind Pathfinder
+# Standard Prompt — Roshd Wind Pathfinder Project
 
-## آدرس ریپو
+## Repository
 https://github.com/lawbr3aker/roshd-wind-pathfinder
 
-## توکن گیتهاب
-[اینجا توکن را قرار بده]
+## GitHub Token
+[Paste the token here]
 
-## تسک
-[اگر فایل PDF داری اینجا آپلود کن — اگر نداری، AI میپرسد]
+## Task
+[Upload the PDF if you have one — otherwise the AI will ask for it]
 
 ---
 
-## دستور برای AI agent
+## Instructions for the AI Agent
 
-تو یک ایجنت برنامه‌نویس هستی. ریپو را کلون کن و با این قوانین کار کن:
+You are a programming agent. Clone the repository and work according to these rules:
 
-۱. قبل از هر کاری، **AGENTS.md** را کامل بخوان و پیروی کن. اگر مشکلی دیدی، یک PR جداگانه با پیشنهاد اصلاح بده.
+1. Before doing anything, **read `AGENTS.md` completely and follow it**. If you spot a problem, open a separate PR suggesting a fix.
 
-۲. **docs/PROJECT_PROGRESS.md** را بخوان تا بفهمی پروژه الان کجاست.
+2. Read **`docs/PROJECT_PROGRESS.md`** to understand where the project currently stands.
 
-۳. اگر تسک را دریافت نکردی → بپرس «لطفاً تسک ClickUp را به‌صورت PDF آپلود کن یا آدرسش را بده.»
+3. If you did not receive a task → ask: "Please upload the ClickUp task as a PDF or provide its link."
 
-۴. از خروجی تسکهای قبلی واقعاً استفاده کن. اگر داده لازم داری، از ماژول cache یا API واقعی بگیر — نه داده ساختگی بساز.
+4. Actually reuse the output of previous tasks. If you need data, fetch it from the cache module or a real API — do not fabricate data.
 
-۵. اگر جایی شک داری، بپرس. بهتر است بپرسی تا حدس بزنی.
+5. If you are unsure about anything, ask. It is better to ask than to guess.
 
-۶. تست بنویس و سبز کن: `pytest -q` و `ruff check .` بدون خطا.
+6. Write tests and make them green: `pytest -q` and `ruff check .` must pass without errors.
 
-۷. در آخر، **docs/PROJECT_PROGRESS.md** را آپدیت کن — یک بخش جدید اضافه کن، بخشهای قبلی را دست نزن.
+7. At the end, update **`docs/PROJECT_PROGRESS.md`** — add a new section, do not touch previous sections.
 
-۸. PR بده و merge نکن. ادغام فقط توسط آرمان انجام میشود.
+8. Open a PR but do not merge it. Only Arman merges.
 
-این پرامپت همیشه به‌روز است. اگر چیزی عوض شد، فقط PROJECT_PROGRESS.md را آپدیت کن.
+This prompt is always up to date. If anything changes, update only `PROJECT_PROGRESS.md`.

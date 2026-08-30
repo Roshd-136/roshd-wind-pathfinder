@@ -1,133 +1,134 @@
-# AGENTS.md — قوانین AI Agents در این ریپو
+# AGENTS.md — AI Agent Rules for This Repository
 
-> این فایل بهطور خودکار در کانتکست هر AI coding agent (Hermes, Claude Code,
-> Cursor, Copilot, Codex و...) که روی این ریپو کار میکند بارگذاری میشود.
-> اگر شما یک AI agent هستید، **باید** قبل از هر کاری این قوانین را کامل بخوانید
-> و پیروی کنید.
-
----
-
-## ۱. نمای کلی پروژه
-
-**Roshd Wind Pathfinder** — پایپلین پیشپردازش دادههای باد و مسیریابی برای یک
-پروژه هواشناسی (تیم فارسیزبان). پروژه بهصورت مراحل (گام) ساخته میشود:
-- **گام ۱:** منابع داده و کلیدهای API (انجام شد)
-- **گام ۲:** پیشپردازش و درونیابی (در حال انجام)
-- **گام ۳+:** مسیریابی (آینده)
-
-**تیم:**
-- **آرمان (مالک پروژه)** — بررسی و ادغام همهچیز. هرگز او را دور نزنید.
-- **مهدی** — همکار (تسکهای QC و آمادهسازی داده)
-- **امیرعلی** — همکار (تسکهای پیوستگی و مستندات)
-
-**قانون زبان:** تمام محتوای کاربرمحور (مستندات، توضیح PR، پیام کامیت، نظرات کد)
-به **فارسی** با نیمفاصله صحیح (ZWNJ) نوشته میشود. شناسههای فنی به انگلیسی میمانند.
+> This file is automatically loaded into the context of every AI coding agent
+> (Hermes, Claude Code, Cursor, Copilot, Codex, and others) working on this repo.
+> If you are an AI agent, you **must** read these rules completely and follow
+> them before doing anything.
 
 ---
 
-## ۲. منبع تسک — ClickUp
+## 1. Project Overview
 
-**همه تسکها در ClickUp تعریف میشوند، نه در این ریپو.** هر تسک دارای:
-- عنوان (فارسی + انگلیسی در پرانتز)
-- توضیح با ۵ بخش: **Purpose / Items to Check / Required Output / Deadline / Priority**
-- چکلیست (۷ آیتم)
-- وابستگیها به تسکهای دیگر
+**Roshd Wind Pathfinder** — a wind-data preprocessing and pathfinding pipeline
+for a meteorological project (Persian-speaking team). The project is built in
+stages:
+- **Stage 1:** Data sources and API keys (done)
+- **Stage 2:** Preprocessing and interpolation (in progress)
+- **Stage 3+:** Pathfinding (future)
 
-### نحوه خواندن یک تسک
+**Team:**
+- **Arman (project owner)** — reviews and merges everything. Never bypass him.
+- **Mehdi** — collaborator (QC and data-preparation tasks)
+- **AmirAli** — collaborator (consistency and documentation tasks)
 
-1. **آدرس تسک را از انسان بگیرید.** مثال:
+**Language rule:** All user-facing content (docs, PR descriptions, commit
+messages, code comments) is written in **Persian** with correct ZWNJ half-spaces.
+Technical identifiers stay English.
+
+---
+
+## 2. Task Source — ClickUp
+
+**All tasks are defined in ClickUp, not in this repo.** Each task has:
+- Title (Persian + English in parentheses)
+- Description with 5 sections: **Purpose / Items to Check / Required Output / Deadline / Priority**
+- Checklist (7 items)
+- Dependencies on other tasks
+
+### How to read a task
+
+1. **Get the task link from a human.** Example:
    `https://app.clickup.com/t/86bb9vt6d`
-2. **تسک را با API ClickUp** بگیرید یا از انسان بخواهید توضیح را paste کند.
-3. **۵ بخش را تحلیل کنید:**
-   - **Purpose** ← این تسک چه کاری انجام میدهد
-   - **Items to Check** ← چکلیستی که باید پیادهسازی شود (همه آیتمها باید انجام شود)
-   - **Required Output** ← چه فایلها/توابع/آرتیفکتهایی باید تولید کنید
-   - **Deadline** ← تاریخ فارسی + ساعت (۱۷:۰۰ ایران)
-   - **Priority** ← High (1-2) یا Normal (3-4)
-4. **وابستگیها را بررسی کنید** ← اگر تسک وابسته است، مطمئن شوید آن تسکها اول ادغام شوند.
+2. **Fetch the task with the ClickUp API**, or ask a human to paste the description.
+3. **Analyze the 5 sections:**
+   - **Purpose** ← what this task accomplishes
+   - **Items to Check** ← the checklist to implement (all items must be done)
+   - **Required Output** ← which files/functions/artifacts you must produce
+   - **Deadline** ← Persian date + time (17:00 Iran)
+   - **Priority** ← High (1-2) or Normal (3-4)
+4. **Check dependencies** ← if a task depends on others, make sure those tasks are merged first.
 
 ---
 
-## ۳. قوانین طلایی (غیرقابل مذاکره)
+## 3. Golden Rules (non-negotiable)
 
-1. **هرگز مستقیم روی `main` push یا commit نکنید.** همه کارها روی برنچ فیچر
-   انجام میشود؛ `main` فقط از طریق Pull Request که مالک تأیید و ادغام میکند تغییر میکند.
-2. **قبل از شروع کار، آخرین `main` را pull کنید** و `origin/main` را قبل از باز کردن
-   PR در برنچ خود merge/rebase کنید.
-3. **هر تسک یک برنچ.** نام برنچ: `task/<short-slug>` (مثلاً `task/idw-interpolation`).
-4. **هرگز راز (secret) کامیت نکنید.** هیچ API key، token، رمز عبور یا اعتبارنامهای —
-   نه در کد، نه در config، نه در مستندات. رازها فقط در environment variables /
-   GitHub Secrets زندگی میکنند.
-5. **واقعیت نسازید.** اگر چیزی را نمیدانید (رفتار API، یک کتابخانه، یک الزام)،
-   منبع واقعی را بررسی کنید یا بپرسید. هرگز حدس نزنید.
-6. **فایلهای خارج از حیطه تسک خود را بدون اعلام تغییر ندهید.**
-7. **داده ساختگی نسازید.** اگر داده لازم دارید، از ماژول cache یا API واقعی بگیرید.
-
----
-
-## ۴. گردش کار تسک (معنای «انجام تسک»)
-
-1. **توضیح تسک و چکلیست آن را کامل بخوانید.** اگر چیزی مبهم است، از مالک بپرسید —
-   حدس نزنید.
-2. **برنچ بسازید:** `git checkout -b task/<slug>`.
-3. **فقط آیتمهای چکلیست را پیادهسازی کنید.** ویژگی اضافه نسازید.
-4. **کد را در پوشه صحیح بگذارید.** فایل [`docs/AGENT_ROUTING.md`](docs/AGENT_ROUTING.md)
-   را بخوانید — جدول مسیریابی آنجا است (کد در `src/roshd_wind_pathfinder/<module>/`،
-   تست در `tests/<module>/`، مستند در `docs/task_*.md`).
-5. **قبل از push، کل تستها و لینتر را اجرا کنید** (ببینید §۶). همه باید پاس شوند.
-6. **برنچ را push کنید و PR باز کنید** با استفاده از قالب PR ریپو. توضیح PR **باید:**
-   - هدف تسک را در یک پاراگراف بازنویسی کند.
-   - **آیتمهای بررسی** (Items to Check) را بهصورت چکلیست (`- [ ]`) تکرار کند و
-     آیتمهای انجامشده را تیک بزند.
-   - **شواهد** بدهد: خروجی واقعی تستها/لینتری که اجرا کردید.
-   - ددلاین و اولویت تسک را ذکر کند.
-   - لینک تسک ClickUp را بگذارد (آدرس را paste کنید).
-7. **هرگز PR خودتان را merge نکنید.** ادغام فقط کار مالک است. اگر مالک تغییراتی
-   خواست، اصلاح کنید و دوباره review درخواست کنید.
-8. **اگر CI روی PR شما قرمز شد، آن را درست کنید** — PR قرمز یعنی PR ناتمام.
-9. **در پایان، بخش جدید به `docs/PROJECT_PROGRESS.md` اضافه کنید** — بخشهای قبلی
-   را دست نزنید (این فایل append-only است).
+1. **Never push or commit directly to `main`.** All work happens on a feature
+   branch; `main` only changes through a Pull Request that the owner approves and merges.
+2. **Pull the latest `main` before starting work**, and merge/rebase
+   `origin/main` into your branch before opening a PR.
+3. **One branch per task.** Branch name: `task/<short-slug>` (e.g. `task/idw-interpolation`).
+4. **Never commit a secret.** No API key, token, password, or credential — not in
+   code, not in config, not in docs. Secrets live only in environment variables /
+   GitHub Secrets.
+5. **Do not fabricate facts.** If you do not know something (API behavior, a
+   library, a requirement), check the real source or ask. Never guess.
+6. **Do not modify files outside your task's scope without announcing it.**
+7. **Do not fabricate data.** If you need data, fetch it from the cache module or a real API.
 
 ---
 
-## ۵. ساختار ریپو
+## 4. Task Workflow (what "doing a task" means)
+
+1. **Read the task description and its checklist completely.** If anything is
+   unclear, ask the owner — do not guess.
+2. **Create a branch:** `git checkout -b task/<slug>`.
+3. **Implement only the checklist items.** Do not add extra features.
+4. **Put code in the correct folder.** Read the file
+   [`docs/AGENT_ROUTING.md`](docs/AGENT_ROUTING.md) — the routing table is there
+   (code in `src/<module>/`, tests in `tests/<module>/`, docs in `docs/task_*.md`).
+5. **Run the full tests and linter before pushing** (see §6). All must pass.
+6. **Push the branch and open a PR** using the repo's PR template. The PR
+   description **must:**
+   - Restate the task's purpose in one paragraph.
+   - Repeat the **Items to Check** as a checklist (`- [ ]`) and tick the ones done.
+   - Provide **evidence**: the actual test/lint output you ran.
+   - Mention the task deadline and priority.
+   - Include the ClickUp task link (paste the URL).
+7. **Never merge your own PR.** Merging is the owner's job. If the owner requests
+   changes, apply them and request review again.
+8. **If the CI on your PR turns red, fix it** — a red PR means an unfinished PR.
+9. **At the end, add a new section to `docs/PROJECT_PROGRESS.md`** — do not touch
+   previous sections (this file is append-only).
+
+---
+
+## 5. Repository Structure
 
 ```
 roshd-wind-pathfinder/
-├── AGENTS.md                  # این فایل — قوانین AI agents
-├── CONTRIBUTING.md            # راهنمای همکاران انسانی (فارسی)
-├── README.md                  # نمای کلی پروژه + معماری
-├── pyproject.toml             # تنظیمات پروژه + ruff/pytest
+├── AGENTS.md                  # This file — AI agent rules
+├── CONTRIBUTING.md            # Guide for human collaborators (Persian)
+├── README.md                  # Project overview + architecture
+├── pyproject.toml             # Project settings + ruff/pytest
 ├── .github/
-│   ├── PROMPT.md              # ⚡ استاندارد پرامپت برای AI agents
+│   ├── PROMPT.md              # ⚡ Standard prompt for AI agents
 │   ├── pull_request_template.md
-│   └── workflows/ci.yml       # روی هر PR و push اجرا میشود
-├── docs/                      # ⚡ مرجع پروژه
-│   ├── PROJECT_PROGRESS.md    # پیشرفت پروژه (append-only — قبل از هر کار بخوان)
-│   ├── AGENT_ROUTING.md       # مسیریابی کد — کجا چه بگذارم
-│   └── task_*.md              # مستندات تک-تسک
-├── tasks/                     # الگوها و وضعیت تسکها
+│   └── workflows/ci.yml       # Runs on every PR and push
+├── docs/                      # ⚡ Project reference
+│   ├── PROJECT_PROGRESS.md    # Project progress (append-only — read before any work)
+│   ├── AGENT_ROUTING.md       # Code routing — where to put what
+│   └── task_*.md              # Per-task documentation
+├── tasks/                     # Task templates and status
 │   ├── templates/task_template.md
 │   ├── active/
 │   └── completed/
-├── src/                       # پکیج پایتون (src-layout)
-│   └── roshd_wind_pathfinder/  # پکیج اصلی
+├── src/                       # Python package (src-layout)
+│   ├── __init__.py
+│   ├── data/                  # Stage 1 — data fetching and caching
+│   │   ├── __init__.py
+│   │   └── cache.py           # WindDataCache
+│   ├── preprocessing/         # Stage 2 — preprocessing and interpolation
+│   │   ├── __init__.py
+│   │   ├── idw.py             # IDWInterpolator
+│   │   ├── kriging.py         # KrigingInterpolator
+│   │   ├── qc.py              # WindQualityControl
+│   │   ├── pathfinding_preparation.py
+│   │   └── consistency.py     # (future)
+│   └── pathfinding/           # Stage 3 — pathfinding (future)
 │       ├── __init__.py
-│       ├── data/                  # گام ۱ — دریافت و کش داده
-│       │   ├── __init__.py
-│       │   └── cache.py           # WindDataCache
-│       ├── preprocessing/         # گام ۲ — پیشپردازش و درونیابی
-│       │   ├── __init__.py
-│       │   ├── idw.py             # IDWInterpolator
-│       │   ├── kriging.py         # KrigingInterpolator
-│       │   ├── qc.py              # WindQualityControl
-│       │   ├── pathfinding_preparation.py
-│       │   └── consistency.py     # (آینده)
-│       └── pathfinding/           # گام ۳ — مسیریابی (آینده)
-│           ├── __init__.py
-│           ├── graph.py           # (آینده)
-│           ├── algorithms.py      # (آینده)
-│           └── routing.py         # (آینده)
+│       ├── graph.py           # (future)
+│       ├── algorithms.py      # (future)
+│       └── routing.py         # (future)
 ├── tests/
 │   ├── data/
 │   │   ├── test_cache.py
@@ -137,87 +138,88 @@ roshd-wind-pathfinder/
 │   │   └── test_kriging.py
 │   ├── test_pathfinding_preparation.py
 │   └── test_wind_qc.py
-└── data/                      # دادههای نمونه/آزمایشی
+└── data/                      # Sample/test data
     ├── khorasan_wind_qc_cleaned.csv
     ├── khorasan_qc_report.json
     └── khorasan_pathfinding_ready.csv
 ```
 
-> ⚠️ **ساختار پکیج:** ماژولهای اصلی در `src/roshd_wind_pathfinder/` قرار دارند.
-> ایمپورت مانند `from data.cache import WindDataCache` است.
-> مسیر صحیح فایل cache: `src/data/cache.py`.
+> ⚠️ **Package structure:** The main modules live directly under `src/`.
+> Imports look like `from data.cache import WindDataCache`.
+> The correct path for the cache file is `src/data/cache.py`.
 
-### مسیریابی کد (خلاصه)
+### Code Routing (summary)
 
-> فایل کامل: [`docs/AGENT_ROUTING.md`](docs/AGENT_ROUTING.md)
+> Full file: [`docs/AGENT_ROUTING.md`](docs/AGENT_ROUTING.md)
 
-| تسک | کد | تست | مستند |
-|-----|-----|------|-------|
-| کش داده | `src/data/cache.py` | `tests/data/test_cache.py` | `docs/task_data_caching.md` |
-| درونیابی IDW | `src/preprocessing/idw.py` | `tests/preprocessing/test_idw.py` | `docs/task_idw_interpolation.md` |
-| درونیابی Kriging | `src/preprocessing/kriging.py` | `tests/preprocessing/test_kriging.py` | `docs/task_kriging_interpolation.md` |
-| کنترل کیفیت | `src/qc/wind_qc.py` | `tests/test_wind_qc.py` | `docs/task_wind_qc.md` |
-| پیوستگی | `src/preprocessing/consistency.py` | `tests/preprocessing/test_consistency.py` | `docs/task_spatiotemporal_consistency.md` |
-| آمادهسازی داده | `src/preprocessing/pathfinding_preparation.py` | `tests/test_pathfinding_preparation.py` | `docs/task_data_prep_pathfinding.md` |
-| ساخت گراف | `src/pathfinding/graph.py` | `tests/pathfinding/test_graph.py` | — |
-| الگوریتمها | `src/pathfinding/algorithms.py` | `tests/pathfinding/test_algorithms.py` | — |
-| بهینهسازی مسیر | `src/pathfinding/routing.py` | `tests/pathfinding/test_routing.py` | — |
+| Task | Code | Test | Docs |
+|------|------|------|------|
+| Data caching | `src/data/cache.py` | `tests/data/test_cache.py` | `docs/task_data_caching.md` |
+| IDW interpolation | `src/preprocessing/idw.py` | `tests/preprocessing/test_idw.py` | `docs/task_idw_interpolation.md` |
+| Kriging interpolation | `src/preprocessing/kriging.py` | `tests/preprocessing/test_kriging.py` | `docs/task_kriging_interpolation.md` |
+| Quality control | `src/qc/wind_qc.py` | `tests/test_wind_qc.py` | `docs/task_wind_qc.md` |
+| Consistency | `src/preprocessing/consistency.py` | `tests/preprocessing/test_consistency.py` | `docs/task_spatiotemporal_consistency.md` |
+| Data prep for pathfinding | `src/preprocessing/pathfinding_preparation.py` | `tests/test_pathfinding_preparation.py` | `docs/task_data_prep_pathfinding.md` |
+| Graph construction | `src/pathfinding/graph.py` | `tests/pathfinding/test_graph.py` | — |
+| Algorithms | `src/pathfinding/algorithms.py` | `tests/pathfinding/test_algorithms.py` | — |
+| Route optimization | `src/pathfinding/routing.py` | `tests/pathfinding/test_routing.py` | — |
 
-### مالکیت ماژول (who owns which files)
+### Module Ownership (who owns which files)
 
-| ماژول | مسئول | فایلها |
-|-------|-------|--------|
-| `src/data/` | آرمان | API clients, caching |
-| `src/preprocessing/` | مشترک | IDW, Kriging, QC, pathfinding_preparation |
-| `src/qc/` | مشترک | WindQualityControl |
-| `src/pathfinding/` | آینده | — |
+| Module | Owner | Files |
+|--------|-------|-------|
+| `src/data/` | Arman | API clients, caching |
+| `src/preprocessing/` | Shared | IDW, Kriging, QC, pathfinding_preparation |
+| `src/qc/` | Shared | WindQualityControl |
+| `src/pathfinding/` | Future | — |
 
-**قانون:** اگر فایلی توسط تسک شخص دیگری ساخته شده، میتوانید بخوانید ولی بازنویسی
-نکنید — از طریق PR هماهنگ کنید.
+**Rule:** If a file was created by another person's task, you may read it but not
+rewrite it — coordinate through a PR.
 
 ---
 
-## ۶. دستورات
+## 6. Commands
 
 ```bash
-# نصب وابستگیهای dev
+# Install dev dependencies
 python -m pip install -e ".[dev]" --break-system-packages
 
-# لینتر (ruff)
+# Linter (ruff)
 ruff check .
 
-# تستها
+# Tests
 pytest -q
 
-# تست با coverage
-pytest --cov=src/roshd_wind_pathfinder
+# Tests with coverage
+pytest --cov=src
 ```
 
-**تعریف انجامشدن:** `ruff check .` پاس میشود **و** `pytest -q` پاس میشود **و**
-هر آیتم چکلیست یا پیادهسازی شده یا با دلیل صریحاً not-applicable علامت خورده.
+**Definition of done:** `ruff check .` passes **and** `pytest -q` passes **and**
+every checklist item is either implemented or explicitly marked not-applicable.
 
 ---
 
-## ۷. سبک کد
+## 7. Code Style
 
-- **Python 3.10+** با type hints در جای ممکن.
-- **Docstringها** به فارسی برای توابع/کلاسهای عمومی.
-- **Importها:** stdlib → third-party → local، الفبایی در هر گروه.
-- **طول خط:** حداکثر ۱۰۰ کاراکتر (توسط ruff اعمال میشود).
-- **تشکیل تست:** هر ماژول `*.py` یک فایل `test_*.py` متناظر در پوشه tests دارد.
+- **Python 3.10+** with type hints where possible.
+- **Docstrings** in Persian for public functions/classes.
+- **Imports:** stdlib → third-party → local, alphabetical within each group.
+- **Line length:** max 100 characters (enforced by ruff).
+- **Test structure:** every `*.py` module has a matching `test_*.py` file in the
+  corresponding tests folder.
 
-### کتابخانههای مجاز (وابستگیها)
+### Allowed Libraries (dependencies)
 
 ```toml
 # Core
 numpy>=1.24
 pandas>=2.0
-xarray>=2023.1     # در صورت لزوم
-scipy>=1.11        # در صورت لزوم (درونیابی)
+xarray>=2023.1     # if needed
+scipy>=1.11        # if needed (interpolation)
 
 # Data fetching
 requests>=2.31
-aiohttp>=3.8       # در صورت لزوم async
+aiohttp>=3.8       # if needed (async)
 
 # Testing
 pytest>=7.4
@@ -227,17 +229,17 @@ pytest-cov>=4.0
 ruff>=0.4
 ```
 
-**بدون تأیید مالک، وابستگی جدید اضافه نکنید.**
+**Do not add new dependencies without the owner's approval.**
 
 ---
 
-## ۸. سبک پیام کامیت
+## 8. Commit Message Style
 
-- به فارسی، حالت امری، یک خط زیر ۷۲ کاراکتر، بهعلاوه یک بدنه کوتاه اگر لازم بود.
-- پیشوند با حوزه تسک: `data: ...`، `preprocess: ...`، `interp: ...`، `qc: ...`,
-  `pathfinding: ...`، `docs: ...`، `test: ...`، `ci: ...`.
+- In Persian, imperative mood, one line under 72 characters, plus a short body if needed.
+- Prefix with the task scope: `data: ...`, `preprocess: ...`, `interp: ...`, `qc: ...`,
+  `pathfinding: ...`, `docs: ...`, `test: ...`, `ci: ...`.
 
-مثالها:
+Examples:
 ```
 interp: پیادهسازی درونیابی IDW با پارامتر توان قابل تنظیم
 ```
@@ -247,21 +249,21 @@ qc: افزودن اعتبارسنجی بازه معتبر برای دادهها�
 
 ---
 
-## ۹. آداب PR
+## 9. PR Etiquette
 
-- **عنوان PR = عنوان تسک** (فارسی اول، انگلیسی در پرانتز اگر هست).
-- PRها را کوچک و متمرکز بر یک تسک نگه دارید. اگر لازم است کد مشترک را لمس کنید،
-  در توضیح PR ذکر کنید.
-- قبل از درخواست دوباره review، conflictها را در برنچ خود رفع کنید.
-- مودب و مختصر باشید؛ مالک به فارسی review میکند.
+- **PR title = task title** (Persian first, English in parentheses if present).
+- Keep PRs small and focused on one task. If you need to touch shared code,
+  mention it in the PR description.
+- Resolve conflicts in your branch before requesting review again.
+- Be polite and concise; the owner reviews in Persian.
 
 ---
 
-## ۱۰. اگر گیر کردید
+## 10. If You Get Stuck
 
-1. **تسک را دوباره بخوانید** — جواب معمولاً در Items to Check است.
-2. **کد موجود را در `src/roshd_wind_pathfinder/` بررسی کنید** برای الگوها و قراردادها.
-3. **مستندات را بخوانید:** `docs/PROJECT_PROGRESS.md` (وضعیت)،
-   `docs/AGENT_ROUTING.md` (مسیریابی).
-4. **از مالک بپرسید** — بهتر است بپرسید تا اشتباه حدس بزنید.
-5. **موانع را در PR مستند کنید** اگر نتوانستید ادامه دهید.
+1. **Re-read the task** — the answer is usually in Items to Check.
+2. **Review the existing code under `src/`** for patterns and conventions.
+3. **Read the docs:** `docs/PROJECT_PROGRESS.md` (status),
+   `docs/AGENT_ROUTING.md` (routing).
+4. **Ask the owner** — it is better to ask than to guess wrong.
+5. **Document blockers in the PR** if you cannot proceed.

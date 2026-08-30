@@ -1,83 +1,86 @@
-# Agent Routing Guide — کجا کد بگذارم؟
+# Agent Routing Guide — Where to Put Code?
 
-> **AI agents:** When you receive a task, route your code to the **correct folder** by matching the task topic to the categories below. Putting code in the wrong folder will cause merge conflicts and will not pass PR review.
+> **AI agents:** When you receive a task, route your code to the **correct folder**
+> by matching the task topic to the categories below. Putting code in the wrong
+> folder causes merge conflicts and will not pass PR review.
 
 ---
 
-## Decision Tree — فلوچارت تصمیم
+## Decision Tree — Routing Flowchart
 
 ```
-تسک شما چیست؟
+What is your task?
 │
-├── دریافت/ذخیره/کش داده
+├── Data fetching/saving/caching
 │   └── src/data/
 │       Tests → tests/data/
 │       Docs → docs/task_data_caching.md
 │
-├── پیش‌پردازش داده
-│   ├── درونیابی IDW
+├── Data preprocessing
+│   ├── IDW interpolation
 │   │   └── src/preprocessing/idw.py
 │   │       Tests → tests/preprocessing/test_idw.py
 │   │       Docs → docs/task_idw_interpolation.md
 │   │
-│   ├── درونیابی Kriging
+│   ├── Kriging interpolation
 │   │   └── src/preprocessing/kriging.py
 │   │       Tests → tests/preprocessing/test_kriging.py
 │   │       Docs → docs/task_kriging_interpolation.md
 │   │
-│   ├── کنترل کیفیت
-│   │   └── src/preprocessing/qc.py
-│   │       Tests → tests/preprocessing/test_qc.py
+│   ├── Quality control
+│   │   └── src/qc/wind_qc.py
+│   │       Tests → tests/test_wind_qc.py
 │   │       Docs → docs/task_wind_qc.md
 │   │
-│   ├── پیوستگی مکانی-زمانی
+│   ├── Spatiotemporal consistency
 │   │   └── src/preprocessing/consistency.py
 │   │       Tests → tests/preprocessing/test_consistency.py
 │   │       Docs → docs/task_spatiotemporal_consistency.md
 │   │
-│   └── آماده‌سازی داده مسیریابی
-│       └── src/preprocessing/data_prep.py
-│           Tests → tests/preprocessing/test_data_prep.py
+│   └── Data prep for pathfinding
+│       └── src/preprocessing/pathfinding_preparation.py
+│           Tests → tests/test_pathfinding_preparation.py
 │           Docs → docs/task_data_prep_pathfinding.md
 │
-├── مسیریابی (گام ۳)
-│   ├── ساخت گراف
+├── Pathfinding (Stage 3)
+│   ├── Graph construction
 │   │   └── src/pathfinding/graph.py
 │   │       Tests → tests/pathfinding/test_graph.py
 │   │
-│   ├── الگوریتم‌ها (A*, Dijkstra)
+│   ├── Algorithms (A*, Dijkstra)
 │   │   └── src/pathfinding/algorithms.py
 │   │       Tests → tests/pathfinding/test_algorithms.py
 │   │
-│   └── بهینه‌سازی مسیر
+│   └── Route optimization
 │       └── src/pathfinding/routing.py
 │           Tests → tests/pathfinding/test_routing.py
 │
-└── مستندات / CI / ساختار پروژه
-    └── docs/ یا .github/
+└── Docs / CI / Project structure
+    └── docs/ or .github/
 ```
 
 ---
 
-## قوانین کلی
+## General Rules
 
-1. **هر تسک فقط یک فایل `*.py` ایجاد می‌کند** در ماژول مربوطه — نه هیچ‌کجا دیگر.
-2. **هر ماژول `*.py` یک فایل `test_*.py` جداگانه دارد** در پوشه تست متناظر.
-3. **هر تسک یک مستند طراحی دارد** در `docs/task_*.md` — از فایل `tasks/templates/task_template.md` استفاده کنید.
-4. **`__init__.py` فقط آن ماژولهایی را import می‌کند که واقعاً وجود دارند** — ماژولهای آینده (tbd) را import نکنید.
-5. **فایل داده خام (`data/*.csv`, `data/*.json`) را تغییر ندهید** — اینها input ثابت هستند.
-6. **`docs/PROJECT_PROGRESS.md` را فقط append کنید** — بخشهای قبلی را دست نزنید.
+1. **Each task creates exactly one `*.py` file** in the relevant module — nowhere else.
+2. **Each `*.py` module has a separate `test_*.py` file** in the corresponding test folder.
+3. **Each task has a design document** in `docs/task_*.md` — use the file
+   `tasks/templates/task_template.md`.
+4. **`__init__.py` imports only those modules that actually exist** — do not import future (tbd) modules.
+5. **Do not modify raw data files (`data/*.csv`, `data/*.json`)** — these are fixed inputs.
+6. **Only append to `docs/PROJECT_PROGRESS.md`** — do not touch previous sections.
 
 ---
 
-## نامگذاری شاخه و PR
+## Branch and PR Naming
 
 ```
 task/<clickup-task-id>-<short-slug>
 ```
 
-مثال: `task/86bba36de-idw-interpolation`
+Example: `task/86bba36de-idw-interpolation`
 
-- اسلگ انگلیسی، با خط تیره
-- شناسه تسک ClickUp (اگر دارید)
-- حداکثر ۴۰ کاراکتر
+- English slug, dash-separated
+- ClickUp task id (if present)
+- Max 40 characters
