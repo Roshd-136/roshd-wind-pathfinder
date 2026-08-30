@@ -8,7 +8,7 @@
 
 ## خلاصه پیاده‌سازی
 
-ماژول درونیابی Kriging در مسیر `src/roshd_wind_pathfinder/preprocessing/kriging.py` پیاده‌سازی شده است که وظایف زیر را انجام می‌دهد:
+ماژول درونیابی Kriging در مسیر `src/preprocessing/kriging.py` پیاده‌سازی شده است که وظایف زیر را انجام می‌دهد:
 
 ۱. **محاسبه واریوگرام تجربی** از همبستگی فضایی داده‌ها
 ۲. **برازش مدل‌های واریوگرام** (کروی، نمایی، گاوسی، خطی)
@@ -35,7 +35,7 @@
 
 ### ۱. کد پیاده‌سازی
 
-#### فایل: `src/roshd_wind_pathfinder/preprocessing/kriging.py`
+#### فایل: `src/preprocessing/kriging.py`
 
 #### ماژول‌ها:
 
@@ -74,7 +74,7 @@
 ## مثال استفاده
 
 ```python
-from roshd_wind_pathfinder.preprocessing.kriging import (
+from preprocessing.kriging import (
     EmpiricalVariogram,
     VariogramFitter,
     KrigingInterpolator,
@@ -142,7 +142,7 @@ print(f"تخمین باد: {prediction[0]:.2f} m/s")
 ## ساختار کد
 
 ```
-src/roshd_wind_pathfinder/preprocessing/
+src/preprocessing/
 ├── idw.py          # پیاده‌سازی IDW (تسک قبلی)
 └── kriging.py      # پیاده‌سازی Kriging + واریوگرام (تسک جدید)
     ├── EmpiricalVariogram

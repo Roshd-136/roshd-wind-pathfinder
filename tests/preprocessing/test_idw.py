@@ -6,7 +6,7 @@ import unittest
 
 import numpy as np
 
-from roshd_wind_pathfinder.preprocessing.idw import IDWInterpolator
+from preprocessing.idw import IDWInterpolator
 
 
 class TestIDWInterpolator(unittest.TestCase):

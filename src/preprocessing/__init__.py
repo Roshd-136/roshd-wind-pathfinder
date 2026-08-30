@@ -1,11 +1,7 @@
-"""پیش‌پردازش داده‌های باد — گام ۲.
-
-ماژول‌های پیش‌پردازش (در اینیسیالایزر به مرور پر می‌شوند):
-- `idw.py` — درونیابی IDW (tbd)
-- `kriging.py` — درونیابی Kriging (tbd)
-- `qc.py` — کنترل کیفیت داده‌ها (tbd)
-- `consistency.py` — پیوستگی مکانی-زمانی (tbd)
-- `data_prep.py` — آماده‌سازی داده مسیریابی (tbd)
+"""
+ماژول پیشپردازش (Preprocessing) — درونیابی و کنترل کیفیت.
 """
 
-__all__: list[str] = []
+from .idw import IDWInterpolator
+
+__all__ = ["IDWInterpolator"]

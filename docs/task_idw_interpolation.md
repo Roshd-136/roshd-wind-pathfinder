@@ -8,7 +8,7 @@
 
 ## خلاصه پیاده‌سازی
 
-ماژول درونیابی IDW در مسیر `src/roshd_wind_pathfinder/preprocessing/idw.py` پیاده‌سازی شده است که وظایف زیر را انجام می‌دهد:
+ماژول درونیابی IDW در مسیر `src/preprocessing/idw.py` پیاده‌سازی شده است که وظایف زیر را انجام می‌دهد:
 
 ۱. **الگوریتم پایه IDW** با فرمول وزنی عکس فاصله
 ۲. **تنظیم پارامتر توان (power)** برای بهینه‌سازی دقت
@@ -35,7 +35,7 @@
 ## خروجی‌های تولیدشده
 
 ### ۱. کد پیاده‌سازی
-- فایل: [`src/roshd_wind_pathfinder/preprocessing/idw.py`](./src/roshd_wind_pathfinder/preprocessing/idw.py)
+- فایل: [`src/preprocessing/idw.py`](./src/preprocessing/idw.py)
 - کلاس: `IDWInterpolator`
 - قابلیت‌ها:
   - درونیابی اسکالر و میدان باد (`interpolate_scalar`, `interpolate_wind_field`)
@@ -63,7 +63,7 @@
 ## مثال استفاده
 
 ```python
-from roshd_wind_pathfinder.preprocessing.idw import IDWInterpolator
+from preprocessing.idw import IDWInterpolator
 import numpy as np
 
 # ایجاد درونیاب با توان ۲

@@ -6,7 +6,8 @@ import unittest
 
 import numpy as np
 
-from roshd_wind_pathfinder.preprocessing.kriging import (
+from preprocessing.idw import IDWInterpolator
+from preprocessing.kriging import (
     EmpiricalVariogram,
     KrigingInterpolator,
     VariogramFitter,
@@ -107,7 +108,7 @@ class TestKrigingInterpolator(unittest.TestCase):
         true_at_target = 2.0 * self.target[:, 0] + 1.5 * self.target[:, 1]
         krig_rmse = float(np.sqrt(np.mean((pred - true_at_target) ** 2)))
         mean_rmse = float(np.sqrt(np.mean((np.full(pred.shape, mean_val) - true_at_target) ** 2)))
-        # Kriging معمولاً بهتر می‌شود؛ انعطاف می‌دهیم با شرط有限的
+        # Kriging معمولاً بهتر می‌شود؛ انعطاف می‌دهیم با شرط محدود
         self.assertLess(krig_rmse, mean_rmse + 0.5)
 
     def test_predict_exact_at_source(self):
@@ -143,9 +144,6 @@ class TestAccuracyComparison(unittest.TestCase):
 
     def test_kriging_vs_idw_accuracy(self):
         """Kriging باید دقت قابل قبولی داشته باشد (مقایسه مقادیر RMSE)."""
-        from roshd_wind_pathfinder.preprocessing.idw import IDWInterpolator
-        from roshd_wind_pathfinder.preprocessing.kriging import KrigingInterpolator
-
         idw = IDWInterpolator(power=2.0)
         krig = KrigingInterpolator(self.train_coords, self.train_values, variogram_model="spherical")
 

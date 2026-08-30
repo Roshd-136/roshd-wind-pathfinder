@@ -9,8 +9,8 @@
 
 ## ۱. نمای کلی پروژه
 
-**Roshd Wind Pathfinder** — پایپلاین پیشپردازش دادههای باد و مسیریابی برای یک
-پروژه هواشناسی (تیم فارسیزبان). پروژه بهصورت مرحلهای (گام) ساخته میشود:
+**Roshd Wind Pathfinder** — پایپلین پیشپردازش دادههای باد و مسیریابی برای یک
+پروژه هواشناسی (تیم فارسیزبان). پروژه بهصورت مراحل (گام) ساخته میشود:
 - **گام ۱:** منابع داده و کلیدهای API (انجام شد)
 - **گام ۲:** پیشپردازش و درونیابی (در حال انجام)
 - **گام ۳+:** مسیریابی (آینده)
@@ -72,7 +72,7 @@
 2. **برنچ بسازید:** `git checkout -b task/<slug>`.
 3. **فقط آیتمهای چکلیست را پیادهسازی کنید.** ویژگی اضافه نسازید.
 4. **کد را در پوشه صحیح بگذارید.** فایل [`docs/AGENT_ROUTING.md`](docs/AGENT_ROUTING.md)
-   را بخوانید — جدول مسیریابی آنجا است (کد در `src/<module>/`،
+   را بخوانید — جدول مسیریابی آنجا است (کد در `src/roshd_wind_pathfinder/<module>/`،
    تست در `tests/<module>/`، مستند در `docs/task_*.md`).
 5. **قبل از push، کل تستها و لینتر را اجرا کنید** (ببینید §۶). همه باید پاس شوند.
 6. **برنچ را push کنید و PR باز کنید** با استفاده از قالب PR ریپو. توضیح PR **باید:**
@@ -111,37 +111,41 @@ roshd-wind-pathfinder/
 │   ├── active/
 │   └── completed/
 ├── src/                       # پکیج پایتون (src-layout)
-│   ├── __init__.py
-│   ├── data/                  # گام ۱ — دریافت و کش داده
-│   │   ├── __init__.py
-│   │   └── cache.py           # WindDataCache
-│   ├── preprocessing/         # گام ۲ — پیشپردازش و درونیابی
-│   │   ├── __init__.py
-│   │   ├── idw.py             # (آینده)
-│   │   ├── kriging.py         # (آینده)
-│   │   ├── qc.py              # (آینده)
-│   │   ├── consistency.py     # (آینده)
-│   │   └── data_prep.py       # (آینده)
-│   └── pathfinding/           # گام ۳ — مسیریابی (آینده)
+│   └── roshd_wind_pathfinder/  # پکیج اصلی
 │       ├── __init__.py
-│       ├── graph.py           # (آینده)
-│       ├── algorithms.py      # (آینده)
-│       └── routing.py         # (آینده)
+│       ├── data/                  # گام ۱ — دریافت و کش داده
+│       │   ├── __init__.py
+│       │   └── cache.py           # WindDataCache
+│       ├── preprocessing/         # گام ۲ — پیشپردازش و درونیابی
+│       │   ├── __init__.py
+│       │   ├── idw.py             # IDWInterpolator
+│       │   ├── kriging.py         # KrigingInterpolator
+│       │   ├── qc.py              # WindQualityControl
+│       │   ├── pathfinding_preparation.py
+│       │   └── consistency.py     # (آینده)
+│       └── pathfinding/           # گام ۳ — مسیریابی (آینده)
+│           ├── __init__.py
+│           ├── graph.py           # (آینده)
+│           ├── algorithms.py      # (آینده)
+│           └── routing.py         # (آینده)
 ├── tests/
 │   ├── data/
 │   │   ├── test_cache.py
 │   │   └── test_cache_no_pandas.py
-│   ├── preprocessing/         # (آینده)
-│   └── pathfinding/           # (آینده)
+│   ├── preprocessing/
+│   │   ├── test_idw.py
+│   │   └── test_kriging.py
+│   ├── test_pathfinding_preparation.py
+│   └── test_wind_qc.py
 └── data/                      # دادههای نمونه/آزمایشی
     ├── khorasan_wind_qc_cleaned.csv
     ├── khorasan_qc_report.json
     └── khorasan_pathfinding_ready.csv
 ```
 
-> ⚠️ **ساختار واقعی پکیج:** ماژولها در `src/` قرار دارند (نه `src/roshd_wind_pathfinder/`):
-> `src/data/`، `src/preprocessing/`، `src/pathfinding/`. ایمپورت مانند `from data.cache
-> import WindDataCache` است. مسیر صحیح فایل cache: `src/data/cache.py`.
+> ⚠️ **ساختار پکیج:** ماژولهای اصلی در `src/roshd_wind_pathfinder/` قرار دارند.
+> ایمپورت مانند `from data.cache import WindDataCache` است.
+> مسیر صحیح فایل cache: `src/data/cache.py`.
 
 ### مسیریابی کد (خلاصه)
 
@@ -152,9 +156,9 @@ roshd-wind-pathfinder/
 | کش داده | `src/data/cache.py` | `tests/data/test_cache.py` | `docs/task_data_caching.md` |
 | درونیابی IDW | `src/preprocessing/idw.py` | `tests/preprocessing/test_idw.py` | `docs/task_idw_interpolation.md` |
 | درونیابی Kriging | `src/preprocessing/kriging.py` | `tests/preprocessing/test_kriging.py` | `docs/task_kriging_interpolation.md` |
-| کنترل کیفیت | `src/preprocessing/qc.py` | `tests/preprocessing/test_qc.py` | `docs/task_wind_qc.md` |
+| کنترل کیفیت | `src/qc/wind_qc.py` | `tests/test_wind_qc.py` | `docs/task_wind_qc.md` |
 | پیوستگی | `src/preprocessing/consistency.py` | `tests/preprocessing/test_consistency.py` | `docs/task_spatiotemporal_consistency.md` |
-| آمادهسازی داده | `src/preprocessing/data_prep.py` | `tests/preprocessing/test_data_prep.py` | `docs/task_data_prep_pathfinding.md` |
+| آمادهسازی داده | `src/preprocessing/pathfinding_preparation.py` | `tests/test_pathfinding_preparation.py` | `docs/task_data_prep_pathfinding.md` |
 | ساخت گراف | `src/pathfinding/graph.py` | `tests/pathfinding/test_graph.py` | — |
 | الگوریتمها | `src/pathfinding/algorithms.py` | `tests/pathfinding/test_algorithms.py` | — |
 | بهینهسازی مسیر | `src/pathfinding/routing.py` | `tests/pathfinding/test_routing.py` | — |
@@ -164,7 +168,8 @@ roshd-wind-pathfinder/
 | ماژول | مسئول | فایلها |
 |-------|-------|--------|
 | `src/data/` | آرمان | API clients, caching |
-| `src/preprocessing/` | مشترک | IDW, Kriging, QC, consistency, data_prep |
+| `src/preprocessing/` | مشترک | IDW, Kriging, QC, pathfinding_preparation |
+| `src/qc/` | مشترک | WindQualityControl |
 | `src/pathfinding/` | آینده | — |
 
 **قانون:** اگر فایلی توسط تسک شخص دیگری ساخته شده، میتوانید بخوانید ولی بازنویسی
@@ -185,7 +190,7 @@ ruff check .
 pytest -q
 
 # تست با coverage
-pytest --cov=src
+pytest --cov=src/roshd_wind_pathfinder
 ```
 
 **تعریف انجامشدن:** `ruff check .` پاس میشود **و** `pytest -q` پاس میشود **و**
@@ -229,7 +234,7 @@ ruff>=0.4
 ## ۸. سبک پیام کامیت
 
 - به فارسی، حالت امری، یک خط زیر ۷۲ کاراکتر، بهعلاوه یک بدنه کوتاه اگر لازم بود.
-- پیشوند با حوزه تسک: `data: ...`، `preprocess: ...`، `interp: ...`، `qc: ...`،
+- پیشوند با حوزه تسک: `data: ...`، `preprocess: ...`، `interp: ...`، `qc: ...`,
   `pathfinding: ...`، `docs: ...`، `test: ...`، `ci: ...`.
 
 مثالها:
@@ -255,7 +260,7 @@ qc: افزودن اعتبارسنجی بازه معتبر برای دادهها�
 ## ۱۰. اگر گیر کردید
 
 1. **تسک را دوباره بخوانید** — جواب معمولاً در Items to Check است.
-2. **کد موجود را در `src/` بررسی کنید** برای الگوها و قراردادها.
+2. **کد موجود را در `src/roshd_wind_pathfinder/` بررسی کنید** برای الگوها و قراردادها.
 3. **مستندات را بخوانید:** `docs/PROJECT_PROGRESS.md` (وضعیت)،
    `docs/AGENT_ROUTING.md` (مسیریابی).
 4. **از مالک بپرسید** — بهتر است بپرسید تا اشتباه حدس بزنید.

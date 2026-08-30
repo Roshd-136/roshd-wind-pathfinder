@@ -1,6 +1,7 @@
 import pandas as pd
 import pytest
-from roshd_wind_pathfinder.qc.wind_qc import QCConfig, WindQualityControl
+
+from qc.wind_qc import WindQualityControl
 
 
 def test_qc_range_and_missing():

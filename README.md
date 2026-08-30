@@ -115,22 +115,21 @@ roshd-wind-pathfinder/
 │   └── completed/            # تسکهای تکمیلشده (خالی — جای خالی)
 │
 ├── src/                       # پکیج پایتون (src-layout)
-│   ├── __init__.py
 │   ├── data/                  # گام ۱ — دریافت و کش داده
 │   │   ├── __init__.py
 │   │   └── cache.py           # WindDataCache
 │   ├── preprocessing/         # گام ۲ — پیشپردازش و درونیابی
 │   │   ├── __init__.py
-│   │   ├── idw.py             # (آینده) درونیابی IDW
-│   │   ├── kriging.py         # (آینده) درونیابی Kriging
-│   │   ├── qc.py              # (آینده) کنترل کیفیت
-│   │   ├── consistency.py     # (آینده) پیوستگی مکانی-زمانی
-│   │   └── data_prep.py       # (آینده) آمادهسازی داده مسیریابی
+│   │   ├── idw.py             # IDWInterpolator
+│   │   ├── kriging.py         # KrigingInterpolator
+│   │   ├── qc.py              # WindQualityControl
+│   │   ├── pathfinding_preparation.py
+│   │   └── consistency.py     # (آینده)
 │   └── pathfinding/           # گام ۳ — مسیریابی (آینده)
 │       ├── __init__.py
-│       ├── graph.py           # (آینده) ساخت گراف بادی
-│       ├── algorithms.py      # (آینده) الگوریتمها
-│       └── routing.py         # (آینده) بهینهسازی مسیر
+│       ├── graph.py           # (آینده)
+│       ├── algorithms.py      # (آینده)
+│       └── routing.py         # (آینده)
 │
 ├── tests/                    # تستها
 │   ├── data/

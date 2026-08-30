@@ -1,10 +1,12 @@
 """Fetch real wind data from Open-Meteo API for Khorasan region and run QC."""
 
 import json
-from pathlib import Path
 import urllib.request
+from pathlib import Path
+
 import pandas as pd
-from roshd_wind_pathfinder.qc.wind_qc import QCConfig, WindQualityControl, save_report_json
+
+from qc.wind_qc import QCConfig, WindQualityControl, save_report_json
 
 KHORASAN_STATIONS = [
     {"name": "Mashhad", "lat": 36.297, "lon": 59.606},
