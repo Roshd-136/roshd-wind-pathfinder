@@ -158,3 +158,40 @@ Implemented GitHub enforcement so that only the owner (lawbr3aker) can write to 
 
 ### Next Steps
 - (Optional) Apply an org-level ruleset for all repos in Roshd-136 (needs owner token with admin:org).
+
+## 2026-08-31 — Stage 2: Spatiotemporal Consistency Check
+
+**Agent:** Hermes (AI), on behalf of AmirAli
+**Branch:** task/spatiotemporal-consistency
+**PR:** (see PR link)
+
+### Summary
+Implemented the "بررسی و اعتبارسنجی پیوستگی زمانی و مکانی داده‌ها" task: a
+`SpatiotemporalConsistencyChecker` that detects per-station temporal gaps,
+flags spatial disagreement between neighboring stations, fills short
+fixable gaps by interpolation, and produces a combined continuity report.
+Thresholds in `ConsistencyConfig` are calibrated against the real Khorasan
+reference dataset rather than picked arbitrarily.
+
+### Changes Made
+- Added `src/preprocessing/consistency.py`:
+  `SpatiotemporalConsistencyChecker`, `ConsistencyConfig`, `haversine_km()`,
+  `circular_diff_deg()`.
+- Added `tests/preprocessing/test_consistency.py` (12 tests, all passing).
+- Replaced the pre-implementation placeholder in
+  `docs/task_spatiotemporal_consistency.md` with as-built documentation,
+  including the threshold-calibration analysis against the real dataset.
+- Did not modify `data/*.csv` or `data/*.json` (read-only per routing rules).
+
+### Verification
+- ✅ `ruff check .` — all checks passed.
+- ✅ `pytest -q` — 44 passed (12 new + existing suite), 0 failed.
+- ✅ Ran against `data/khorasan_wind_qc_cleaned.csv` (144 records, 3
+  stations): 0 temporal gaps, 144 spatial comparisons across 3 neighbor
+  pairs, 33 flagged above the calibrated thresholds (informational, not
+  necessarily errors — see task doc).
+
+### Next Steps
+- Owner review/merge of PR.
+- Consider distance-scaled or z-score-based spatial thresholds once more
+  station pairs are available (see Future Improvements in the task doc).
