@@ -158,3 +158,60 @@ Implemented GitHub enforcement so that only the owner (lawbr3aker) can write to 
 
 ### Next Steps
 - (Optional) Apply an org-level ruleset for all repos in Roshd-136 (needs owner token with admin:org).
+
+## 2026-08-31 — Task: Data Preparation for Pathfinding (Stage 2)
+
+**Agent:** Claude (AI)
+**Branch:** `task/data-prep-pathfinding-units`
+**PR:** #TBD (opened by owner/token holder; see note below)
+
+### Summary
+Reviewed `src/preprocessing/pathfinding_preparation.py`, which already existed
+on `main` (added in PR #8, "documentation overhaul", not as a dedicated task
+PR) and already covered most of the checklist: grid construction, altitude
+range 500-2000 m, u/v conversion, and vector normalization. Added the one
+missing checklist item — unit unification — and fixed a stale, mismatched doc.
+
+### What I built
+- `normalize_units()` in `pathfinding_preparation.py`: accepts `speed`/`direction`
+  or `wind_speed`/`wind_direction` column names, converts speed to m/s from
+  `m/s`/`km/h`/`kt`, rejects negative speeds, wraps direction into `[0, 360)`.
+- Wired `normalize_units` into `prepare_for_pathfinding` via a new `speed_unit=` parameter.
+- Exported the module's public functions from `preprocessing/__init__.py`.
+
+### Input I used
+Existing `src/preprocessing/pathfinding_preparation.py` and its test file;
+`data/khorasan_pathfinding_ready.csv` as a reference for real-world column
+naming (it uses `speed`/`direction`, which is what motivated the alias support).
+
+### Output of this task
+- `src/preprocessing/pathfinding_preparation.py` — added `normalize_units`, `SPEED_ALIASES`, `DIRECTION_ALIASES`, `SPEED_UNIT_TO_MPS`; `prepare_for_pathfinding` gained `speed_unit=` param.
+- `tests/test_pathfinding_preparation.py` — 6 new tests (38 total in repo, up from 32).
+- `docs/task_data_prep_pathfinding.md` — rewritten; previously described an unimplemented, unrelated `networkx` graph-builder design that did not match the real code.
+- `docs/PATHFINDING_DATA_FORMAT.md` — added an "Accepted Input Units and Column Names" section and documented dense-grid behavior for missing cells.
+
+### For the next task
+- Canonical output columns: `timestamp, lat, lon, altitude, wind_speed, wind_direction, u, v, u_normalized, v_normalized` — see `docs/PATHFINDING_DATA_FORMAT.md`.
+- Import via `from preprocessing import prepare_for_pathfinding`.
+- **Known gap, flagged to task owner, who chose to proceed anyway:** the QC dependency's real completion status is unclear (progress log above says incomplete, but 32 tests now exist and pass), and the Spatiotemporal Consistency dependency has not been started at all (`src/preprocessing/consistency.py` does not exist). This module has not been validated against either module's real output.
+- The task's stated deadline (1405-05-29 17:00 Iran time) had already passed by the time this was picked up.
+
+### Test
+```
+pytest -q       → 38 passed
+ruff check .    → All checks passed!
+```
+
+### PR
+Not yet opened — no valid GitHub token was supplied for this session (the
+prompt's token field only contained the placeholder text). Branch and commits
+are ready locally; opening the PR requires a token with push + PR scopes.
+
+### Separate note — AGENTS.md vs .github/PROMPT.md conflict
+`AGENTS.md` §1 requires all user-facing content (docs, PR descriptions, commit
+messages, code comments) to be in Persian. `.github/PROMPT.md` §6 requires
+English for the same categories ("comments, PRs, commit messages, docs...
+enforced for AI-agent-facing files"). These directly conflict. This PR follows
+`.github/PROMPT.md` (the more specific, more recently updated canonical prompt,
+and what was explicitly pasted as this session's instructions), but the
+conflict itself should be resolved by the owner in a separate docs PR.
