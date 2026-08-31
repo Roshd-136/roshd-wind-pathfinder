@@ -62,7 +62,7 @@
 سپس به AI بگویید این ریپو را کلون کند:
 
 ```bash
-git clone https://github.com/lawbr3aker/roshd-wind-pathfinder.git
+git clone https://github.com/Roshd-136/roshd-wind-pathfinder.git
 ```
 
 ---
@@ -70,9 +70,11 @@ git clone https://github.com/lawbr3aker/roshd-wind-pathfinder.git
 ## قدم ۴ — پرامپت استاندارد
 
 **پرامپت استاندارد پروژه در [`.github/PROMPT.md`](.github/PROMPT.md) قرار دارد.**  
-این پرامپت قوانین ۸گانه را برای AI تعریف میکند: خواندن AGENTS.md، خواندن
-PROJECT_PROGRESS.md، دریافت تسک ClickUp، استفاده از داده واقعی (نه ساختگی)،
-پرسیدن در صورت شک، تست/لینتر، آپدیت مستندات، و PR بدون merge.
+این پرامپت قوانین کار را برای AI تعریف میکند: خواندن AGENTS.md و
+docs/AGENT_ROUTING.md، دریافت تسک ClickUp، استفاده از داده واقعی (نه ساختگی)،
+پرسیدن در صورت شک، رعایت زبان (فارسی برای محتوای انسانی / انگلیسی برای کد و
+مستندات agent)، نامگذاری برنچ `task/<id>-<slug>`، تست/لینتر، آپدیت مستندات، و PR
+بدون merge (ادغام فقط با مالک پروژه).
 
 استفاده:
 

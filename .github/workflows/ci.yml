@@ -28,8 +28,8 @@ jobs:
 
       - name: Test (pytest)
         run: |
-          if [ -d tests ] && ls tests/test_*.py >/dev/null 2>&1; then
-            pytest -q
-          else
-            echo "No tests yet — skipping (CI will enforce tests once code lands)."
+          if [ ! -d tests ] || ! ls tests/test_*.py tests/**/test_*.py >/dev/null 2>&1; then
+            echo "::error::No tests found under tests/. Every code change must ship tests."
+            exit 1
           fi
+          pytest -q

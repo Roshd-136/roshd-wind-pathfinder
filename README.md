@@ -23,7 +23,7 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    Roshd Wind Pathfinder                            │
 ├─────────────────────────────────────────────────────────────────────┤
-│  GitHub: https://github.com/lawbr3aker/roshd-wind-pathfinder       │
+│  GitHub: https://github.com/Roshd-136/roshd-wind-pathfinder     │
 │  ClickUp Workspace: Roshd (Space: Data & Meteorology)              │
 │  استاندارد پرامپت: مراجعه به .github/PROMPT.md                     │
 └─────────────────────────────────────────────────────────────────────┘
@@ -53,16 +53,16 @@
 WindDataCache (src/data/cache.py)
     │
     ▼
-QC — کنترل کیفیت (preprocessing/qc.py)
+QC — کنترل کیفیت (src/qc/wind_qc.py)
     │
     ▼
-IDW / Kriging درونیابی (preprocessing/idw.py, kriging.py)
+IDW / Kriging درونیابی (src/preprocessing/idw.py, kriging.py)
     │
     ▼
-پیوستگی مکانی-زمانی (preprocessing/consistency.py)
+پیوستگی مکانی-زمانی (src/preprocessing/consistency.py — آینده)
     │
     ▼
-آمادهسازی داده مسیریابی (preprocessing/data_prep.py)
+آمادهسازی داده مسیریابی (src/preprocessing/pathfinding_preparation.py)
     │
     ▼
 data/khorasan_pathfinding_ready.csv  ──▶  مسیریابی (گام ۳)
@@ -75,7 +75,7 @@ data/khorasan_pathfinding_ready.csv  ──▶  مسیریابی (گام ۳)
 | گام | موضوع | وضعیت | تسکهای کلیدی | ClickUp List |
 |-----|-------|--------|--------------|--------------|
 | **گام ۱** | **منابع داده و کلیدهای API** | ✅ انجام شد | • بررسی و انتخاب سرویسهای هواشناسی (Survey)<br>• دریافت کلیدهای API و تست اتصال (API Keys)<br>• تست اتصال NOMADS/GFS<br>• تست اتصال Open-Meteo<br>• ارزیابی و انتخاب نهایی ECMWF | `Data Sources` |
-| **گام ۲** | **پیشپردازش و درونیابی** | 🔄 **در حال انجام** | • درونیابی IDW (آرمان) ✅<br>• درونیابی پیشرفته Kriging (آرمان) ❌<br>• کنترل کیفیت دادههای باد (مهدی) ❌<br>• بررسی پیوستگی زمانی و مکانی (امیرعلی) ❌<br>• آمادهسازی داده ورودی مسیریابی (مهدی) ❌<br>• مستندات و گزارش پیشپردازش (امیرعلی) ❌ | `Preprocessing & Interpolation` |
+| **گام ۲** | **پیشپردازش و درونیابی** | 🔄 **در حال انجام** | • درونیابی IDW (آرمان) ✅<br>• درونیابی پیشرفته Kriging (آرمان) ✅<br>• کنترل کیفیت دادههای باد (مهدی) ✅<br>• آمادهسازی داده ورودی مسیریابی (مهدی) ✅<br>• بررسی پیوستگی زمانی و مکانی (امیرعلی) ❌ (آینده)<br>• مستندات و گزارش پیشپردازش (امیرعلی) ❌ (آینده) | `Preprocessing & Interpolation` |
 | **گام ۳+** | **مسیریابی** | 🔮 آینده | • ساخت گراف بادی<br>• الگوریتم A* / Dijkstra<br>• بهینهسازی مسیر با جریان باد<br>• UI تحت وب (React + FastAPI) | — |
 
 ---
@@ -115,6 +115,7 @@ roshd-wind-pathfinder/
 │   └── completed/            # تسکهای تکمیلشده (خالی — جای خالی)
 │
 ├── src/                       # پکیج پایتون (src-layout)
+│   ├── __init__.py
 │   ├── data/                  # گام ۱ — دریافت و کش داده
 │   │   ├── __init__.py
 │   │   └── cache.py           # WindDataCache
@@ -122,9 +123,11 @@ roshd-wind-pathfinder/
 │   │   ├── __init__.py
 │   │   ├── idw.py             # IDWInterpolator
 │   │   ├── kriging.py         # KrigingInterpolator
-│   │   ├── qc.py              # WindQualityControl
-│   │   ├── pathfinding_preparation.py
-│   │   └── consistency.py     # (آینده)
+│   │   ├── pathfinding_preparation.py  # آمادهسازی داده مسیریابی
+│   │   └── consistency.py     # (آینده) پیوستگی مکانی-زمانی
+│   ├── qc/                    # گام ۲ — کنترل کیفیت داده
+│   │   ├── __init__.py
+│   │   └── wind_qc.py         # WindQualityControl
 │   └── pathfinding/           # گام ۳ — مسیریابی (آینده)
 │       ├── __init__.py
 │       ├── graph.py           # (آینده)
@@ -135,8 +138,11 @@ roshd-wind-pathfinder/
 │   ├── data/
 │   │   ├── test_cache.py
 │   │   └── test_cache_no_pandas.py
-│   ├── preprocessing/        # تستهای پیشپردازش (آینده)
-│   └── pathfinding/          # تستهای مسیریابی (آینده)
+│   ├── preprocessing/
+│   │   ├── test_idw.py
+│   │   └── test_kriging.py
+│   ├── test_pathfinding_preparation.py
+│   └── test_wind_qc.py
 │
 └── data/                     # دادههای نمونه/آزمایشی
     ├── khorasan_wind_qc_cleaned.csv       # داده QC شده خراسان
@@ -171,7 +177,7 @@ roshd-wind-pathfinder/
 1. **خودکار:** `AGENTS.md` در کانتکست شما بارگذاری شده — آن را کامل بخوانید.
 2. **ریپو را کلون کنید:**
    ```bash
-   git clone https://github.com/lawbr3aker/roshd-wind-pathfinder.git
+   git clone https://github.com/Roshd-136/roshd-wind-pathfinder.git
    cd roshd-wind-pathfinder
    ```
 3. **معماری را بفهمید:** این `README.md` + `docs/PROJECT_PROGRESS.md` را بخوانید.
@@ -267,7 +273,7 @@ Merge to main (Squash + Merge)
 
 ```bash
 # کلون و تنظیم
-git clone https://github.com/lawbr3aker/roshd-wind-pathfinder.git
+git clone https://github.com/Roshd-136/roshd-wind-pathfinder.git
 cd roshd-wind-pathfinder
 
 # نصب وابستگیها
@@ -295,17 +301,17 @@ pytest --cov=src tests/
 | ماژول | وضعیت | فایل اصلی | تست | مستندات |
 |-------|--------|-----------|-----|---------|
 | **WindDataCache** | ✅ کامل | `src/data/cache.py` | ✅ ۱۱ پاس | `docs/task_data_caching.md` |
-| **IDW Interpolation** | 🔄 در انتظار | `src/preprocessing/idw.py` | — | `docs/task_idw_interpolation.md` |
-| **Kriging Interpolation** | 🔄 در انتظار | `src/preprocessing/kriging.py` | — | `docs/task_kriging_interpolation.md` |
-| **Wind Data QC** | 🔄 در انتظار | `src/preprocessing/qc.py` | — | `docs/task_wind_qc.md` |
-| **Spatio-temporal Consistency** | 🔄 در انتظار | `src/preprocessing/consistency.py` | — | `docs/task_spatiotemporal_consistency.md` |
-| **Data Prep for Pathfinding** | 🔄 در انتظار | `src/preprocessing/data_prep.py` | — | `docs/task_data_prep_pathfinding.md` |
-| **Preprocessing Docs** | 🔄 در انتظار | `docs/preprocessing_guide.md` | — | `docs/task_preprocessing_docs.md` |
+| **IDW Interpolation** | ✅ کامل | `src/preprocessing/idw.py` | ✅ ۷ پاس | `docs/task_idw_interpolation.md` |
+| **Kriging Interpolation** | ✅ کامل | `src/preprocessing/kriging.py` | ✅ ۱۱ پاس | `docs/task_kriging_interpolation.md` |
+| **Wind Data QC** | ✅ کامل | `src/qc/wind_qc.py` | ✅ ۲ پاس | `docs/task_wind_qc.md` |
+| **Data Prep for Pathfinding** | ✅ کامل | `src/preprocessing/pathfinding_preparation.py` | ✅ ۱ پاس | `docs/task_data_prep_pathfinding.md` |
+| **Spatio-temporal Consistency** | 🔄 در انتظار | `src/preprocessing/consistency.py` (آینده) | — | `docs/task_spatiotemporal_consistency.md` |
+| **Preprocessing Docs** | 🔄 در انتظار | `docs/preprocessing_guide.md` (آینده) | — | `docs/task_preprocessing_docs.md` |
 
 ---
 
 **مالک پروژه:** آرمان احمدی (Arman Ahmadi)  
 **GitHub:** [lawbr3aker](https://github.com/lawbr3aker)  
-**ریپو:** [roshd-wind-pathfinder](https://github.com/lawbr3aker/roshd-wind-pathfinder)  
+**ریپو:** [roshd-wind-pathfinder](https://github.com/Roshd-136/roshd-wind-pathfinder)  
 **ClickUp:** Roshd Workspace → Space: Data & Meteorology  
 **استاندارد پرامپت AI:** [`.github/PROMPT.md`](.github/PROMPT.md)
