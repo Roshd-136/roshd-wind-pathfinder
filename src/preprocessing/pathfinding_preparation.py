@@ -5,6 +5,71 @@ import pandas as pd
 
 DEFAULT_ALTITUDES = (500.0, 1000.0, 1500.0, 2000.0)
 
+# Accepted input column aliases -> canonical column name.
+# Upstream tasks (QC, IDW, Kriging) do not all agree on column names, so we
+# accept the common variants instead of silently failing or duplicating data.
+SPEED_ALIASES = ("wind_speed", "speed")
+DIRECTION_ALIASES = ("wind_direction", "direction")
+
+# Supported speed units and their conversion factor to m/s (the canonical unit).
+SPEED_UNIT_TO_MPS = {
+    "m/s": 1.0,
+    "km/h": 1.0 / 3.6,
+    "kmh": 1.0 / 3.6,
+    "kt": 0.514444,
+    "knots": 0.514444,
+}
+
+
+def _resolve_alias(columns: pd.Index, aliases: tuple[str, ...]) -> str | None:
+    """Return the first alias present in ``columns``, or ``None``."""
+    for alias in aliases:
+        if alias in columns:
+            return alias
+    return None
+
+
+def normalize_units(
+    data: pd.DataFrame,
+    speed_unit: str = "m/s",
+) -> pd.DataFrame:
+    """Unify wind speed/direction columns onto the canonical schema.
+
+    - Speed columns (``wind_speed`` or ``speed``) are converted to m/s and
+      renamed to ``wind_speed``.
+    - Direction columns (``wind_direction`` or ``direction``) are wrapped into
+      the ``[0, 360)`` degree range and renamed to ``wind_direction``.
+
+    ``data`` is not required to contain speed/direction at all (a caller may
+    be supplying ``u``/``v`` directly); in that case the frame is returned
+    unchanged aside from a copy.
+    """
+    if speed_unit not in SPEED_UNIT_TO_MPS:
+        raise ValueError(
+            f"Unsupported speed_unit {speed_unit!r}; expected one of {sorted(SPEED_UNIT_TO_MPS)}"
+        )
+
+    result = data.copy()
+
+    speed_col = _resolve_alias(result.columns, SPEED_ALIASES)
+    if speed_col is not None:
+        factor = SPEED_UNIT_TO_MPS[speed_unit]
+        speed_mps = result[speed_col].astype(float) * factor
+        if (speed_mps < 0).any():
+            raise ValueError("Wind speed cannot be negative.")
+        if speed_col != "wind_speed":
+            result = result.drop(columns=[speed_col])
+        result["wind_speed"] = speed_mps
+
+    direction_col = _resolve_alias(result.columns, DIRECTION_ALIASES)
+    if direction_col is not None:
+        direction_deg = result[direction_col].astype(float) % 360.0
+        if direction_col != "wind_direction":
+            result = result.drop(columns=[direction_col])
+        result["wind_direction"] = direction_deg
+
+    return result
+
 
 def speed_direction_to_uv(
     wind_speed: pd.Series,
@@ -42,6 +107,7 @@ def prepare_for_pathfinding(
     lon_step: float,
     altitude_levels: tuple[float, ...] = DEFAULT_ALTITUDES,
     normalize: bool = True,
+    speed_unit: str = "m/s",
 ) -> pd.DataFrame:
     required_base = {"lat", "lon", "altitude", "timestamp"}
     missing = required_base.difference(data.columns)
@@ -51,7 +117,7 @@ def prepare_for_pathfinding(
     if lat_step <= 0 or lon_step <= 0:
         raise ValueError("Grid steps must be positive.")
 
-    result = data.copy()
+    result = normalize_units(data, speed_unit=speed_unit)
 
     has_uv = {"u", "v"}.issubset(result.columns)
     has_speed_dir = {"wind_speed", "wind_direction"}.issubset(result.columns)
