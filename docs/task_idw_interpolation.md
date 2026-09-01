@@ -107,7 +107,7 @@ print(f"تخمین باد: u={u_est[0]}, v={v_est[0]}")
 
 ## وابستگی‌ها
 
-- پیش‌نیاز: [`Data Preparation for Pathfinding`](https://github.com/lawbr3aker/roshd-wind-pathfinder/)
+- پیشنیاز: [`Data Preparation for Pathfinding`](https://github.com/Roshd-136/roshd-wind-pathfinder/)
 - وابسته به: ماژول کش دادهها (`WindDataCache`)
 - پیش‌نیازِ: آماده‌سازی داده ورودی مسیریابی
 

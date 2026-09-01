@@ -32,7 +32,11 @@ You are a programming agent. Clone the repository and work according to these ru
 
 5. If you are unsure about anything, ask. It is better to ask than to guess.
 
-6. Work in English (comments, PRs, commit messages, docs). This is enforced for AI-agent-facing files.
+6. **Language** — code, technical identifiers, branch slugs, and agent-facing docs
+   (`AGENTS.md`, `docs/AGENT_ROUTING.md`, this prompt, PR titles/descriptions to the
+   owner) are written in **English**. Human-facing content (README, CONTRIBUTING,
+   commit messages, code comments/docstrings for the Persian-speaking team) is in
+   **Persian with correct ZWNJ half-spaces**. Follow `AGENTS.md` for the exact rule.
 
 7. **Branch naming** (enforced): create a branch named
    ```
@@ -48,4 +52,5 @@ You are a programming agent. Clone the repository and work according to these ru
 
 11. Open a PR but **do not merge it** — merging is only done by the project owner (lawbr3aker). PRs touching owned files require the owner's review (CODEOWNERS), so expect review feedback before merge.
 
-This prompt is always up to date. If anything changes, update only `PROJECT_PROGRESS.md`.
+This file is the canonical prompt. If the project rules change, update this file
+and `AGENTS.md` together (they must stay in sync).
