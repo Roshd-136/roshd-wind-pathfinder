@@ -195,3 +195,45 @@ reference dataset rather than picked arbitrarily.
 - Owner review/merge of PR.
 - Consider distance-scaled or z-score-based spatial thresholds once more
   station pairs are available (see Future Improvements in the task doc).
+
+## 2026-09-02 — Stage 2: Preprocessing Report (final)
+
+**Agent:** Hermes (AI), on behalf of AmirAli
+**Branch:** task/preprocessing-report
+**PR:** (see PR link)
+
+### Summary
+Wrote the final Persian preprocessing report (`docs/preprocessing_report.md`)
+consolidating real results from all preprocessing modules (QC, IDW, Kriging,
+Spatiotemporal Consistency, Data Preparation for Pathfinding), with an actual
+leave-one-station-out cross-validation comparing IDW vs Kriging accuracy on
+the real Khorasan dataset, and three real charts generated from that data.
+
+### Changes Made
+- Added `docs/preprocessing_report.md` (final report).
+- Replaced the mismatched placeholder in `docs/task_preprocessing_docs.md`
+  with content matching the actual ClickUp task (same pattern as prior
+  mismatched-stub fixes for Consistency and Data Prep tasks).
+- Added `scripts/generate_preprocessing_report_assets.py` (reproducible
+  chart/comparison generator) and three PNGs under `docs/assets/`.
+
+### Verification
+- ✅ `ruff check .` — all checks passed.
+- ✅ `pytest -q` — 50 passed, 0 failed (full repo suite; no test regressions).
+- ✅ IDW vs Kriging comparison actually computed (not fabricated): IDW
+  RMSE=7.92 MAE=6.05 m/s; Kriging RMSE=10.65 MAE=8.30 m/s (144
+  leave-one-station-out comparisons). Documented the methodological caveat
+  that only 3 stations are available, so Kriging's variogram fit (2 source
+  points per fold) is statistically unreliable — this result should not be
+  read as a general IDW-beats-Kriging conclusion.
+
+### Findings flagged for the team
+- `data/khorasan_pathfinding_ready.csv` (added in PR #15) still has 100%
+  NaN values in wind_speed/wind_direction/u/v across all 23,040 rows; the
+  `pathfinding_preparation.py` code itself works correctly (PR #16), but
+  this sample file needs to be regenerated from real QC/interpolation output.
+
+### Next Steps
+- Owner review/merge of PR.
+- Regenerate `khorasan_pathfinding_ready.csv` with real interpolated data.
+- Re-run the IDW/Kriging comparison once more stations are available.
