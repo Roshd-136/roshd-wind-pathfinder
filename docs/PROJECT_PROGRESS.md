@@ -237,3 +237,59 @@ the real Khorasan dataset, and three real charts generated from that data.
 - Owner review/merge of PR.
 - Regenerate `khorasan_pathfinding_ready.csv` with real interpolated data.
 - Re-run the IDW/Kriging comparison once more stations are available.
+
+## 2026-09-09 — Stage 3: Wind Cost Model & Validation
+
+**Agent:** Claude (AI), on behalf of Mehdi
+**Branch:** `task/wind-cost-model-validation`
+**PR:** (see PR link)
+
+### Summary
+Implemented `compute_edge_cost()` in `src/pathfinding/cost.py`: a dynamic
+edge-cost function decomposing real wind into along-track (headwind/tailwind)
+and cross-track (crosswind) components, with three selectable optimality
+criteria (time / energy / user-weighted balanced). Validated against three
+real Khorasan station pairs using all 48 real hourly readings per pair (no
+synthetic data).
+
+### Changes Made
+- Added `src/pathfinding/cost.py`: `CostModelConfig`, `EdgeCostResult`,
+  `InfeasibleEdgeError`, `initial_bearing_deg()`, `decompose_wind()`,
+  `ground_speed_mps()`, `compute_edge_cost()`.
+- Added `tests/pathfinding/test_cost.py` (19 tests, all passing).
+- Added `scripts/validate_wind_cost_model.py` and its real output at
+  `docs/assets/wind_cost_validation_results.json`.
+- Added `docs/task_wind_cost_model.md` (design doc + real worked example) and
+  `docs/wind_cost_validation_report.md` (separate numeric validation report).
+- Updated `src/pathfinding/__init__.py` docstring (`cost.py` now exists).
+- Did not modify `data/*.csv` or `data/*.json`.
+
+### Verification
+- ✅ `ruff check .` — all checks passed.
+- ✅ `pytest -q` — 69 passed, 0 failed (50 existing + 19 new).
+- ✅ `pytest --cov=src` — `src/pathfinding/cost.py` at 97% line coverage
+  (target was ≥90%).
+- ✅ Validation script run on real data: 3 station pairs × 48 real hourly
+  readings each, 0 infeasible edges; full numbers in
+  `docs/wind_cost_validation_report.md`.
+
+### Blocker flagged (not silently resolved)
+This task's ClickUp dependency ("multi-layer wind graph + final pathfinder
+integration") is **not started** — `src/pathfinding/graph.py`,
+`algorithms.py`, `routing.py` are all still future/empty, so there is no
+graph/orchestration layer yet to wire this cost function into end-to-end.
+Delivered the cost function as a standalone, independently-tested,
+directly-callable unit instead of building the graph layer myself (out of
+this task's scope). Flagging for the owner per the existing pattern used for
+the QC/Consistency dependency gaps in PR #16.
+
+Also confirmed (did not fix, out of scope): `data/khorasan_pathfinding_ready.csv`
+is still 100% NaN as flagged on 2026-09-02; validation here used
+`data/khorasan_wind_qc_cleaned.csv` instead, which is real and clean.
+
+### Next Steps
+- Owner review/merge of PR.
+- Build `src/pathfinding/graph.py` and wire `compute_edge_cost` in as the
+  edge-weight function once that task starts.
+- Replace `airspeed_mps`/`induced_drag_coeff` defaults with vehicle-specific
+  values once a concrete aircraft/UAV type is specified.
