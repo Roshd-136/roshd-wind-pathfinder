@@ -31,107 +31,6 @@ OUTPUT_PATH = Path(__file__).resolve().parent.parent / "docs" / "assets"
 OUTPUT_FILE = OUTPUT_PATH / "multi_layer_graph_visualization.png"
 
 
-def main() -> None:
-    """ساخت تصویرسازی ۲×۲: گراف‌ها + مسیر بهینه."""
-    # --- داده چندلایه واقعی (باد از شمال = رو-به-رو برای حرکت شمال‌شرقی) ---
-    rows = []
-    coords = [(36.0, 58.0), (36.0, 58.2), (36.1, 58.0), (36.1, 58.2)]
-    # لایه ۵۰۰م: باد ۱۵ م/ث؛ لایه ۱۰۰۰م: باد ۵ م/ث
-    for alt, speed in [(500.0, 15.0), (1000.0, 5.0)]:
-        for lat, lon in coords:
-            rows.append(
-                {
-                    "altitude": alt,
-                    "lat": lat,
-                    "lon": lon,
-                    "wind_speed": speed,
-                    "wind_direction": 0.0,
-                }
-            )
-    df = pd.DataFrame(rows)
-
-    multi = MultiLayerWindGraph.build_from_dataframe(df)
-    router = WindRouter(multi, criterion="time")
-
-    origin = (36.0, 58.0)
-    dest = (36.1, 58.2)
-    comp = router.compare_layers(origin, dest)
-
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-
-    # --- ۱و۲) گراف هر لایه ---
-    for idx, alt in enumerate(multi.available_layers):
-        ax = axes[0][idx]
-        graph = multi.get_layer(alt)
-        _draw_layer(ax, graph, comp.results[alt], title=f"لایه {alt:.0f} متر")
-
-    # --- ۳) مقایسه زمان سفر ---
-    ax3 = axes[1][0]
-    alts = sorted(comp.results.keys())
-    times = [comp.results[a].total_cost for a in alts]
-    bars = ax3.bar(
-        [f"{a:.0f}m" for a in alts],
-        times,
-        color=["#d9534f" if a != comp.best_altitude else "#5cb85c" for a in alts],
-    )
-    ax3.set_title("مقایسه زمان سفر بین لایه‌ها")
-    ax3.set_ylabel("زمان (ساعت)")
-    ax3.grid(axis="y", alpha=0.3)
-    for bar, t in zip(bars, times):
-        ax3.text(
-            bar.get_x() + bar.get_width() / 2,
-            bar.get_height(),
-            f"{t:.4f}",
-            ha="center",
-            va="bottom",
-            fontsize=9,
-        )
-
-    # --- ۴) جدول مقایسه ---
-    ax4 = axes[1][1]
-    ax4.axis("off")
-    table_data = [
-        ["لایه (م)", "باد (م/ث)", "مسافت (km)", "زمان (ساعت)", "بهترین؟"]
-    ]
-    for a in alts:
-        r = comp.results[a]
-        speed = "۱۵" if a == 500.0 else "۵"
-        table_data.append(
-            [
-                f"{a:.0f}",
-                speed,
-                f"{r.total_distance_km:.2f}",
-                f"{r.total_cost:.4f}",
-                "✅" if a == comp.best_altitude else "✔",
-            ]
-        )
-    table = ax4.table(
-        cellText=table_data,
-        loc="center",
-        colWidths=[0.24, 0.24, 0.24, 0.26, 0.18],
-    )
-    table.auto_set_font_size(False)
-    table.set_fontsize(9)
-    table.scale(1.0, 1.4)
-    for (row, col), cell in table.get_celld().items():
-        if row == 0:
-            cell.set_facecolor("#5cb85c")
-            cell.set_text_props(color="white", fontweight="bold")
-    ax4.set_title("جدول مقایسه لایه‌ها")
-
-    fig.suptitle(
-        "گراف باد چندلایه و مسیر بهینه — Roshd Wind Pathfinder",
-        fontsize=14,
-        fontweight="bold",
-    )
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
-
-    OUTPUT_PATH.mkdir(parents=True, exist_ok=True)
-    fig.savefig(OUTPUT_FILE, dpi=130, bbox_inches="tight")
-    plt.close(fig)
-    print(f"تصویر ذخیره شد: {OUTPUT_FILE}")
-
-
 def _draw_layer(
     ax: plt.Axes,
     graph,
@@ -159,7 +58,7 @@ def _draw_layer(
         )
 
     # گره‌ها
-    for nid, node in graph.nodes.items():
+    for _nid, node in graph.nodes.items():
         ax.plot(node.lon, node.lat, "o", color="#337ab7", markersize=9, zorder=3)
 
     # مسیر بهینه
@@ -188,8 +87,127 @@ def _draw_layer(
     ax.legend(loc="best", fontsize=8)
 
 
-origin = (36.0, 58.0)
-dest = (36.1, 58.2)
+origin = (36.00, 58.00)
+dest = (36.00, 58.30)
+
+
+def main() -> None:
+    """ساخت تصویرسازی ۲×۲: گراف‌ها + مسیر بهینه."""
+    # --- داده چندلایه: باد متفاوت → مسیرهای متفاوت در لایه‌ها ---
+    # شبکه ۶ نقطه‌ای:
+    # لایه ۵۰۰م: باد شدید از شمال (۴۰ م/ث) = رو-به-رو برای حرکت شرقی
+    #   → مسیر مستقیم گران است، بهترین مسیر از گره میانی B می‌گذرد
+    # لایه ۱۰۰۰م: باد ملایم از جنوب (۵ م/ث) = باد پشت برای حرکت شرقی
+    #   → مسیر مستقیم بهترین است
+    pts = [
+        (36.00, 58.00),   # A مبدأ
+        (36.00, 58.15),   # B میانی
+        (36.10, 58.05),   # C
+        (36.00, 58.30),   # D مقصد
+        (36.10, 58.20),   # C2
+        (36.10, 58.35),   # E
+    ]
+    rows = []
+    for lat, lon in pts:
+        rows.append(
+            {
+                "altitude": 500.0,
+                "lat": lat,
+                "lon": lon,
+                "wind_speed": 40.0,
+                "wind_direction": 0.0,
+            }
+        )
+    for lat, lon in pts:
+        rows.append(
+            {
+                "altitude": 1000.0,
+                "lat": lat,
+                "lon": lon,
+                "wind_speed": 5.0,
+                "wind_direction": 180.0,
+            }
+        )
+    df = pd.DataFrame(rows)
+
+    multi = MultiLayerWindGraph.build_from_dataframe(df, max_edge_distance_km=300.0)
+    router = WindRouter(multi, criterion="time")
+
+    comp = router.compare_layers(origin, dest)
+
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+
+    # --- ۱و۲) گراف هر لایه ---
+    for idx, alt in enumerate(multi.available_layers):
+        ax = axes[0][idx]
+        graph = multi.get_layer(alt)
+        _draw_layer(ax, graph, comp.results[alt], title=f"لایه {alt:.0f} متر")
+
+    # --- ۳) مقایسه زمان سفر ---
+    ax3 = axes[1][0]
+    alts = sorted(comp.results.keys())
+    times = [comp.results[a].total_cost for a in alts]
+    bars = ax3.bar(
+        [f"{a:.0f}m" for a in alts],
+        times,
+        color=["#d9534f" if a != comp.best_altitude else "#5cb85c" for a in alts],
+    )
+    ax3.set_title("مقایسه زمان سفر بین لایه‌ها")
+    ax3.set_ylabel("زمان (ساعت)")
+    ax3.grid(axis="y", alpha=0.3)
+    for bar, t in zip(bars, times, strict=True):
+        ax3.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height(),
+            f"{t:.4f}",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+        )
+
+    # --- ۴) جدول مقایسه ---
+    ax4 = axes[1][1]
+    ax4.axis("off")
+    table_data = [
+        ["لایه (م)", "باد (م/ث)", "مسافت (km)", "زمان (ساعت)", "بهترین؟"]
+    ]
+    for a in alts:
+        r = comp.results[a]
+        speed = "۴۰" if a == 500.0 else "۵"
+        table_data.append(
+            [
+                f"{a:.0f}",
+                speed,
+                f"{r.total_distance_km:.2f}",
+                f"{r.total_cost:.4f}",
+                "✅" if a == comp.best_altitude else "✔",
+            ]
+        )
+    table = ax4.table(
+        cellText=table_data,
+        loc="center",
+        colWidths=[0.24, 0.24, 0.24, 0.26, 0.18],
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(9)
+    table.scale(1.0, 1.4)
+    for (row, _col), cell in table.get_celld().items():
+        if row == 0:
+            cell.set_facecolor("#5cb85c")
+            cell.set_text_props(color="white", fontweight="bold")
+    ax4.set_title("جدول مقایسه لایه‌ها")
+
+    fig.suptitle(
+        "گراف باد چندلایه و مسیر بهینه — Roshd Wind Pathfinder",
+        fontsize=14,
+        fontweight="bold",
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+
+    OUTPUT_PATH.mkdir(parents=True, exist_ok=True)
+    fig.savefig(OUTPUT_FILE, dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    print(f"تصویر ذخیره شد: {OUTPUT_FILE}")
 
 
 if __name__ == "__main__":
