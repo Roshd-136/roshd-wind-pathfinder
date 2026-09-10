@@ -1,0 +1,196 @@
+"""تولید تصویرسازی گراف باد چندلایه و مسیر بهینه.
+
+خروجی: docs/assets/multi_layer_graph_visualization.png
+اجرا: python scripts/visualize_multi_layer_graph.py
+"""
+from __future__ import annotations
+
+import math
+from pathlib import Path
+
+import matplotlib
+
+matplotlib.use("Agg")
+
+import matplotlib.font_manager as fm  # noqa: E402
+import matplotlib.pyplot as plt  # noqa: E402
+import pandas as pd  # noqa: E402
+
+from pathfinding.graph import MultiLayerWindGraph  # noqa: E402
+from pathfinding.routing import WindRouter  # noqa: E402
+
+# فونت فارسی با fallback برای گلیف‌های لاتین
+try:
+    fm.fontManager.addfont("/usr/share/fonts/noto/NotoSansArabic-Regular.ttf")
+    plt.rcParams["font.family"] = ["Noto Sans Arabic", "DejaVu Sans"]
+except (FileNotFoundError, OSError):
+    pass
+plt.rcParams["axes.unicode_minus"] = False
+
+OUTPUT_PATH = Path(__file__).resolve().parent.parent / "docs" / "assets"
+OUTPUT_FILE = OUTPUT_PATH / "multi_layer_graph_visualization.png"
+
+
+def main() -> None:
+    """ساخت تصویرسازی ۲×۲: گراف‌ها + مسیر بهینه."""
+    # --- داده چندلایه واقعی (باد از شمال = رو-به-رو برای حرکت شمال‌شرقی) ---
+    rows = []
+    coords = [(36.0, 58.0), (36.0, 58.2), (36.1, 58.0), (36.1, 58.2)]
+    # لایه ۵۰۰م: باد ۱۵ م/ث؛ لایه ۱۰۰۰م: باد ۵ م/ث
+    for alt, speed in [(500.0, 15.0), (1000.0, 5.0)]:
+        for lat, lon in coords:
+            rows.append(
+                {
+                    "altitude": alt,
+                    "lat": lat,
+                    "lon": lon,
+                    "wind_speed": speed,
+                    "wind_direction": 0.0,
+                }
+            )
+    df = pd.DataFrame(rows)
+
+    multi = MultiLayerWindGraph.build_from_dataframe(df)
+    router = WindRouter(multi, criterion="time")
+
+    origin = (36.0, 58.0)
+    dest = (36.1, 58.2)
+    comp = router.compare_layers(origin, dest)
+
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+
+    # --- ۱و۲) گراف هر لایه ---
+    for idx, alt in enumerate(multi.available_layers):
+        ax = axes[0][idx]
+        graph = multi.get_layer(alt)
+        _draw_layer(ax, graph, comp.results[alt], title=f"لایه {alt:.0f} متر")
+
+    # --- ۳) مقایسه زمان سفر ---
+    ax3 = axes[1][0]
+    alts = sorted(comp.results.keys())
+    times = [comp.results[a].total_cost for a in alts]
+    bars = ax3.bar(
+        [f"{a:.0f}m" for a in alts],
+        times,
+        color=["#d9534f" if a != comp.best_altitude else "#5cb85c" for a in alts],
+    )
+    ax3.set_title("مقایسه زمان سفر بین لایه‌ها")
+    ax3.set_ylabel("زمان (ساعت)")
+    ax3.grid(axis="y", alpha=0.3)
+    for bar, t in zip(bars, times):
+        ax3.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height(),
+            f"{t:.4f}",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+        )
+
+    # --- ۴) جدول مقایسه ---
+    ax4 = axes[1][1]
+    ax4.axis("off")
+    table_data = [
+        ["لایه (م)", "باد (م/ث)", "مسافت (km)", "زمان (ساعت)", "بهترین؟"]
+    ]
+    for a in alts:
+        r = comp.results[a]
+        speed = "۱۵" if a == 500.0 else "۵"
+        table_data.append(
+            [
+                f"{a:.0f}",
+                speed,
+                f"{r.total_distance_km:.2f}",
+                f"{r.total_cost:.4f}",
+                "✅" if a == comp.best_altitude else "✔",
+            ]
+        )
+    table = ax4.table(
+        cellText=table_data,
+        loc="center",
+        colWidths=[0.24, 0.24, 0.24, 0.26, 0.18],
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(9)
+    table.scale(1.0, 1.4)
+    for (row, col), cell in table.get_celld().items():
+        if row == 0:
+            cell.set_facecolor("#5cb85c")
+            cell.set_text_props(color="white", fontweight="bold")
+    ax4.set_title("جدول مقایسه لایه‌ها")
+
+    fig.suptitle(
+        "گراف باد چندلایه و مسیر بهینه — Roshd Wind Pathfinder",
+        fontsize=14,
+        fontweight="bold",
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+
+    OUTPUT_PATH.mkdir(parents=True, exist_ok=True)
+    fig.savefig(OUTPUT_FILE, dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    print(f"تصویر ذخیره شد: {OUTPUT_FILE}")
+
+
+def _draw_layer(
+    ax: plt.Axes,
+    graph,
+    result,
+    title: str,
+) -> None:
+    """رسم گراف یک لایه + مسیر بهینه روی آن."""
+    # یال‌ها
+    for (fid, tid), edge in graph._edges.items():
+        fn = graph.get_node(fid)
+        tn = graph.get_node(tid)
+        if fn is None or tn is None:
+            continue
+        if math.isinf(edge.weight):
+            color, width, alpha = "#999999", 0.6, 0.5
+        else:
+            width = min(0.4 + edge.weight * 8, 3.0)
+            color, alpha = "#999999", 0.55
+        ax.plot(
+            [fn.lon, tn.lon],
+            [fn.lat, tn.lat],
+            color=color,
+            linewidth=width,
+            alpha=alpha,
+        )
+
+    # گره‌ها
+    for nid, node in graph.nodes.items():
+        ax.plot(node.lon, node.lat, "o", color="#337ab7", markersize=9, zorder=3)
+
+    # مسیر بهینه
+    if result.path:
+        lons = [p[1] for p in result.path]
+        lats = [p[0] for p in result.path]
+        ax.plot(
+            lons,
+            lats,
+            color="#d9534f",
+            linewidth=3.0,
+            marker="o",
+            markersize=7,
+            zorder=4,
+            label="مسیر بهینه",
+        )
+
+    # مبدأ و مقصد
+    ax.plot(origin[1], origin[0], "s", color="#5cb85c", markersize=12, zorder=5)
+    ax.plot(dest[1], dest[0], "^", color="#f0ad4e", markersize=12, zorder=5)
+
+    ax.set_title(title)
+    ax.set_xlabel("طول جغرافیایی")
+    ax.set_ylabel("عرض جغرافیایی")
+    ax.grid(alpha=0.2)
+    ax.legend(loc="best", fontsize=8)
+
+
+origin = (36.0, 58.0)
+dest = (36.1, 58.2)
+
+
+if __name__ == "__main__":
+    main()
