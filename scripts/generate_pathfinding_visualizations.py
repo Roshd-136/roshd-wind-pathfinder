@@ -118,11 +118,11 @@ def compute_best_layer_map(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, np
         bearing = np.array(
             [
                 _bearing(lat, lon, MASHHAD[0], MASHHAD[1])
-                for lat, lon in zip(GY.ravel(), GX.ravel())
+                for lat, lon in zip(GY.ravel(), GX.ravel(), strict=False)
             ]
         )
         gs = ground_speed(sp, dr, bearing)
-        dkm = np.array([haversine_km(lat, lon, MASHHAD[0], MASHHAD[1]) for lat, lon in zip(GY.ravel(), GX.ravel())])
+        dkm = np.array([haversine_km(lat, lon, MASHHAD[0], MASHHAD[1]) for lat, lon in zip(GY.ravel(), GX.ravel(), strict=False)])
         times[alt] = dkm / (gs / 3.6) / 3600.0
 
     # argmin across layers
@@ -235,7 +235,7 @@ def plot_optimized_route(
     fig, ax = plt.subplots(figsize=(11, 6.5))
 
     contour = ax.pcolormesh(GX, GY, speed_field, cmap="YlGnBu", shading="auto")
-    cbar = fig.colorbar(contour, ax=ax, label="سرعت باد (m/s) — IDW", shrink=0.82)
+    fig.colorbar(contour, ax=ax, label="سرعت باد (m/s) — IDW", shrink=0.82)
 
     # Per-layer routes (faint)
     layer_styles = {500: "-", 1000: "--", 1500: "-.", 2000: ":"}
