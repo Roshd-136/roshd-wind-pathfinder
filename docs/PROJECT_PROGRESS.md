@@ -328,11 +328,13 @@ Implemented the complete pathfinding routing pipeline:
 - [x] خروجی coverage pytest ضمیمه شود
 
 ### Verification
-- ✅ `ruff check .` — all checks passed
-- ✅ `pytest` — 111 passed (69 existing + 42 new), 0 failed
-- ✅ `pytest --cov=src/pathfinding --cov-branch` — 95% branch coverage (target ≥85%)
-- ✅ A* and Dijkstra produce identical costs on all 12 station-pair × layer combinations (real data)
-- ✅ Benchmark documented in `docs/task_routing_benchmark.md` with real Khorasan comparison table
+- `ruff check .` all checks passed
+- `pytest` 111 passed (69 existing + 42 new) 0 failed
+- `pytest --cov=src/pathfinding --cov-branch` 95% branch coverage (target ≥85%)
+- Dijkstra produce identical costs all 12 station-pair layer combinations (real data)
+- Benchmark documented `docs/task_routing_benchmark.md` real Khorasan comparison table
+- Visualization images added `docs/assets/`: best-layer depth map + optimized route
+  (`scripts/generate_pathfinding_visualizations.py`, real Khorasan data)
 
 ### Architecture
 - `graph.py`: Builds weighted graphs from wind data; handles multi-layer altitude separation
