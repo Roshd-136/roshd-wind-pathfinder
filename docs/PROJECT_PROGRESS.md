@@ -292,4 +292,66 @@ is still 100% NaN as flagged on 2026-09-02; validation here used
 - Build `src/pathfinding/graph.py` and wire `compute_edge_cost` in as the
   edge-weight function once that task starts.
 - Replace `airspeed_mps`/`induced_drag_coeff` defaults with vehicle-specific
-  values once a concrete aircraft/UAV type is specified.
+  values once concrete aircraft/UAV type specified.
+
+## 2026-09-10 — Stage 3: Routing Algorithms (A*, Dijkstra) & Optimal Layer Selection
+
+**Agent:** Hermes (AI)
+**Branch:** `task/86bbw32kw-routing-algorithms`
+**PR:** (TBD)
+
+### Summary
+Implemented the complete pathfinding routing pipeline:
+1. **A* algorithm** with Haversine heuristic (admissible, optimal) in `src/pathfinding/algorithms.py`
+2. **Dijkstra algorithm** as comparison/fallback in the same module
+3. **Optimal layer selection** (`WindRouter`) in `src/pathfinding/routing.py` that runs pathfinding on all altitude layers and selects the best
+4. **WindGraph + MultiLayerWindGraph** construction from wind data in `src/pathfinding/graph.py`
+
+### Changes Made
+- Added `src/pathfinding/graph.py`: `GraphNode`, `EdgeData`, `WindGraph`, `MultiLayerWindGraph` (with `build_from_dataframe` class methods)
+- Added `src/pathfinding/algorithms.py`: `dijkstra()`, `a_star()` (Haversine heuristic)
+- Added `src/pathfinding/routing.py`: `RouteResult`, `LayerComparison`, `WindRouter` (orchestration layer)
+- Updated `src/pathfinding/__init__.py` with all new exports
+- Added `tests/pathfinding/test_graph.py` (16 tests)
+- Added `tests/pathfinding/test_algorithms.py` (18 tests)
+- Added `tests/pathfinding/test_routing.py` (9 tests)
+- Added `docs/task_routing_benchmark.md` (benchmark doc with real Khorasan data comparison)
+- Did not modify `data/*.csv` or `data/*.json`
+
+### Items Check (from ClickUp task 86bbw32kw)
+- [x] الگوریتم هیوریستیک هاورساین روی گراف وزن‌دار عمومی پیاده‌سازی شود
+- [x] دایکسترا به‌عنوان روش مقایسه‌ای fallback پیاده‌سازی شود
+- [x] سیستم انتخاب لایه بهینه پیاده‌سازی شود روی همه لایه‌های موجود اجرا شود
+- [x] حداقل ۸ تست برای الگوریتم‌ها و ۴ تست برای انتخاب لایه نوشته شود (۱۸ + ۹)
+- [x] پوشش تست پکیج merge تسک‌های دیگر حداقل ۸۵٪ (actual 95% branch coverage)
+- [x] مستند انتخاب بنچمارک واقعی جدول مقایسه لایه‌ها تهیه شود
+- [x] خروجی coverage pytest ضمیمه شود
+
+### Verification
+- ✅ `ruff check .` — all checks passed
+- ✅ `pytest` — 111 passed (69 existing + 42 new), 0 failed
+- ✅ `pytest --cov=src/pathfinding --cov-branch` — 95% branch coverage (target ≥85%)
+- ✅ A* and Dijkstra produce identical costs on all 12 station-pair × layer combinations (real data)
+- ✅ Benchmark documented in `docs/task_routing_benchmark.md` with real Khorasan comparison table
+
+### Architecture
+- `graph.py`: Builds weighted graphs from wind data; handles multi-layer altitude separation
+- `algorithms.py`: A* (Haversine heuristic, admissible) + Dijkstra (fallback); both return `(path, cost)`
+- `routing.py`: `WindRouter` evaluates all layers, selects optimal, provides comparison table
+- `cost.py` (pre-existing): Provides `compute_edge_cost` as the edge weight function
+
+### For the Next Task
+- The `WindRouter` is ready for final integration with the flight planner
+- `WindGraph.build_from_dataframe` handles both real station data and grid data
+- When more stations/data become available, rebuild graphs for better coverage
+- `airspeed_mps`/`induced_drag_coeff` defaults in `CostModelConfig` should be updated for specific aircraft type
+
+### Coverage Evidence
+```
+TOTAL  395  11  134  15  95%
+src/pathfinding/__init__.py     5    0    0    0  100%
+src/pathfinding/algorithms.py  86    3   40    3   95%
+src/pathfinding/cost.py        73    2   20    1   97%
+src/pathfinding/graph.py      145    3   44    5   96%
+src/pathfinding/routing.py     86    3   30    6   92%
+```
