@@ -134,7 +134,7 @@ class TestBuildFromDataframe:
 
     def test_build_missing_columns_raises(self) -> None:
         df = pd.DataFrame({"lat": [1.0], "lon": [2.0]})
-        with pytest.raises(ValueError, match="missing required columns"):
+        with pytest.raises(ValueError, match="missing required wind columns"):
             WindGraph.build_from_dataframe(df, altitude=500.0)
 
     def test_build_filters_nan(self) -> None:
@@ -210,7 +210,8 @@ class TestMultiLayerWindGraph:
         assert m.layer_count == 1
         assert m.available_layers == [500.0]
 
-    def test_build_missing_altitude_raises(self) -> None:
+    def test_build_without_altitude_creates_single_layer(self) -> None:
+        """اگر ستون altitude وجود نداشته باشد، لایه تک‌لایه‌ای ساخته شود."""
         df = pd.DataFrame(
             {
                 "lat": [36.0],
@@ -219,8 +220,9 @@ class TestMultiLayerWindGraph:
                 "wind_direction": [270.0],
             }
         )
-        with pytest.raises(ValueError, match="altitude"):
-            MultiLayerWindGraph.build_from_dataframe(df)
+        m = MultiLayerWindGraph.build_from_dataframe(df)
+        assert m.layer_count == 1
+        assert m.available_layers == [0.0]
 
     def test_layer_independence(self) -> None:
         """لایه‌های مختلف باید مستقل باشند (تغییر در یکی روی دیگری تأثیر ندارد)."""

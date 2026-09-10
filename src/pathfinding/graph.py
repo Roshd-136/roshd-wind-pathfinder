@@ -215,15 +215,43 @@ class WindGraph:
         WindGraph
             گراف وزن‌دار ساخته‌شده.
         """
-        required_cols = {"lat", "lon", "wind_speed", "wind_direction"}
-        missing = required_cols - set(data.columns)
-        if missing:
-            raise ValueError(f"DataFrame missing required columns: {sorted(missing)}")
+        # پشتیبانی از نام‌های جایگزین ستون‌های بادی (مانند pathfinding_preparation)
+        _SPEED_ALIASES = ("wind_speed", "speed")
+        _DIR_ALIASES = ("wind_direction", "direction")
+
+        cols = set(data.columns)
+
+        def _resolve(aliases: tuple[str, ...]) -> str | None:
+            for a in aliases:
+                if a in cols:
+                    return a
+            return None
+
+        speed_col = _resolve(_SPEED_ALIASES)
+        dir_col = _resolve(_DIR_ALIASES)
+
+        if speed_col is None or dir_col is None:
+            missing = set()
+            if speed_col is None:
+                missing.update(_SPEED_ALIASES)
+            if dir_col is None:
+                missing.update(_DIR_ALIASES)
+            raise ValueError(
+                f"DataFrame missing required wind columns. "
+                f"Expected one of {_SPEED_ALIASES} and one of {_DIR_ALIASES}. "
+                f"Missing: {sorted(missing)}"
+            )
 
         graph = cls(altitude=altitude, max_edge_distance_km=max_edge_distance_km)
 
-        # میانگین‌گیری روی زمان اگر چند timestamp وجود داشته باشد
+        # نرمال‌سازی نام ستون‌ها + کپی واحد
         df = data.copy()
+        if speed_col != "wind_speed":
+            df = df.rename(columns={speed_col: "wind_speed"})
+        if dir_col != "wind_direction":
+            df = df.rename(columns={dir_col: "wind_direction"})
+
+        # میانگین‌گیری روی زمان اگر چند timestamp وجود داشته باشد
         agg_dict: dict[str, str] = {
             "wind_speed": "mean",
             "wind_direction": "mean",
@@ -344,9 +372,19 @@ class MultiLayerWindGraph:
         multi = cls()
 
         if "altitude" not in data.columns:
-            raise ValueError(
-                "DataFrame must contain 'altitude' column for multi-layer graph."
+            # اگر ستون altitude وجود نداشته باشد، تمام داده‌ها به‌عنوان
+            # یک لایه تک‌لایه‌ای با altitude پیش‌فرض (0.0) در نظر گرفته می‌شوند.
+            graph = WindGraph.build_from_dataframe(
+                data,
+                altitude=0.0,
+                config=config,
+                criterion=criterion,
+                max_edge_distance_km=max_edge_distance_km,
+                time_weight=time_weight,
             )
+            if graph.node_count > 0:
+                multi.add_layer(graph)
+            return multi
 
         for altitude in sorted(data["altitude"].unique()):
             layer_data = data[data["altitude"] == altitude].copy()
