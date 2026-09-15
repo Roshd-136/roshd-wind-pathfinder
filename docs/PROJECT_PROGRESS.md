@@ -357,3 +357,50 @@ src/pathfinding/cost.py        73    2   20    1   97%
 src/pathfinding/graph.py      145    3   44    5   96%
 src/pathfinding/routing.py     86    3   30    6   92%
 ```
+
+## 2026-09-15 — Stage 3: Multi-Layer Wind Graph & Final Routing Integration (schema doc + e2e tests)
+
+**Agent:** Hermes (AI), on behalf of AmirAli
+**Branch:** task/multi-layer-graph-orchestration
+**PR:** (see PR link)
+
+### Summary
+This is the exact task previously merged by the owner as PR #19 and
+self-reverted 4 minutes later, then substantially re-implemented under a
+different ClickUp task (`86bbw32kw`, PR #20, already on `main`):
+`WindGraph`/`MultiLayerWindGraph` (graph.py), `WindRouter` (routing.py),
+`available_layers`, and the layer travel-time comparison table
+(`docs/task_routing_benchmark.md`) all already existed and were verified
+working (111 tests passing) before this PR.
+
+Two checklist items from this task's own ClickUp card were still genuinely
+missing and are what this PR adds:
+1. **Item 6 — graph schema + architecture doc**: no standalone document
+   existed (the one from #19 was deleted by the revert and #20 did not
+   recreate an equivalent). Added `docs/task_multi_layer_graph_orchestration.md`.
+2. **Item 5 — end-to-end tests**: existing tests were unit-level only
+   (hand-built DataFrames). Added `tests/pathfinding/test_end_to_end.py`
+   with 3 tests that read the real `data/khorasan_wind_qc_cleaned.csv` from
+   disk and run the full pipeline through to a final `RouteResult`.
+
+No changes made to `graph.py`, `routing.py`, `algorithms.py`, or `cost.py` —
+that code already exists, is tested, and works; re-implementing it would
+create duplicate/conflicting logic.
+
+### Verification
+- ✅ `ruff check .` — all checks passed.
+- ✅ `pytest` — 114 passed (111 existing + 3 new end-to-end), 0 failed.
+
+### Findings flagged for the team
+- `data/khorasan_pathfinding_ready.csv` is still all-NaN (flagged 2026-09-02
+  and again 2026-09-10) — elevated-altitude layers in tests/benchmarks are
+  built by documented scaling of real surface data, not real measured
+  elevated wind data. Should be revisited once that file is regenerated.
+- The PR #19 self-revert by the owner was undocumented; worth a quick check
+  with the owner on whether there was a known issue with that version beyond
+  what #20 later fixed, in case anything was missed.
+
+### Next Steps
+- Owner review/merge of PR.
+- Regenerate `khorasan_pathfinding_ready.csv` with real data, then rebuild
+  multi-layer graphs from it directly instead of the scaled approximation.
