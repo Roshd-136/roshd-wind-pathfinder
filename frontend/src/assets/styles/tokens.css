@@ -1,0 +1,75 @@
+/**
+ * Design Tokens — Roshd Wind Pathfinder
+ *
+ * رنگ‌ها و مقادیر پایه از ui_mockup.png استخراج شده‌اند (تم تیره پیش‌فرض،
+ * accent آبی، legend سرعت باد آبی→سبز→زرد→قرمز). نسخه روشن به‌صورت
+ * معکوسِ سازگار با WCAG AA طراحی شده چون در mockup نیامده است.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* --- سطوح پس‌زمینه --- */
+  --color-bg: #0a0e1a;
+  --color-surface: #10162a;
+  --color-surface-raised: #161d35;
+  --color-border: #232b45;
+
+  /* --- متن --- */
+  --color-text-primary: #f3f5fb;
+  --color-text-secondary: #9aa4c0;
+  --color-text-muted: #6b7494;
+
+  /* --- accent (دکمه اصلی، آیتم فعال) --- */
+  --color-accent: #3b82f6;
+  --color-accent-hover: #5b93f7;
+  --color-accent-fg: #ffffff;
+
+  /* --- وضعیت --- */
+  --color-success: #22c55e;
+  --color-danger: #ef4444;
+  --color-warning: #f8ae00;
+
+  /* --- legend سرعت باد: آبی (کم) -> سبز -> زرد -> قرمز (زیاد) --- */
+  --wind-speed-0: #2563eb;
+  --wind-speed-5: #22c55e;
+  --wind-speed-10: #eab308;
+  --wind-speed-15: #f97316;
+  --wind-speed-20: #ef4444;
+
+  /* --- نقاط مبدأ/مقصد روی نقشه --- */
+  --color-origin-pin: #22c55e;
+  --color-destination-pin: #ef4444;
+
+  /* --- شعاع گوشه --- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  /* --- سایه کارت‌ها روی پس‌زمینه تیره --- */
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.35);
+
+  /* --- فاصله‌گذاری پایه (۴px scale) --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* --- فونت --- */
+  --font-sans: "Vazirmatn", "Inter", system-ui, -apple-system, sans-serif;
+}
+
+/* تم روشن — در mockup نیامده؛ برای Preferences.theme=light با کنتراست AA */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-bg: #f5f7fb;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-border: #dbe1ee;
+  --color-text-primary: #10162a;
+  --color-text-secondary: #454f6e;
+  --color-text-muted: #6b7494;
+  --shadow-card: 0 2px 12px rgba(16, 22, 42, 0.08);
+}

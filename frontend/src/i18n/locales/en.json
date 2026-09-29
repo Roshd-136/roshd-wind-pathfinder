@@ -1,0 +1,36 @@
+{
+  "app": { "name": "WindPath" },
+  "nav": { "map": "Map", "settings": "Settings", "about": "About" },
+  "map": {
+    "title": "Path Finding",
+    "toggle2d": "2D",
+    "toggle3d": "3D",
+    "selectHint": "Select start and end points"
+  },
+  "routing": {
+    "algorithm": "Algorithm",
+    "windLayerFilter": "Wind Layer Filter",
+    "layerSurface": "Surface (0-50m)",
+    "layerMid": "Mid (50-200m)",
+    "layerHigh": "High (200-500m)",
+    "constraints": "Constraints",
+    "maxWindSpeed": "Max wind speed (m/s)",
+    "calculatePath": "Calculate Path"
+  },
+  "windLayers": {
+    "title": "Wind Layers",
+    "pointInfo": "Point Info"
+  },
+  "common": {
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "retry": "Retry"
+  },
+  "auth": {
+    "login": "Log in",
+    "register": "Register",
+    "email": "Email",
+    "password": "Password",
+    "forgotPassword": "Forgot password?"
+  }
+}
