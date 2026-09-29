@@ -24,7 +24,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["data*", "preprocessing*", "pathfinding*", "qc*"]
+include = ["data*", "preprocessing*", "pathfinding*", "qc*", "backend*"]
 
 [tool.ruff]
 line-length = 100

@@ -971,3 +971,42 @@ src/pathfinding/routing.py     86    3   30    6   92%
   passed!`; artifact regenerated (`docs/assets/routing_scene.html`, **۸.۰ MB**, ۸ مسیر,
   DEM grid ۲۵×۸۸).
 - **PR:** —
+### Next Steps
+- Owner review/merge of PR.
+- Regenerate `khorasan_pathfinding_ready.csv` with real data, then rebuild
+  multi-layer graphs from it directly instead of the scaled approximation.
+
+## 2026-09-30 — Stage 4: Backend Layer & Button Wiring
+
+**Agent:** Claude (AI), on behalf of the project team
+**Branch:** task/86bc860cr-backend-wiring
+**ClickUp:** 86bc860cr (depends on 86bc860cq — UI foundation / API contract)
+**PR:** (see PR link)
+
+### Summary
+Added `src/backend/`: a stdlib-only backend that serves the routing engine to the UI following
+`api/openapi.yaml`. Implements 10 operations (routes sync/async, job status, layer comparison,
+route get/delete, wind layers, field, point, point-all, algorithms), input validation,
+error handling, a session/state layer with one named action per UI control, an in-process
+event bus, and a wiring registry (`verify_wiring()`) proving no control is dead.
+Docs: `docs/task_backend_wiring.md`. Tests: `tests/backend/` (65 tests, incl. real Khorasan
+data and a real HTTP server smoke test).
+
+### Verification
+- ✅ `ruff check .` — all checks passed.
+- ✅ `pytest` — full suite green (existing + 65 new).
+
+### Findings flagged for the team
+- **`main` is broken:** commit `18149f4` does not include `src/pathfinding/cost.py`, but
+  `routing.py`/`algorithms.py` import `CRITERIA`/`air_heading_deg` from it → 5 test files fail
+  at collection and `import pathfinding` fails. Progress notes mention "uncommitted, on main".
+  This PR is therefore based on `task/ui-foundation`. Needs Arman to push the missing files.
+- Auth/favorites/me endpoints return 501 (need DB + JWT) — separate task.
+- `max_wind_speed_mps`, `avoid_zones`, `altitude_range_m`, `checkpoints` are enforced in the
+  backend by filtering the graph, not in the engine itself.
+- FastAPI not added (not in the approved dependency list).
+
+### Next Steps
+- Owner review/merge; restore `cost.py` on `main`, then rebase.
+- Final UI integration task: connect React components to the `/v1` endpoints.
+- Decide on FastAPI/WebSocket and the auth/favorites task.
