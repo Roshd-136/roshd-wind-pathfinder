@@ -1,6 +1,6 @@
 {
   "app": { "name": "WindPath" },
-  "nav": { "map": "Map", "settings": "Settings", "about": "About" },
+  "nav": { "map": "Map", "settings": "Settings", "about": "About", "profile": "Profile" },
   "map": {
     "title": "Path Finding",
     "toggle2d": "2D",
