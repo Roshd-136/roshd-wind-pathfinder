@@ -23,6 +23,7 @@ from .routing import LayerComparison, RouteResult, WindRouter
 
 __all__ = [
     # cost.py
+    "CRITERIA",
     "CostModelConfig",
     "EdgeCostResult",
     "InfeasibleEdgeError",
