@@ -18,3 +18,21 @@ export const forgotPasswordSchema = z.object({
   email: z.string().email(),
 })
 export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>
+
+/** منطبق با `token`/`new_password` در api/openapi.yaml (حداقل ۸ کاراکتر). */
+export const resetPasswordSchema = z
+  .object({
+    token: z.string().min(1),
+    password: z.string().min(8),
+    confirmPassword: z.string().min(8),
+  })
+  .refine((v) => v.password === v.confirmPassword, {
+    path: ['confirmPassword'],
+    message: 'auth.passwordMismatch',
+  })
+export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>
+
+export const verifyEmailSchema = z.object({
+  token: z.string().min(1),
+})
+export type VerifyEmailFormValues = z.infer<typeof verifyEmailSchema>

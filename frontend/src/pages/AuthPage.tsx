@@ -4,10 +4,16 @@ import { Card } from '../components/ui/Card'
 import { LoginForm } from '../components/features/auth/LoginForm'
 import { RegisterForm } from '../components/features/auth/RegisterForm'
 import { ForgotPasswordForm } from '../components/features/auth/ForgotPasswordForm'
+import { ResetPasswordForm } from '../components/features/auth/ResetPasswordForm'
+import { VerifyEmailPanel } from '../components/features/auth/VerifyEmailPanel'
 
-type Tab = 'login' | 'register' | 'forgot'
+type Tab = 'login' | 'register' | 'forgot' | 'reset' | 'verify'
 
-/** صفحه احراز هویت — تب‌های ورود/ثبت‌نام/بازیابی رمز (چک‌لیست آیتم ۹). */
+/**
+ * صفحه احراز هویت — ورود، ثبت‌نام، بازیابی رمز (درخواست + تعیین رمز جدید)
+ * و تایید ایمیل (چک‌لیست آیتم ۹). توکن بازیابی/تایید از لینک ایمیل
+ * (`?token=...`) خوانده می‌شود.
+ */
 export function AuthPage() {
   const { t } = useTranslation()
   const [tab, setTab] = useState<Tab>('login')
@@ -19,7 +25,7 @@ export function AuthPage() {
           {t('app.name')}
         </h1>
 
-        {tab !== 'forgot' && (
+        {(tab === 'login' || tab === 'register') && (
           <div className="mb-4 flex rounded-md border border-border p-1 text-sm">
             <button
               onClick={() => setTab('login')}
@@ -36,9 +42,18 @@ export function AuthPage() {
           </div>
         )}
 
-        {tab === 'login' && <LoginForm onForgotPassword={() => setTab('forgot')} />}
-        {tab === 'register' && <RegisterForm />}
-        {tab === 'forgot' && <ForgotPasswordForm onBack={() => setTab('login')} />}
+        {tab === 'login' && (
+          <LoginForm
+            onForgotPassword={() => setTab('forgot')}
+            onVerifyEmail={() => setTab('verify')}
+          />
+        )}
+        {tab === 'register' && <RegisterForm onVerifyEmail={() => setTab('verify')} />}
+        {tab === 'forgot' && (
+          <ForgotPasswordForm onBack={() => setTab('login')} onHaveToken={() => setTab('reset')} />
+        )}
+        {tab === 'reset' && <ResetPasswordForm onBack={() => setTab('login')} />}
+        {tab === 'verify' && <VerifyEmailPanel onDone={() => setTab('login')} />}
       </Card>
     </div>
   )

@@ -10,9 +10,13 @@ interface MapViewProps {
   mode: '2d' | '3d'
   origin: Coordinate | null
   destination: Coordinate | null
+  checkpoints?: Coordinate[]
   path: Coordinate[] | null
   onMapClick: (coord: Coordinate) => void
-  onPointInfoRequest?: (coord: Coordinate) => void
+  /** کلیک بعد از تعیین مبدأ/مقصد — نمایش لایه‌های باد در آن نقطه. */
+  onPointInfo?: (coord: Coordinate) => void
+  /** long-press روی نقشه — برای افزودن چک‌پوینت یا اطلاعات نقطه. */
+  onLongPress?: (coord: Coordinate) => void
 }
 
 const ROUTE_SOURCE_ID = 'route-line'
@@ -26,12 +30,28 @@ const ROUTE_LAYER_ID = 'route-line-layer'
  * بدون توکن Mapbox، به‌جای رندر شکسته یا mock، پیام واضح نشان می‌دهد —
  * توکن باید در `.env.local` به‌عنوان `VITE_MAPBOX_TOKEN` تنظیم شود.
  */
-export function MapView({ mode, origin, destination, path, onMapClick }: MapViewProps) {
+export function MapView({
+  mode,
+  origin,
+  destination,
+  checkpoints = [],
+  path,
+  onMapClick,
+  onPointInfo,
+  onLongPress,
+}: MapViewProps) {
   const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const originMarkerRef = useRef<mapboxgl.Marker | null>(null)
   const destinationMarkerRef = useRef<mapboxgl.Marker | null>(null)
+  const checkpointMarkersRef = useRef<mapboxgl.Marker[]>([])
+  // هندلرهای کلیک در ref نگه داشته می‌شوند تا map فقط یک‌بار ساخته شود
+  // ولی همیشه آخرین کلوژرها را صدا بزند.
+  const handlersRef = useRef({ origin, destination, onMapClick, onPointInfo, onLongPress })
+  useEffect(() => {
+    handlersRef.current = { origin, destination, onMapClick, onPointInfo, onLongPress }
+  })
 
   useEffect(() => {
     if (!MAPBOX_TOKEN || !containerRef.current || mapRef.current) return
@@ -45,8 +65,47 @@ export function MapView({ mode, origin, destination, path, onMapClick }: MapView
     })
     map.addControl(new mapboxgl.NavigationControl(), 'bottom-right')
 
+    // long-press: نگه‌داشتن ۵۰۰ms بدون جابه‌جایی، بعد رها کردن بدون drag.
+    // اگر long-press رخ دهد، کلیک بعدی نادیده گرفته می‌شود.
+    let pressTimer: ReturnType<typeof setTimeout> | null = null
+    let pressStart: mapboxgl.Point | null = null
+    let longPressFired = false
+
+    const clearPress = () => {
+      if (pressTimer) clearTimeout(pressTimer)
+      pressTimer = null
+      pressStart = null
+    }
+
+    map.on('mousedown', (e) => {
+      if (e.originalEvent.button !== 0) return
+      longPressFired = false
+      pressStart = e.point
+      pressTimer = setTimeout(() => {
+        longPressFired = true
+        handlersRef.current.onLongPress?.({ lat: e.lngLat.lat, lon: e.lngLat.lng })
+      }, 500)
+    })
+
+    map.on('mousemove', (e) => {
+      if (!pressStart || !pressTimer) return
+      if (e.point.dist(pressStart) > 6) clearPress()
+    })
+
+    map.on('mouseup', clearPress)
+    map.on('dragstart', clearPress)
+
     map.on('click', (e) => {
-      onMapClick({ lat: e.lngLat.lat, lon: e.lngLat.lng })
+      // ترتیب اولویت کلیک: مبدأ → مقصد → اطلاعات نقطه (mockup: «View wind
+      // Layers at Point»). چک‌پوینت با long-press اضافه می‌شود.
+      if (longPressFired) {
+        longPressFired = false
+        return
+      }
+      const coord = { lat: e.lngLat.lat, lon: e.lngLat.lng }
+      const h = handlersRef.current
+      if (!h.origin || !h.destination) h.onMapClick(coord)
+      else h.onPointInfo?.(coord)
     })
 
     map.on('load', () => {
@@ -65,10 +124,10 @@ export function MapView({ mode, origin, destination, path, onMapClick }: MapView
 
     mapRef.current = map
     return () => {
+      clearPress()
       map.remove()
       mapRef.current = null
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- init once
   }, [])
 
   // pitch/bearing برای toggle حالت 3D
@@ -103,6 +162,20 @@ export function MapView({ mode, origin, destination, path, onMapClick }: MapView
       destinationMarkerRef.current?.remove()
     }
   }, [destination])
+
+  // نشانگر چک‌پوینت‌های اجباری — با شماره ترتیب روی پین
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    checkpointMarkersRef.current.forEach((m) => m.remove())
+    checkpointMarkersRef.current = checkpoints.map((cp, i) => {
+      const el = document.createElement('div')
+      el.className =
+        'flex h-6 w-6 items-center justify-center rounded-full bg-accent text-xs font-bold text-white'
+      el.textContent = String(i + 1)
+      return new mapboxgl.Marker({ element: el }).setLngLat([cp.lon, cp.lat]).addTo(map)
+    })
+  }, [checkpoints])
 
   // رسم خط مسیر
   useEffect(() => {

@@ -8,9 +8,10 @@ import { useLogin } from '../../../hooks/useAuth'
 
 interface LoginFormProps {
   onForgotPassword: () => void
+  onVerifyEmail: () => void
 }
 
-export function LoginForm({ onForgotPassword }: LoginFormProps) {
+export function LoginForm({ onForgotPassword, onVerifyEmail }: LoginFormProps) {
   const { t } = useTranslation()
   const login = useLogin()
   const {
@@ -40,13 +41,22 @@ export function LoginForm({ onForgotPassword }: LoginFormProps) {
         {...register('password')}
       />
       {login.isError && <p className="text-sm text-danger">{login.error.message}</p>}
-      <button
-        type="button"
-        onClick={onForgotPassword}
-        className="text-xs text-accent hover:underline"
-      >
-        {t('auth.forgotPassword')}
-      </button>
+      <div className="flex justify-between">
+        <button
+          type="button"
+          onClick={onForgotPassword}
+          className="text-xs text-accent hover:underline"
+        >
+          {t('auth.forgotPassword')}
+        </button>
+        <button
+          type="button"
+          onClick={onVerifyEmail}
+          className="text-xs text-accent hover:underline"
+        >
+          {t('auth.verifyEmail')}
+        </button>
+      </div>
       <Button type="submit" className="w-full" disabled={login.isPending}>
         {login.isPending ? t('common.loading') : t('auth.login')}
       </Button>

@@ -6,7 +6,7 @@ import { TextField } from '../../ui/TextField'
 import { registerSchema, type RegisterFormValues } from './authSchemas'
 import { useRegister } from '../../../hooks/useAuth'
 
-export function RegisterForm() {
+export function RegisterForm({ onVerifyEmail }: { onVerifyEmail: () => void }) {
   const { t } = useTranslation()
   const registerMutation = useRegister()
   const {
@@ -40,7 +40,16 @@ export function RegisterForm() {
         <p className="text-sm text-danger">{registerMutation.error.message}</p>
       )}
       {registerMutation.isSuccess && (
-        <p className="text-sm text-success">ثبت‌نام موفق — ایمیل تایید ارسال شد.</p>
+        <div className="space-y-1 text-sm text-success">
+          <p>{t('auth.registerSuccess')}</p>
+          <button
+            type="button"
+            onClick={onVerifyEmail}
+            className="text-xs text-accent hover:underline"
+          >
+            {t('auth.verifyEmail')}
+          </button>
+        </div>
       )}
       <Button type="submit" className="w-full" disabled={registerMutation.isPending}>
         {registerMutation.isPending ? t('common.loading') : t('auth.register')}

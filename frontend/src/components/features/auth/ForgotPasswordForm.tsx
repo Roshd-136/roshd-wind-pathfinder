@@ -8,9 +8,10 @@ import { useRequestPasswordReset } from '../../../hooks/useAuth'
 
 interface ForgotPasswordFormProps {
   onBack: () => void
+  onHaveToken: () => void
 }
 
-export function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) {
+export function ForgotPasswordForm({ onBack, onHaveToken }: ForgotPasswordFormProps) {
   const { t } = useTranslation()
   const requestReset = useRequestPasswordReset()
   const {
@@ -33,14 +34,27 @@ export function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) {
         {...register('email')}
       />
       {requestReset.isSuccess && (
-        <p className="text-sm text-success">در صورت وجود این ایمیل، لینک بازیابی ارسال شد.</p>
+        <p className="text-sm text-success">{t('auth.resetEmailSent')}</p>
       )}
       <Button type="submit" className="w-full" disabled={requestReset.isPending}>
-        {requestReset.isPending ? t('common.loading') : 'ارسال لینک بازیابی'}
+        {requestReset.isPending ? t('common.loading') : t('auth.sendResetLink')}
       </Button>
-      <button type="button" onClick={onBack} className="w-full text-xs text-text-secondary hover:underline">
-        بازگشت به ورود
-      </button>
+      <div className="flex justify-between">
+        <button
+          type="button"
+          onClick={onBack}
+          className="text-xs text-text-secondary hover:underline"
+        >
+          {t('auth.backToLogin')}
+        </button>
+        <button
+          type="button"
+          onClick={onHaveToken}
+          className="text-xs text-accent hover:underline"
+        >
+          {t('auth.haveToken')}
+        </button>
+      </div>
     </form>
   )
 }

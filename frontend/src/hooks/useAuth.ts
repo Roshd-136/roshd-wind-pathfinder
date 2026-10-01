@@ -1,5 +1,13 @@
 import { useMutation } from '@tanstack/react-query'
-import { login, register, requestPasswordReset, type AuthTokens, type User } from '../services/api/auth'
+import {
+  confirmPasswordReset,
+  login,
+  register,
+  requestPasswordReset,
+  verifyEmail,
+  type AuthTokens,
+  type User,
+} from '../services/api/auth'
 
 /** POST /auth/login */
 export function useLogin() {
@@ -19,5 +27,19 @@ export function useRegister() {
 export function useRequestPasswordReset() {
   return useMutation<void, Error, string>({
     mutationFn: requestPasswordReset,
+  })
+}
+
+/** POST /auth/password-reset/confirm */
+export function useConfirmPasswordReset() {
+  return useMutation<void, Error, { token: string; newPassword: string }>({
+    mutationFn: ({ token, newPassword }) => confirmPasswordReset(token, newPassword),
+  })
+}
+
+/** POST /auth/verify-email/confirm */
+export function useVerifyEmail() {
+  return useMutation<void, Error, string>({
+    mutationFn: verifyEmail,
   })
 }

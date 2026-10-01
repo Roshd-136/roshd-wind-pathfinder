@@ -1004,3 +1004,32 @@ src/pathfinding/routing.py     86    3   30    6   92%
   `npm run build` → موفق؛ `npm run typecheck` → موفق.
 - **PR:** —
 
+## Task: «طراحی پایهٔ رابط کاربری و انتخاب معماری فنی» — گام ۵ (بسته‌بندی سه‌گانه و تکمیل چک‌لیست)
+
+- **تسک ClickUp:** `86bc860cq` (همان تسک بالا) — تکمیل آیتم‌های باقی‌مانده.
+- **بسته‌بندی سه‌گانه (آیتم ۱):** `frontend/src-tauri/` (Tauri 2 — `tauri.conf.json`
+  با شناسه `com.roshd.windpath`، `Cargo.toml`، `src/main.rs`، `src/lib.rs`) و
+  `frontend/capacitor.config.ts` (Capacitor 8) اضافه شد؛ اسکریپت‌های
+  `npm run tauri` و `npm run cap:sync` به `package.json`. مستند:
+  `docs/frontend_architecture.md`.
+- **فرم‌های احراز هویت (آیتم ۹):** `VerifyEmailPanel` (تایید ایمیل با توکن لینک)،
+  `ResetPasswordForm` (تعیین رمز جدید با `POST /auth/password-reset/confirm`)،
+  هوک‌های `useVerifyEmail`/`useConfirmPasswordReset`، و کلیدهای i18n مربوطه.
+  تب‌های `AuthPage` به پنج حالت (ورود/ثبت‌نام/فراموشی/تعیین رمز/تایید ایمیل) گسترش یافت.
+- **اتصال داده روی نقشه (رفع کد مرده):** پاپ‌آپ «Wind Layers at Point» قبلاً هیچ‌جا
+  وصل نبود؛ اکنون با کلیک روی نقشه پس از تعیین مبدأ/مقصد و همچنین با دکمهٔ
+  «مشاهده لایه‌های باد در نقطه» در پنل باز می‌شود.
+- **چک‌پوینت روی نقشه (آیتم ۱۰):** هندلر long-press (۵۰۰ms، بدون drag) در
+  `MapView` اضافه شد و مارکر شماره‌دار چک‌پوینت روی نقشه رسم می‌شود؛ متن راهنما
+  با رفتار واقعی هم‌تراز شد.
+- **مستندات تحویلی (آیتم‌های ۱، ۴، ۷):** `docs/task_ui_foundation.md`،
+  `docs/frontend_architecture.md`، `docs/ui_design_system.md`،
+  `docs/accessibility_wcag_aa.md`.
+- **تست‌ها:** `AuthForms.test.tsx` (۴ تست) اضافه شد؛ تست `PathInfoPanel` برای
+  دکمهٔ جدید به‌روز شد (انتخاب دکمه بر اساس نام قابل‌دسترس، نه ایندکس).
+- **شواهد:** `npm test` → ۶ فایل / ۱۹ تست پاس؛ `npm run lint` → بدون خطا؛
+  `npm run typecheck` → موفق؛ `npm run build` → موفق.
+- **باز (آیتم ۸):** بررسی پیکسل‌به‌پیکسل با mockup نیازمند `VITE_MAPBOX_TOKEN`
+  است؛ بدون توکن نقشه رندر نمی‌شود.
+- **PR:** —
+

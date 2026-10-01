@@ -18,6 +18,8 @@ interface PathInfoPanelProps {
   checkpoints: Checkpoint[]
   onRemoveCheckpoint: (index: number) => void
   onMoveCheckpoint: (index: number, direction: -1 | 1) => void
+  onPointInfo: () => void
+  canPointInfo: boolean
   onCalculate: () => void
   isCalculating: boolean
   canCalculate: boolean
@@ -40,6 +42,8 @@ export function PathInfoPanel({
   checkpoints,
   onRemoveCheckpoint,
   onMoveCheckpoint,
+  onPointInfo,
+  canPointInfo,
   onCalculate,
   isCalculating,
   canCalculate,
@@ -74,6 +78,18 @@ export function PathInfoPanel({
           onRemove={onRemoveCheckpoint}
           onMove={onMoveCheckpoint}
         />
+      </div>
+
+      <div className="space-y-2 border-t border-border pt-3">
+        <Button
+          variant="secondary"
+          className="w-full"
+          onClick={onPointInfo}
+          disabled={!canPointInfo}
+        >
+          {t('windLayers.viewAtPoint')}
+        </Button>
+        <p className="text-xs text-text-muted">{t('windLayers.viewAtPointHint')}</p>
       </div>
 
       {result && (

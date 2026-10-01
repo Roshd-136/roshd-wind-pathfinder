@@ -19,7 +19,9 @@
   },
   "windLayers": {
     "title": "Wind Layers",
-    "pointInfo": "Point Info"
+    "pointInfo": "Point Info",
+    "viewAtPoint": "View Wind Layers at Point",
+    "viewAtPointHint": "Click on the map to pick a point."
   },
   "common": {
     "loading": "Loading…",
@@ -31,6 +33,20 @@
     "register": "Register",
     "email": "Email",
     "password": "Password",
-    "forgotPassword": "Forgot password?"
+    "forgotPassword": "Forgot password?",
+    "sendResetLink": "Send reset link",
+    "resetEmailSent": "If this email exists, a reset link has been sent.",
+    "resetPassword": "Set a new password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "resetToken": "Reset code",
+    "resetSuccess": "Your password has been changed.",
+    "passwordMismatch": "Passwords do not match.",
+    "haveToken": "I have a reset code",
+    "backToLogin": "Back to login",
+    "verifyEmail": "Verify email",
+    "verifyEmailHint": "A verification link has been sent to your email.",
+    "verifySuccess": "Your email has been verified.",
+    "registerSuccess": "Registration complete — a verification email was sent."
   }
 }

@@ -12,20 +12,24 @@ const baseProps = {
   checkpoints: [],
   onRemoveCheckpoint: vi.fn(),
   onMoveCheckpoint: vi.fn(),
+  onPointInfo: vi.fn(),
+  canPointInfo: true,
   onCalculate: vi.fn(),
   isCalculating: false,
   result: null,
 }
 
 describe('PathInfoPanel', () => {
+  const calculateButton = () => screen.getByRole('button', { name: /calculate|محاسبه/i })
+
   it('disables the calculate button when origin/destination are not both set', () => {
     render(<PathInfoPanel {...baseProps} canCalculate={false} />)
-    expect(screen.getByRole('button')).toBeDisabled()
+    expect(calculateButton()).toBeDisabled()
   })
 
   it('enables the calculate button once both points are chosen', () => {
     render(<PathInfoPanel {...baseProps} canCalculate={true} />)
-    expect(screen.getByRole('button')).toBeEnabled()
+    expect(calculateButton()).toBeEnabled()
   })
 
   it('shows the route result summary once a result is available', () => {

@@ -19,7 +19,9 @@
   },
   "windLayers": {
     "title": "لایه‌های باد",
-    "pointInfo": "اطلاعات نقطه"
+    "pointInfo": "اطلاعات نقطه",
+    "viewAtPoint": "مشاهده لایه‌های باد در نقطه",
+    "viewAtPointHint": "برای انتخاب نقطه، روی نقشه کلیک کنید."
   },
   "common": {
     "loading": "در حال بارگذاری…",
@@ -31,6 +33,20 @@
     "register": "ثبت‌نام",
     "email": "ایمیل",
     "password": "رمز عبور",
-    "forgotPassword": "رمز عبور را فراموش کرده‌اید؟"
+    "forgotPassword": "رمز عبور را فراموش کرده‌اید؟",
+    "sendResetLink": "ارسال لینک بازیابی",
+    "resetEmailSent": "در صورت وجود این ایمیل، لینک بازیابی ارسال شد.",
+    "resetPassword": "تعیین رمز عبور جدید",
+    "newPassword": "رمز عبور جدید",
+    "confirmPassword": "تکرار رمز عبور جدید",
+    "resetToken": "کد بازیابی",
+    "resetSuccess": "رمز عبور با موفقیت تغییر کرد.",
+    "passwordMismatch": "رمز عبور و تکرار آن یکسان نیستند.",
+    "haveToken": "کد بازیابی دارم",
+    "backToLogin": "بازگشت به ورود",
+    "verifyEmail": "تایید ایمیل",
+    "verifyEmailHint": "لینک تایید به ایمیل شما ارسال شده است.",
+    "verifySuccess": "ایمیل با موفقیت تایید شد.",
+    "registerSuccess": "ثبت‌نام موفق — ایمیل تایید ارسال شد."
   }
 }

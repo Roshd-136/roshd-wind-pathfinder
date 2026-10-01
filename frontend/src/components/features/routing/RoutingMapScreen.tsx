@@ -17,10 +17,11 @@ interface RoutingMapScreenProps {
 
 /**
  * پیاده‌سازی مشترک صفحات Map2D/Map3D — همان چیدمان و منطق، فقط `mode`
- * فرق می‌کند. جریان کلیک روی نقشه: کلیک ۱=مبدأ، کلیک ۲=مقصد، کلیک‌های
- * بعدی=چک‌پوینت اجباری (به ترتیب کلیک). دکمه «پاک کردن» همه را ریست
- * می‌کند. همه در `useRouteStore` نگه داشته می‌شود تا toggle دوحالته ۲/۳
- * بعدی (ناوبری واقعی بین دو route) چیزی را از دست ندهد.
+ * فرق می‌کند. جریان روی نقشه: کلیک ۱=مبدأ، کلیک ۲=مقصد، کلیک‌های بعدی=
+ * نمایش اطلاعات باد آن نقطه (mockup: «View wind Layers at Point»)، و
+ * long-press=افزودن چک‌پوینت اجباری. دکمه «پاک کردن» همه را ریست می‌کند.
+ * همه در `useRouteStore` نگه داشته می‌شود تا toggle دوحالته ۲/۳ بعدی
+ * (ناوبری واقعی بین دو route) چیزی را از دست ندهد.
  */
 export function RoutingMapScreen({ mode }: RoutingMapScreenProps) {
   const { t } = useTranslation()
@@ -54,7 +55,7 @@ export function RoutingMapScreen({ mode }: RoutingMapScreenProps) {
     } else if (!destination) {
       setDestination(coord)
     } else {
-      addCheckpoint(coord)
+      setInfoPoint(coord)
     }
   }
 
@@ -77,6 +78,8 @@ export function RoutingMapScreen({ mode }: RoutingMapScreenProps) {
       checkpoints={checkpoints}
       onRemoveCheckpoint={removeCheckpoint}
       onMoveCheckpoint={moveCheckpoint}
+      onPointInfo={() => setInfoPoint(origin)}
+      canPointInfo={Boolean(origin)}
       onCalculate={handleCalculate}
       isCalculating={pathfinding.isPending}
       canCalculate={Boolean(origin && destination)}
@@ -91,8 +94,10 @@ export function RoutingMapScreen({ mode }: RoutingMapScreenProps) {
           mode={mode}
           origin={origin}
           destination={destination}
+          checkpoints={checkpoints}
           path={result?.path ?? null}
           onMapClick={handleMapClick}
+          onLongPress={addCheckpoint}
         />
         <MapModeToggle />
         {(origin || destination || checkpoints.length > 0) && (

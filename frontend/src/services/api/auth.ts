@@ -32,6 +32,19 @@ export function requestPasswordReset(email: string): Promise<void> {
   return apiFetch<void>('/auth/password-reset/request', { method: 'POST', body: { email } })
 }
 
+/** POST /auth/password-reset/confirm — تعیین رمز جدید با توکن ایمیل‌شده. */
+export function confirmPasswordReset(token: string, newPassword: string): Promise<void> {
+  return apiFetch<void>('/auth/password-reset/confirm', {
+    method: 'POST',
+    body: { token, new_password: newPassword },
+  })
+}
+
+/** POST /auth/verify-email/confirm — تایید ایمیل با توکن ارسال‌شده. */
+export function verifyEmail(token: string): Promise<void> {
+  return apiFetch<void>('/auth/verify-email/confirm', { method: 'POST', body: { token } })
+}
+
 /** POST /auth/logout */
 export async function logout(): Promise<void> {
   await apiFetch<void>('/auth/logout', { method: 'POST' })
