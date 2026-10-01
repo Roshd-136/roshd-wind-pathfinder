@@ -1,39 +1,76 @@
 import { useTranslation } from 'react-i18next'
 import { Card } from '../components/ui/Card'
+import { Select } from '../components/ui/Select'
 import { useSettingsStore } from '../store/useSettingsStore'
 
-/** صفحه تنظیمات — فرم کامل (واحد/تم/زبان/الگوریتم پیش‌فرض) در فاز ۳. */
+/** صفحه تنظیمات — تم، زبان، واحد، الگوریتم/معیار پیش‌فرض (Preferences در OpenAPI). */
 export function SettingsPage() {
   const { t } = useTranslation()
-  const { theme, language, setTheme, setLanguage } = useSettingsStore()
+  const {
+    theme,
+    language,
+    units,
+    defaultAlgorithm,
+    defaultCriterion,
+    setTheme,
+    setLanguage,
+    setUnits,
+    setDefaultAlgorithm,
+    setDefaultCriterion,
+  } = useSettingsStore()
 
   return (
     <div className="p-6">
-      <Card className="max-w-md">
-        <h1 className="mb-4 text-lg font-semibold text-text-primary">{t('nav.settings')}</h1>
-        <div className="mb-3 flex items-center justify-between text-sm">
-          <span className="text-text-secondary">Theme</span>
-          <select
-            value={theme}
-            onChange={(e) => setTheme(e.target.value as typeof theme)}
-            className="rounded-md border border-border bg-surface-raised px-2 py-1 text-text-primary"
-          >
-            <option value="dark">Dark</option>
-            <option value="light">Light</option>
-            <option value="system">System</option>
-          </select>
-        </div>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-text-secondary">Language</span>
-          <select
-            value={language}
-            onChange={(e) => setLanguage(e.target.value as typeof language)}
-            className="rounded-md border border-border bg-surface-raised px-2 py-1 text-text-primary"
-          >
-            <option value="fa">فارسی</option>
-            <option value="en">English</option>
-          </select>
-        </div>
+      <Card className="max-w-md space-y-4">
+        <h1 className="text-lg font-semibold text-text-primary">{t('nav.settings')}</h1>
+
+        <Select
+          label="Theme"
+          value={theme}
+          onChange={(v) => setTheme(v as typeof theme)}
+          options={[
+            { value: 'dark', label: 'Dark' },
+            { value: 'light', label: 'Light' },
+            { value: 'system', label: 'System' },
+          ]}
+        />
+        <Select
+          label="Language"
+          value={language}
+          onChange={(v) => setLanguage(v as typeof language)}
+          options={[
+            { value: 'fa', label: 'فارسی' },
+            { value: 'en', label: 'English' },
+          ]}
+        />
+        <Select
+          label="Units"
+          value={units}
+          onChange={(v) => setUnits(v as typeof units)}
+          options={[
+            { value: 'metric', label: 'Metric (m/s, km)' },
+            { value: 'imperial', label: 'Imperial (mph, mi)' },
+          ]}
+        />
+        <Select
+          label={t('routing.algorithm')}
+          value={defaultAlgorithm}
+          onChange={(v) => setDefaultAlgorithm(v as typeof defaultAlgorithm)}
+          options={[
+            { value: 'a_star', label: 'A* (Wind Aware) — default' },
+            { value: 'dijkstra', label: 'Dijkstra — fallback' },
+          ]}
+        />
+        <Select
+          label="Optimization criterion"
+          value={defaultCriterion}
+          onChange={(v) => setDefaultCriterion(v as typeof defaultCriterion)}
+          options={[
+            { value: 'time', label: 'Time' },
+            { value: 'energy', label: 'Energy' },
+            { value: 'balanced', label: 'Balanced' },
+          ]}
+        />
       </Card>
     </div>
   )

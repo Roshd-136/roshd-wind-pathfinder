@@ -1,18 +1,23 @@
 import { useTranslation } from 'react-i18next'
-import type { Algorithm, RouteResult } from '../../../types/routing'
+import type { Algorithm, Checkpoint, RouteConstraints, RouteResult } from '../../../types/routing'
 import { Button } from '../../ui/Button'
 import { Card } from '../../ui/Card'
 import { Slider } from '../../ui/Slider'
 import { WindLayerControls, type LayerVisibility } from '../layers/WindLayerControls'
 import { AlgorithmSelector } from './AlgorithmSelector'
+import { AdvancedFiltersPanel } from './AdvancedFiltersPanel'
+import { CheckpointManager } from './CheckpointManager'
 
 interface PathInfoPanelProps {
   algorithm: Algorithm
   onAlgorithmChange: (algorithm: Algorithm) => void
   layerVisibility: LayerVisibility
   onLayerVisibilityChange: (value: LayerVisibility) => void
-  maxWindSpeed: number
-  onMaxWindSpeedChange: (value: number) => void
+  constraints: RouteConstraints
+  onConstraintsChange: (value: RouteConstraints) => void
+  checkpoints: Checkpoint[]
+  onRemoveCheckpoint: (index: number) => void
+  onMoveCheckpoint: (index: number, direction: -1 | 1) => void
   onCalculate: () => void
   isCalculating: boolean
   canCalculate: boolean
@@ -21,16 +26,20 @@ interface PathInfoPanelProps {
 
 /**
  * پنل سمت راست (کنترل + نتیجه) — ترکیب AlgorithmSelector، WindLayerControls،
- * Constraints، و دکمه اصلی، دقیقاً مطابق چیدمان mockup. بعد از محاسبه، خلاصه
- * نتیجه (مسافت/زمان/لایه انتخابی) هم همین‌جا نمایش داده می‌شود.
+ * مدیریت چک‌پوینت، فیلترهای پیشرفته، و دکمه اصلی، مطابق چیدمان mockup +
+ * چک‌لیست کامل تسک (آیتم‌های ۶، ۱۰، ۱۱). بعد از محاسبه، خلاصه نتیجه هم
+ * همین‌جا نمایش داده می‌شود.
  */
 export function PathInfoPanel({
   algorithm,
   onAlgorithmChange,
   layerVisibility,
   onLayerVisibilityChange,
-  maxWindSpeed,
-  onMaxWindSpeedChange,
+  constraints,
+  onConstraintsChange,
+  checkpoints,
+  onRemoveCheckpoint,
+  onMoveCheckpoint,
   onCalculate,
   isCalculating,
   canCalculate,
@@ -48,11 +57,22 @@ export function PathInfoPanel({
         <h3 className="text-sm font-semibold text-text-primary">{t('routing.constraints')}</h3>
         <Slider
           label={t('routing.maxWindSpeed')}
-          value={maxWindSpeed}
+          value={constraints.max_wind_speed_mps ?? 20}
           min={0}
           max={30}
           step={1}
-          onChange={onMaxWindSpeedChange}
+          onChange={(v) => onConstraintsChange({ ...constraints, max_wind_speed_mps: v })}
+        />
+      </div>
+
+      <AdvancedFiltersPanel value={constraints} onChange={onConstraintsChange} />
+
+      <div className="space-y-2 border-t border-border pt-3">
+        <h3 className="text-sm font-semibold text-text-primary">چک‌پوینت‌های اجباری</h3>
+        <CheckpointManager
+          checkpoints={checkpoints}
+          onRemove={onRemoveCheckpoint}
+          onMove={onMoveCheckpoint}
         />
       </div>
 
@@ -62,7 +82,7 @@ export function PathInfoPanel({
           data-testid="route-result-summary"
         >
           <div className="flex justify-between">
-            <span>{t('routing.layerSurface').split(' ')[0]} layer</span>
+            <span>Layer</span>
             <span className="text-text-primary">{result.layer_altitude_m} m</span>
           </div>
           <div className="flex justify-between">
