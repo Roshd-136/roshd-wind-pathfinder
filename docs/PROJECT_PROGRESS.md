@@ -971,3 +971,65 @@ src/pathfinding/routing.py     86    3   30    6   92%
   passed!`; artifact regenerated (`docs/assets/routing_scene.html`, **۸.۰ MB**, ۸ مسیر,
   DEM grid ۲۵×۸۸).
 - **PR:** —
+
+---
+
+## Task: «طراحی پایهٔ رابط کاربری و انتخاب معماری فنی» — گام ۴ (UI Foundation)
+
+- **تسک ClickUp:** `86bc860cq` — «طراحی پایهٔ رابط کاربری و انتخاب معماری فنی
+  (UI Foundation & Technical Architecture)»، اولویت High، ددلاین ۷ مهر ۱۴۰۵ ساعت ۲۰:۰۰.
+- **دامنه:** یک کدبیس React + TypeScript که در سه هدف توزیع می‌شود — Web/PWA،
+  دسکتاپ (Tauri) و موبایل (Capacitor) — به‌همراه سیستم طراحی، تمام صفحات/جریان‌ها
+  و قرارداد API.
+- **معماری فنی (آیتم ۱):** `docs/frontend/architecture.md` — مرجع بصری، توکن‌های
+  طراحی، ساختار پوشه‌بندی، لایه‌های سرویس، مدیریت state، تشخیص پلتفرم.
+- **قرارداد API (آیتم ۲):** `api/openapi.yaml` (OpenAPI **3.0.3**) — مسیریابی،
+  لایه‌های باد، نقاط/چک‌پوینت، الگوریتم‌ها، احراز هویت، پروفایل/ترجیحات، خطاها،
+  محدودیت نرخ و نسخه‌بندی.
+- **اسکلت و سیستم طراحی (آیتم‌های ۳ و ۴):** پروژهٔ `frontend/` (React + Vite +
+  TypeScript + Tailwind + React Router + Mapbox GL JS)، توکن‌های CSS، کامپوننت‌های
+  پایه (Button/Card/Checkbox/Select/Slider/TextField) و کامپوننت‌های فیچر (نقشه،
+  لایه‌ها، مسیریابی).
+- **صفحات و جریان‌ها (آیتم‌های ۵ و ۶):** Map2D، Map3D، Settings، Results، Auth
+  (ورود/ثبت‌نام/بازیابی رمز)، Profile، Onboarding؛ انتخاب مبدأ/مقصد/چک‌پوینت،
+  کنترل لایه‌ها، انتخاب‌گر الگوریتم، پروفایل مسیر، پنل فیلترهای پیشرفته، نوار کناری/
+  drawer و bottom sheet موبایل.
+- **دسترسی‌پذیری (آیتم ۷):** طراحی واکنش‌گرا (RTL)، تم تاریک/روشن، بررسی خودکار
+  axe-core روی primitives و کامپوننت‌های کلیدی مسیریابی (`vitest-axe`).
+- **یکپارچگی ابزارها:** در همین شاخه یک نقص تایپ در پیکربندی تست پیدا و رفع شد —
+  `vitest-axe` تایپ matcher خود را فقط روی namespace قدیمی `Vi` augment می‌کرد که
+  در Vitest 5 معتبر نیست و باعث شکست `tsc -b` (و در نتیجه build) می‌شد؛ با یک
+  shim تایپ در `frontend/src/test/vitest-axe.d.ts` رفع شد.
+- **شواهد:** `npm test` → ۵ فایل / ۱۵ تست پاس؛ `npm run lint` → بدون خطا؛
+  `npm run build` → موفق؛ `npm run typecheck` → موفق.
+- **PR:** —
+
+## Task: «طراحی پایهٔ رابط کاربری و انتخاب معماری فنی» — گام ۵ (بسته‌بندی سه‌گانه و تکمیل چک‌لیست)
+
+- **تسک ClickUp:** `86bc860cq` (همان تسک بالا) — تکمیل آیتم‌های باقی‌مانده.
+- **بسته‌بندی سه‌گانه (آیتم ۱):** `frontend/src-tauri/` (Tauri 2 — `tauri.conf.json`
+  با شناسه `com.roshd.windpath`، `Cargo.toml`، `src/main.rs`، `src/lib.rs`) و
+  `frontend/capacitor.config.ts` (Capacitor 8) اضافه شد؛ اسکریپت‌های
+  `npm run tauri` و `npm run cap:sync` به `package.json`. مستند:
+  `docs/frontend_architecture.md`.
+- **فرم‌های احراز هویت (آیتم ۹):** `VerifyEmailPanel` (تایید ایمیل با توکن لینک)،
+  `ResetPasswordForm` (تعیین رمز جدید با `POST /auth/password-reset/confirm`)،
+  هوک‌های `useVerifyEmail`/`useConfirmPasswordReset`، و کلیدهای i18n مربوطه.
+  تب‌های `AuthPage` به پنج حالت (ورود/ثبت‌نام/فراموشی/تعیین رمز/تایید ایمیل) گسترش یافت.
+- **اتصال داده روی نقشه (رفع کد مرده):** پاپ‌آپ «Wind Layers at Point» قبلاً هیچ‌جا
+  وصل نبود؛ اکنون با کلیک روی نقشه پس از تعیین مبدأ/مقصد و همچنین با دکمهٔ
+  «مشاهده لایه‌های باد در نقطه» در پنل باز می‌شود.
+- **چک‌پوینت روی نقشه (آیتم ۱۰):** هندلر long-press (۵۰۰ms، بدون drag) در
+  `MapView` اضافه شد و مارکر شماره‌دار چک‌پوینت روی نقشه رسم می‌شود؛ متن راهنما
+  با رفتار واقعی هم‌تراز شد.
+- **مستندات تحویلی (آیتم‌های ۱، ۴، ۷):** `docs/task_ui_foundation.md`،
+  `docs/frontend_architecture.md`، `docs/ui_design_system.md`،
+  `docs/accessibility_wcag_aa.md`.
+- **تست‌ها:** `AuthForms.test.tsx` (۴ تست) اضافه شد؛ تست `PathInfoPanel` برای
+  دکمهٔ جدید به‌روز شد (انتخاب دکمه بر اساس نام قابل‌دسترس، نه ایندکس).
+- **شواهد:** `npm test` → ۶ فایل / ۱۹ تست پاس؛ `npm run lint` → بدون خطا؛
+  `npm run typecheck` → موفق؛ `npm run build` → موفق.
+- **باز (آیتم ۸):** بررسی پیکسل‌به‌پیکسل با mockup نیازمند `VITE_MAPBOX_TOKEN`
+  است؛ بدون توکن نقشه رندر نمی‌شود.
+- **PR:** —
+

@@ -1,0 +1,52 @@
+{
+  "app": { "name": "WindPath" },
+  "nav": { "map": "Map", "settings": "Settings", "about": "About", "profile": "Profile" },
+  "map": {
+    "title": "Path Finding",
+    "toggle2d": "2D",
+    "toggle3d": "3D",
+    "selectHint": "Select start and end points"
+  },
+  "routing": {
+    "algorithm": "Algorithm",
+    "windLayerFilter": "Wind Layer Filter",
+    "layerSurface": "Surface (0-50m)",
+    "layerMid": "Mid (50-200m)",
+    "layerHigh": "High (200-500m)",
+    "constraints": "Constraints",
+    "maxWindSpeed": "Max wind speed (m/s)",
+    "calculatePath": "Calculate Path"
+  },
+  "windLayers": {
+    "title": "Wind Layers",
+    "pointInfo": "Point Info",
+    "viewAtPoint": "View Wind Layers at Point",
+    "viewAtPointHint": "Click on the map to pick a point."
+  },
+  "common": {
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "retry": "Retry"
+  },
+  "auth": {
+    "login": "Log in",
+    "register": "Register",
+    "email": "Email",
+    "password": "Password",
+    "forgotPassword": "Forgot password?",
+    "sendResetLink": "Send reset link",
+    "resetEmailSent": "If this email exists, a reset link has been sent.",
+    "resetPassword": "Set a new password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "resetToken": "Reset code",
+    "resetSuccess": "Your password has been changed.",
+    "passwordMismatch": "Passwords do not match.",
+    "haveToken": "I have a reset code",
+    "backToLogin": "Back to login",
+    "verifyEmail": "Verify email",
+    "verifyEmailHint": "A verification link has been sent to your email.",
+    "verifySuccess": "Your email has been verified.",
+    "registerSuccess": "Registration complete — a verification email was sent."
+  }
+}
