@@ -9,6 +9,7 @@
 
 from .algorithms import a_star, dijkstra
 from .cost import (
+    CRITERIA,
     CostModelConfig,
     EdgeCostResult,
     InfeasibleEdgeError,
