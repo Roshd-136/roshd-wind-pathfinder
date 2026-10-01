@@ -971,3 +971,36 @@ src/pathfinding/routing.py     86    3   30    6   92%
   passed!`; artifact regenerated (`docs/assets/routing_scene.html`, **۸.۰ MB**, ۸ مسیر,
   DEM grid ۲۵×۸۸).
 - **PR:** —
+
+---
+
+## Task: «طراحی پایهٔ رابط کاربری و انتخاب معماری فنی» — گام ۴ (UI Foundation)
+
+- **تسک ClickUp:** `86bc860cq` — «طراحی پایهٔ رابط کاربری و انتخاب معماری فنی
+  (UI Foundation & Technical Architecture)»، اولویت High، ددلاین ۷ مهر ۱۴۰۵ ساعت ۲۰:۰۰.
+- **دامنه:** یک کدبیس React + TypeScript که در سه هدف توزیع می‌شود — Web/PWA،
+  دسکتاپ (Tauri) و موبایل (Capacitor) — به‌همراه سیستم طراحی، تمام صفحات/جریان‌ها
+  و قرارداد API.
+- **معماری فنی (آیتم ۱):** `docs/frontend/architecture.md` — مرجع بصری، توکن‌های
+  طراحی، ساختار پوشه‌بندی، لایه‌های سرویس، مدیریت state، تشخیص پلتفرم.
+- **قرارداد API (آیتم ۲):** `api/openapi.yaml` (OpenAPI **3.0.3**) — مسیریابی،
+  لایه‌های باد، نقاط/چک‌پوینت، الگوریتم‌ها، احراز هویت، پروفایل/ترجیحات، خطاها،
+  محدودیت نرخ و نسخه‌بندی.
+- **اسکلت و سیستم طراحی (آیتم‌های ۳ و ۴):** پروژهٔ `frontend/` (React + Vite +
+  TypeScript + Tailwind + React Router + Mapbox GL JS)، توکن‌های CSS، کامپوننت‌های
+  پایه (Button/Card/Checkbox/Select/Slider/TextField) و کامپوننت‌های فیچر (نقشه،
+  لایه‌ها، مسیریابی).
+- **صفحات و جریان‌ها (آیتم‌های ۵ و ۶):** Map2D، Map3D، Settings، Results، Auth
+  (ورود/ثبت‌نام/بازیابی رمز)، Profile، Onboarding؛ انتخاب مبدأ/مقصد/چک‌پوینت،
+  کنترل لایه‌ها، انتخاب‌گر الگوریتم، پروفایل مسیر، پنل فیلترهای پیشرفته، نوار کناری/
+  drawer و bottom sheet موبایل.
+- **دسترسی‌پذیری (آیتم ۷):** طراحی واکنش‌گرا (RTL)، تم تاریک/روشن، بررسی خودکار
+  axe-core روی primitives و کامپوننت‌های کلیدی مسیریابی (`vitest-axe`).
+- **یکپارچگی ابزارها:** در همین شاخه یک نقص تایپ در پیکربندی تست پیدا و رفع شد —
+  `vitest-axe` تایپ matcher خود را فقط روی namespace قدیمی `Vi` augment می‌کرد که
+  در Vitest 5 معتبر نیست و باعث شکست `tsc -b` (و در نتیجه build) می‌شد؛ با یک
+  shim تایپ در `frontend/src/test/vitest-axe.d.ts` رفع شد.
+- **شواهد:** `npm test` → ۵ فایل / ۱۵ تست پاس؛ `npm run lint` → بدون خطا؛
+  `npm run build` → موفق؛ `npm run typecheck` → موفق.
+- **PR:** —
+
