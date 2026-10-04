@@ -72,7 +72,7 @@ export function PathInfoPanel({
       <AdvancedFiltersPanel value={constraints} onChange={onConstraintsChange} />
 
       <div className="space-y-2 border-t border-border pt-3">
-        <h3 className="text-sm font-semibold text-text-primary">چک‌پوینت‌های اجباری</h3>
+        <h3 className="text-sm font-semibold text-text-primary">{t('routing.checkpoints')}</h3>
         <CheckpointManager
           checkpoints={checkpoints}
           onRemove={onRemoveCheckpoint}
@@ -98,15 +98,15 @@ export function PathInfoPanel({
           data-testid="route-result-summary"
         >
           <div className="flex justify-between">
-            <span>Layer</span>
+            <span>{t('results.layerAltitude')}</span>
             <span className="text-text-primary">{result.layer_altitude_m} m</span>
           </div>
           <div className="flex justify-between">
-            <span>Distance</span>
+            <span>{t('results.distance')}</span>
             <span className="text-text-primary">{result.total_distance_km.toFixed(1)} km</span>
           </div>
           <div className="flex justify-between">
-            <span>ETA</span>
+            <span>{t('results.eta')}</span>
             <span className="text-text-primary">{result.estimated_time_hours.toFixed(2)} h</span>
           </div>
         </div>

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { Checkpoint } from '../../../types/routing'
 
 interface CheckpointManagerProps {
@@ -12,12 +13,10 @@ interface CheckpointManagerProps {
  * (چک‌لیست آیتم ۱۰).
  */
 export function CheckpointManager({ checkpoints, onRemove, onMove }: CheckpointManagerProps) {
+  const { t } = useTranslation()
+
   if (checkpoints.length === 0) {
-    return (
-      <p className="text-xs text-text-muted">
-        بعد از انتخاب مبدأ/مقصد، برای افزودن چک‌پوینت اجباری روی نقشه کلیک نگه دارید (long-press).
-      </p>
-    )
+    return <p className="text-xs text-text-muted">{t('routing.checkpointHint')}</p>
   }
 
   return (
@@ -35,7 +34,7 @@ export function CheckpointManager({ checkpoints, onRemove, onMove }: CheckpointM
               type="button"
               onClick={() => onMove(i, -1)}
               disabled={i === 0}
-              aria-label="move up"
+              aria-label={t('routing.moveUp')}
               className="text-text-muted hover:text-text-primary disabled:opacity-30"
             >
               ↑
@@ -44,7 +43,7 @@ export function CheckpointManager({ checkpoints, onRemove, onMove }: CheckpointM
               type="button"
               onClick={() => onMove(i, 1)}
               disabled={i === checkpoints.length - 1}
-              aria-label="move down"
+              aria-label={t('routing.moveDown')}
               className="text-text-muted hover:text-text-primary disabled:opacity-30"
             >
               ↓
@@ -52,7 +51,7 @@ export function CheckpointManager({ checkpoints, onRemove, onMove }: CheckpointM
             <button
               type="button"
               onClick={() => onRemove(i)}
-              aria-label="remove"
+              aria-label={t('routing.remove')}
               className="text-danger hover:opacity-80"
             >
               ✕

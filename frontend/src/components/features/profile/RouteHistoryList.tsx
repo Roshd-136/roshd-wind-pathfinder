@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { RouteResult } from '../../../types/routing'
 import { Card } from '../../ui/Card'
 
@@ -7,8 +8,10 @@ interface RouteHistoryListProps {
 
 /** تاریخچه مسیرهای محاسبه/ذخیره‌شده کاربر — GET /me/routes. */
 export function RouteHistoryList({ routes }: RouteHistoryListProps) {
+  const { t } = useTranslation()
+
   if (routes.length === 0) {
-    return <p className="text-sm text-text-muted">هنوز مسیری ذخیره نشده است.</p>
+    return <p className="text-sm text-text-muted">{t('profile.emptyHistory')}</p>
   }
 
   return (

@@ -3,19 +3,75 @@
   "nav": { "map": "نقشه", "settings": "تنظیمات", "about": "درباره", "profile": "پروفایل" },
   "map": {
     "title": "مسیریابی",
+    "subtitle": "مسیریابی با در نظر گرفتن جریان باد",
     "toggle2d": "۲بعدی",
     "toggle3d": "۳بعدی",
-    "selectHint": "مبدأ و مقصد را انتخاب کنید"
+    "selectHint": "مبدأ و مقصد را انتخاب کنید",
+    "clear": "پاک کردن",
+    "tokenMissing": "خطا: {{code}} تنظیم نشده — نقشه بارگذاری نمی‌شود."
   },
   "routing": {
     "algorithm": "الگوریتم",
+    "algorithmDefault": "پیش‌فرض",
+    "algorithmFallback": "جایگزین",
     "windLayerFilter": "فیلتر لایه باد",
     "layerSurface": "سطحی (۰ تا ۵۰ متر)",
     "layerMid": "میانی (۵۰ تا ۲۰۰ متر)",
     "layerHigh": "بالا (۲۰۰ تا ۵۰۰ متر)",
     "constraints": "محدودیت‌ها",
     "maxWindSpeed": "حداکثر سرعت باد (m/s)",
-    "calculatePath": "محاسبه مسیر"
+    "calculatePath": "محاسبه مسیر",
+    "advancedFilters": "فیلترهای پیشرفته",
+    "minAltitude": "حداقل ارتفاع",
+    "maxAltitude": "حداکثر ارتفاع",
+    "criterion": "معیار بهینه‌سازی",
+    "criterionTime": "زمان",
+    "criterionEnergy": "انرژی",
+    "criterionBalanced": "متعادل",
+    "avoidZones": "اجتناب از مناطق علامت‌گذاری‌شده",
+    "checkpoints": "چک‌پوینت‌های اجباری",
+    "checkpointHint": "بعد از انتخاب مبدأ/مقصد، برای افزودن چک‌پوینت اجباری روی نقشه کلیک نگه دارید (long-press).",
+    "moveUp": "جابجایی به بالا",
+    "moveDown": "جابجایی به پایین",
+    "remove": "حذف"
+  },
+  "settings": {
+    "theme": "تم",
+    "themeDark": "تاریک",
+    "themeLight": "روشن",
+    "themeSystem": "سیستم",
+    "language": "زبان",
+    "units": "واحدها",
+    "unitsMetric": "متریک (m/s، km)",
+    "unitsImperial": "ایمپریال (mph، mi)"
+  },
+  "results": {
+    "title": "نتیجه مسیر",
+    "layerAltitude": "لایه ارتفاعی",
+    "algorithm": "الگوریتم",
+    "criterion": "معیار",
+    "distance": "مسافت",
+    "eta": "زمان تخمینی",
+    "pathPoints": "تعداد نقاط مسیر"
+  },
+  "profile": {
+    "title": "پروفایل",
+    "name": "نام",
+    "email": "ایمیل",
+    "routeHistory": "تاریخچه مسیرها",
+    "emptyHistory": "هنوز مسیری ذخیره نشده است."
+  },
+  "onboarding": {
+    "welcome": "خوش آمدید",
+    "welcomeBody": "مسیریاب بادی — کوتاه‌ترین/کم‌مصرف‌ترین مسیر را با در نظر گرفتن باد پیدا کنید.",
+    "pickPoints": "انتخاب مبدأ و مقصد",
+    "pickPointsBody": "روی نقشه کلیک کنید تا مبدأ و مقصد را مشخص کنید.",
+    "layerAlgorithm": "لایه و الگوریتم",
+    "layerAlgorithmBody": "لایه ارتفاعی و الگوریتم مسیریابی را از پنل کنار نقشه انتخاب کنید.",
+    "start": "شروع کنید"
+  },
+  "about": {
+    "text": "روشد — مسیریاب بادی مبتنی بر داده واقعی ایستگاه‌های خراسان."
   },
   "windLayers": {
     "title": "لایه‌های باد",
@@ -31,6 +87,7 @@
   "auth": {
     "login": "ورود",
     "register": "ثبت‌نام",
+    "name": "نام",
     "email": "ایمیل",
     "password": "رمز عبور",
     "forgotPassword": "رمز عبور را فراموش کرده‌اید؟",

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { Criterion, RouteConstraints } from '../../../types/routing'
 import { Select } from '../../ui/Select'
 import { Slider } from '../../ui/Slider'
@@ -18,14 +19,15 @@ const ALTITUDE_MAX = 500
  * (چک‌لیست آیتم ۱۱).
  */
 export function AdvancedFiltersPanel({ value, onChange }: AdvancedFiltersPanelProps) {
+  const { t } = useTranslation()
   const [altMin, altMax] = value.altitude_range_m ?? [ALTITUDE_MIN, ALTITUDE_MAX]
 
   return (
     <div className="space-y-3 border-t border-border pt-3">
-      <h3 className="text-sm font-semibold text-text-primary">فیلترهای پیشرفته</h3>
+      <h3 className="text-sm font-semibold text-text-primary">{t('routing.advancedFilters')}</h3>
 
       <Slider
-        label="حداقل ارتفاع"
+        label={t('routing.minAltitude')}
         value={altMin}
         min={ALTITUDE_MIN}
         max={altMax}
@@ -33,7 +35,7 @@ export function AdvancedFiltersPanel({ value, onChange }: AdvancedFiltersPanelPr
         onChange={(v) => onChange({ ...value, altitude_range_m: [v, altMax] })}
       />
       <Slider
-        label="حداکثر ارتفاع"
+        label={t('routing.maxAltitude')}
         value={altMax}
         min={altMin}
         max={ALTITUDE_MAX}
@@ -42,18 +44,18 @@ export function AdvancedFiltersPanel({ value, onChange }: AdvancedFiltersPanelPr
       />
 
       <Select
-        label="معیار بهینه‌سازی"
+        label={t('routing.criterion')}
         value={value.criterion ?? 'time'}
         onChange={(v) => onChange({ ...value, criterion: v as Criterion })}
         options={[
-          { value: 'time', label: 'زمان' },
-          { value: 'energy', label: 'انرژی' },
-          { value: 'balanced', label: 'متعادل' },
+          { value: 'time', label: t('routing.criterionTime') },
+          { value: 'energy', label: t('routing.criterionEnergy') },
+          { value: 'balanced', label: t('routing.criterionBalanced') },
         ]}
       />
 
       <Checkbox
-        label="اجتناب از مناطق علامت‌گذاری‌شده"
+        label={t('routing.avoidZones')}
         checked={Boolean(value.avoid_zones?.length)}
         onChange={(e) =>
           onChange({ ...value, avoid_zones: e.target.checked ? (value.avoid_zones ?? []) : [] })

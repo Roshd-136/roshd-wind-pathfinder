@@ -25,17 +25,17 @@ export function SettingsPage() {
         <h1 className="text-lg font-semibold text-text-primary">{t('nav.settings')}</h1>
 
         <Select
-          label="Theme"
+          label={t('settings.theme')}
           value={theme}
           onChange={(v) => setTheme(v as typeof theme)}
           options={[
-            { value: 'dark', label: 'Dark' },
-            { value: 'light', label: 'Light' },
-            { value: 'system', label: 'System' },
+            { value: 'dark', label: t('settings.themeDark') },
+            { value: 'light', label: t('settings.themeLight') },
+            { value: 'system', label: t('settings.themeSystem') },
           ]}
         />
         <Select
-          label="Language"
+          label={t('settings.language')}
           value={language}
           onChange={(v) => setLanguage(v as typeof language)}
           options={[
@@ -44,12 +44,12 @@ export function SettingsPage() {
           ]}
         />
         <Select
-          label="Units"
+          label={t('settings.units')}
           value={units}
           onChange={(v) => setUnits(v as typeof units)}
           options={[
-            { value: 'metric', label: 'Metric (m/s, km)' },
-            { value: 'imperial', label: 'Imperial (mph, mi)' },
+            { value: 'metric', label: t('settings.unitsMetric') },
+            { value: 'imperial', label: t('settings.unitsImperial') },
           ]}
         />
         <Select
@@ -57,18 +57,18 @@ export function SettingsPage() {
           value={defaultAlgorithm}
           onChange={(v) => setDefaultAlgorithm(v as typeof defaultAlgorithm)}
           options={[
-            { value: 'a_star', label: 'A* (Wind Aware) — default' },
-            { value: 'dijkstra', label: 'Dijkstra — fallback' },
+            { value: 'a_star', label: `A* (Wind Aware) — ${t('routing.algorithmDefault')}` },
+            { value: 'dijkstra', label: `Dijkstra — ${t('routing.algorithmFallback')}` },
           ]}
         />
         <Select
-          label="Optimization criterion"
+          label={t('routing.criterion')}
           value={defaultCriterion}
           onChange={(v) => setDefaultCriterion(v as typeof defaultCriterion)}
           options={[
-            { value: 'time', label: 'Time' },
-            { value: 'energy', label: 'Energy' },
-            { value: 'balanced', label: 'Balanced' },
+            { value: 'time', label: t('routing.criterionTime') },
+            { value: 'energy', label: t('routing.criterionEnergy') },
+            { value: 'balanced', label: t('routing.criterionBalanced') },
           ]}
         />
       </Card>

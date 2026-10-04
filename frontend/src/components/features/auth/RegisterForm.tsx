@@ -21,7 +21,7 @@ export function RegisterForm({ onVerifyEmail }: { onVerifyEmail: () => void }) {
       onSubmit={handleSubmit((values) => registerMutation.mutate(values))}
       noValidate
     >
-      <TextField label="نام" autoComplete="name" error={errors.name?.message} {...register('name')} />
+      <TextField label={t('auth.name')} autoComplete="name" error={errors.name?.message} {...register('name')} />
       <TextField
         label={t('auth.email')}
         type="email"
