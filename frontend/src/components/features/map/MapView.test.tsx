@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MapView } from './MapView'
 
 // mapbox-gl فقط در مرورگر واقعی (WebGL) قابل اجراست؛ در jsdom حتی import
@@ -14,8 +14,14 @@ vi.mock('mapbox-gl/dist/mapbox-gl.css', () => ({}))
 
 // بدون VITE_MAPBOX_TOKEN در محیط تست، MapView باید پیام واضح نشان دهد
 // نه این‌که تلاش کند یک نقشه WebGL بسازد (که در jsdom ممکن نیست).
+// stubEnv تست را مستقل از `.env.local` توسعه‌دهنده می‌کند.
 describe('MapView', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
   it('shows a clear message when no Mapbox token is configured', () => {
+    vi.stubEnv('VITE_MAPBOX_TOKEN', '')
     render(
       <MapView mode="2d" origin={null} destination={null} path={null} onMapClick={() => {}} />,
     )

@@ -4,8 +4,6 @@ import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Coordinate } from '../../../types/routing'
 
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined
-
 interface MapViewProps {
   mode: '2d' | '3d'
   origin: Coordinate | null
@@ -41,6 +39,9 @@ export function MapView({
   onLongPress,
 }: MapViewProps) {
   const { t } = useTranslation()
+  // در بدنه کامپوننت خوانده می‌شود (نه در سطح ماژول) تا با vi.stubEnv در
+  // تست و تغییر `.env.local` در حالت dev، مقدار به‌روز خوانده شود.
+  const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const originMarkerRef = useRef<mapboxgl.Marker | null>(null)
@@ -128,7 +129,7 @@ export function MapView({
       map.remove()
       mapRef.current = null
     }
-  }, [])
+  }, [MAPBOX_TOKEN])
 
   // pitch/bearing برای toggle حالت 3D
   useEffect(() => {
@@ -196,7 +197,7 @@ export function MapView({
     return (
       <div className="flex h-full items-center justify-center bg-bg p-6 text-center text-text-muted">
         <p>
-          {t('common.error')}: VITE_MAPBOX_TOKEN تنظیم نشده — نقشه بارگذاری نمی‌شود.
+          {t('map.tokenMissing', { code: 'VITE_MAPBOX_TOKEN' })}
           <br />
           یک توکن Mapbox در فایل <code>.env.local</code> قرار دهید.
         </p>
