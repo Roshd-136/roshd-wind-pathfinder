@@ -4,7 +4,6 @@ import { MapModeToggle } from '../map/MapModeToggle'
 import { MapView } from '../map/MapView'
 import { PointInfoPopup } from '../map/PointInfoPopup'
 import { WindSpeedLegend } from '../layers/WindSpeedLegend'
-import { AppHeader } from '../../layout/AppHeader'
 import { MobileBottomSheet } from '../../layout/MobileBottomSheet'
 import { Button } from '../../ui/Button'
 import { usePathfinding } from '../../../hooks/usePathfinding'
@@ -129,10 +128,10 @@ export function RoutingMapScreen({ mode }: RoutingMapScreenProps) {
   )
 
   return (
-    <div className="flex h-full flex-col">
-      <AppHeader />
-      <div className="relative flex flex-1 flex-col md:flex-row">
-      <div className="relative flex-1">
+    // پنل کنترل روی نقشه شناور است (مطابق mockup)؛ نوار بالایی حذف شده —
+    // کلید تم داخل پنل است.
+    <div className="relative h-full">
+      <div className="absolute inset-0">
         <MapView
           mode={mode}
           origin={origin}
@@ -177,9 +176,11 @@ export function RoutingMapScreen({ mode }: RoutingMapScreenProps) {
         )}
       </div>
 
-      <div className="hidden p-4 md:block">{panel}</div>
-      <MobileBottomSheet title={t('trip.title')}>{panel}</MobileBottomSheet>
+      {/* پنل شناور روی نقشه (دسکتاپ) — سمت مقابل راهنما/زوم */}
+      <div className="absolute top-4 bottom-4 z-10 hidden w-[19.5rem] md:block end-4">
+        {panel}
       </div>
+      <MobileBottomSheet title={t('trip.title')}>{panel}</MobileBottomSheet>
     </div>
   )
 }

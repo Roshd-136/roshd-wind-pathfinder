@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Check } from 'lucide-react'
+import { Check, Moon, Sun } from 'lucide-react'
 import type {
   Algorithm,
   Checkpoint,
@@ -10,10 +10,29 @@ import type {
 import { Button } from '../../ui/Button'
 import { Card } from '../../ui/Card'
 import { Slider } from '../../ui/Slider'
+import { useSettingsStore } from '../../../store/useSettingsStore'
 import { WindLayerControls, type LayerVisibility } from '../layers/WindLayerControls'
 import { AlgorithmSelector } from './AlgorithmSelector'
 import { AdvancedFiltersPanel } from './AdvancedFiltersPanel'
 import { CheckpointManager } from './CheckpointManager'
+
+/** کلید تم روشن/تاریک — به داخل پنل منتقل شد (نوار بالایی حذف شده است). */
+function ThemeToggle() {
+  const theme = useSettingsStore((s) => s.theme)
+  const setTheme = useSettingsStore((s) => s.setTheme)
+  const isDark = theme !== 'light'
+  return (
+    <button
+      type="button"
+      onClick={() => setTheme(isDark ? 'light' : 'dark')}
+      aria-label={useTranslation().t('settings.theme')}
+      title={useTranslation().t('settings.theme')}
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-surface-raised text-text-secondary transition-colors hover:text-text-primary"
+    >
+      {isDark ? <Sun size={15} aria-hidden /> : <Moon size={15} aria-hidden />}
+    </button>
+  )
+}
 
 interface PathInfoPanelProps {
   algorithm: Algorithm
@@ -119,8 +138,11 @@ export function PathInfoPanel({
   const { t } = useTranslation()
 
   return (
-    <Card className="flex w-72 shrink-0 flex-col gap-4 overflow-y-auto">
-      <RouteSteps origin={origin} destination={destination} />
+    <Card className="flex h-full w-full flex-col gap-4 overflow-y-auto">
+      <div className="flex items-start justify-between gap-2">
+        <RouteSteps origin={origin} destination={destination} />
+        <ThemeToggle />
+      </div>
 
       <AlgorithmSelector value={algorithm} onChange={onAlgorithmChange} />
 

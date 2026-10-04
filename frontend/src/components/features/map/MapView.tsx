@@ -1,7 +1,6 @@
-import mapboxgl from 'mapbox-gl'
-import 'mapbox-gl/dist/mapbox-gl.css'
+import maplibregl from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEffect, useRef } from 'react'
-import { useTranslation } from 'react-i18next'
 import type { Coordinate, WindField } from '../../../types/routing'
 import { addWindLayers, applyWindField } from './windFieldLayer'
 
@@ -25,13 +24,57 @@ const ROUTE_LAYER_ID = 'route-line-layer'
 const ROUTE_DOTS_SOURCE_ID = 'route-dots'
 const ROUTE_DOTS_LAYER_ID = 'route-dots-layer'
 
+const Khorasan_CENTER: [number, number] = [58.65, 36.18]
+
 /**
- * نقشه اصلی (Mapbox GL JS) — مطابق mockup: کلیک اول = مبدأ (پین سبز)،
- * کلیک دوم = مقصد (پین قرمز)، و اگر `path` موجود باشد رسم مسیر.
- * حالت 3D با `map.setPitch`/`setTerrain` فعال می‌شود (نیازمند DEM tiles).
- *
- * بدون توکن Mapbox، به‌جای رندر شکسته یا mock، پیام واضح نشان می‌دهد —
- * توکن باید در `.env.local` به‌عنوان `VITE_MAPBOX_TOKEN` تنظیم شود.
+ * استایل نقشه — کاشی‌های آزاد OpenStreetMap (بدون نیاز به هیچ توکن/کلید) با
+ * تم هماهنگ برنامه؛ در تم تاریک با فیلتر CSS روی بوم نقشه تیره می‌شود
+ * (global.css). مشابه Google Maps اما آزاد و خودمیزبان از نظر کلید.
+ */
+function baseStyle(): maplibregl.StyleSpecification {
+  return {
+    version: 8,
+    glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+    sources: {
+      osm: {
+        type: 'raster',
+        tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+        tileSize: 256,
+        maxzoom: 19,
+        attribution: '© OpenStreetMap contributors',
+      },
+      // ارتفاع‌سنج آزاد AWS Terrarium — برای ترن سه‌بعدی و سایهٔ کوهستان
+      terrain: {
+        type: 'raster-dem',
+        tiles: [
+          'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png',
+        ],
+        encoding: 'terrarium',
+        tileSize: 256,
+        maxzoom: 14,
+      },
+    },
+    layers: [
+      { id: 'bg', type: 'background', paint: { 'background-color': '#e8e6e1' } },
+      { id: 'osm', type: 'raster', source: 'osm' },
+      {
+        id: 'hillshade',
+        type: 'hillshade',
+        source: 'terrain',
+        paint: {
+          'hillshade-exaggeration': 0.35,
+          'hillshade-shadow-color': '#473b2d',
+        },
+      },
+    ],
+  }
+}
+
+/**
+ * نقشهٔ اصلی (MapLibre GL — بدون توکن، کاشی آزاد OSM) — کلیک اول = مبدأ
+ * (پین سبز)، کلیک دوم = مقصد (پین قرمز)، مسیر با خط سفید + نقاط سفید رسم
+ * می‌شود و کادر نقشه روی مسیر تنظیم می‌گردد. حالت ۳بعدی با ترن واقعی
+ * (raster-dem آزاد) + pitch فعال می‌شود — مشابه صحنهٔ بصری‌سازی پروژه.
  */
 export function MapView({
   mode,
@@ -44,15 +87,11 @@ export function MapView({
   onPointInfo,
   onLongPress,
 }: MapViewProps) {
-  const { t } = useTranslation()
-  // در بدنه کامپوننت خوانده می‌شود (نه در سطح ماژول) تا با vi.stubEnv در
-  // تست و تغییر `.env.local` در حالت dev، مقدار به‌روز خوانده شود.
-  const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined
   const containerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<mapboxgl.Map | null>(null)
-  const originMarkerRef = useRef<mapboxgl.Marker | null>(null)
-  const destinationMarkerRef = useRef<mapboxgl.Marker | null>(null)
-  const checkpointMarkersRef = useRef<mapboxgl.Marker[]>([])
+  const mapRef = useRef<maplibregl.Map | null>(null)
+  const originMarkerRef = useRef<maplibregl.Marker | null>(null)
+  const destinationMarkerRef = useRef<maplibregl.Marker | null>(null)
+  const checkpointMarkersRef = useRef<maplibregl.Marker[]>([])
   // هندلرهای کلیک در ref نگه داشته می‌شوند تا map فقط یک‌بار ساخته شود
   // ولی همیشه آخرین کلوژرها را صدا بزند.
   const handlersRef = useRef({ origin, destination, onMapClick, onPointInfo, onLongPress })
@@ -70,21 +109,21 @@ export function MapView({
   }, [windField])
 
   useEffect(() => {
-    if (!MAPBOX_TOKEN || !containerRef.current || mapRef.current) return
+    if (!containerRef.current || mapRef.current) return
 
-    mapboxgl.accessToken = MAPBOX_TOKEN
-    const map = new mapboxgl.Map({
+    const map = new maplibregl.Map({
       container: containerRef.current,
-      style: 'mapbox://styles/mapbox/dark-v11',
-      center: [58.65, 36.18], // مرکز کریدور مسیریابی (مطابق میدان باد نمایشی)
+      style: baseStyle(),
+      center: Khorasan_CENTER,
       zoom: 7,
+      attributionControl: { compact: true },
     })
-    map.addControl(new mapboxgl.NavigationControl(), document.documentElement.dir === 'rtl' ? 'bottom-left' : 'bottom-right')
+    map.addControl(new maplibregl.NavigationControl(), document.documentElement.dir === 'rtl' ? 'bottom-left' : 'bottom-right')
 
     // long-press: نگه‌داشتن ۵۰۰ms بدون جابه‌جایی، بعد رها کردن بدون drag.
     // اگر long-press رخ دهد، کلیک بعدی نادیده گرفته می‌شود.
     let pressTimer: ReturnType<typeof setTimeout> | null = null
-    let pressStart: mapboxgl.Point | null = null
+    let pressStart: maplibregl.Point | null = null
     let longPressFired = false
 
     const clearPress = () => {
@@ -167,11 +206,29 @@ export function MapView({
       map.remove()
       mapRef.current = null
     }
-  }, [MAPBOX_TOKEN])
+  }, [])
 
-  // pitch/bearing برای toggle حالت 3D
+  // حالت ۳بعدی: pitch + ترن واقعی (DEM آزاد) با بزرگ‌نمایی ارتفاع.
+  // setTerrain قبل از آماده‌شدن استایل خطا می‌دهد (قبلاً کل اپ را می‌انداخت) —
+  // پس با رویداد load همگام می‌شود.
   useEffect(() => {
-    mapRef.current?.easeTo({ pitch: mode === '3d' ? 60 : 0, duration: 400 })
+    const map = mapRef.current
+    if (!map) return
+    const applyMode = () => {
+      try {
+        if (mode === '3d') {
+          map.easeTo({ pitch: 60, duration: 500 })
+          map.setTerrain({ source: 'terrain', exaggeration: 1.4 })
+        } else {
+          map.setTerrain(null)
+          map.easeTo({ pitch: 0, duration: 400 })
+        }
+      } catch {
+        // استایل هنوز کامل نیست — در فراخوانی بعدی (load) اعمال می‌شود
+      }
+    }
+    if (map.isStyleLoaded()) applyMode()
+    else map.once('load', applyMode)
   }, [mode])
 
   // نشانگر مبدأ
@@ -180,11 +237,12 @@ export function MapView({
     if (!map) return
     if (origin) {
       if (!originMarkerRef.current) {
-        originMarkerRef.current = new mapboxgl.Marker({ color: '#22c55e' })
+        originMarkerRef.current = new maplibregl.Marker({ color: '#22c55e' })
       }
       originMarkerRef.current.setLngLat([origin.lon, origin.lat]).addTo(map)
     } else {
       originMarkerRef.current?.remove()
+      originMarkerRef.current = null
     }
   }, [origin])
 
@@ -194,11 +252,12 @@ export function MapView({
     if (!map) return
     if (destination) {
       if (!destinationMarkerRef.current) {
-        destinationMarkerRef.current = new mapboxgl.Marker({ color: '#ef4444' })
+        destinationMarkerRef.current = new maplibregl.Marker({ color: '#ef4444' })
       }
       destinationMarkerRef.current.setLngLat([destination.lon, destination.lat]).addTo(map)
     } else {
       destinationMarkerRef.current?.remove()
+      destinationMarkerRef.current = null
     }
   }, [destination])
 
@@ -212,15 +271,15 @@ export function MapView({
       el.className =
         'flex h-6 w-6 items-center justify-center rounded-full bg-accent text-xs font-bold text-white'
       el.textContent = String(i + 1)
-      return new mapboxgl.Marker({ element: el }).setLngLat([cp.lon, cp.lat]).addTo(map)
+      return new maplibregl.Marker({ element: el }).setLngLat([cp.lon, cp.lat]).addTo(map)
     })
   }, [checkpoints])
 
-  // رسم خط مسیر + نقاط سفید روی آن (مطابق mockup)
+  // رسم خط مسیر + نقاط سفید روی آن (مطابق mockup) + تنظیم کادر روی مسیر
   useEffect(() => {
     const map = mapRef.current
     if (!map || !map.isStyleLoaded()) return
-    const source = map.getSource(ROUTE_SOURCE_ID) as mapboxgl.GeoJSONSource | undefined
+    const source = map.getSource(ROUTE_SOURCE_ID) as maplibregl.GeoJSONSource | undefined
     source?.setData({
       type: 'Feature',
       properties: {},
@@ -229,7 +288,7 @@ export function MapView({
         coordinates: (path ?? []).map((c) => [c.lon, c.lat]),
       },
     })
-    const dots = map.getSource(ROUTE_DOTS_SOURCE_ID) as mapboxgl.GeoJSONSource | undefined
+    const dots = map.getSource(ROUTE_DOTS_SOURCE_ID) as maplibregl.GeoJSONSource | undefined
     dots?.setData({
       type: 'FeatureCollection',
       features: (path ?? [])
@@ -241,19 +300,17 @@ export function MapView({
           geometry: { type: 'Point' as const, coordinates: [c.lon, c.lat] },
         })),
     })
-  }, [path])
-
-  if (!MAPBOX_TOKEN) {
-    return (
-      <div className="flex h-full items-center justify-center bg-bg p-6 text-center text-text-muted">
-        <p>
-          {t('map.tokenMissing', { code: 'VITE_MAPBOX_TOKEN' })}
-          <br />
-          یک توکن Mapbox در فایل <code>.env.local</code> قرار دهید.
-        </p>
-      </div>
-    )
-  }
+    // پس از محاسبه، کادر نقشه روی مسیر تنظیم شود
+    if (path && path.length > 1) {
+      const lons = path.map((c) => c.lon)
+      const lats = path.map((c) => c.lat)
+      const bounds = new maplibregl.LngLatBounds(
+        [Math.min(...lons), Math.min(...lats)],
+        [Math.max(...lons), Math.max(...lats)],
+      )
+      map.fitBounds(bounds, { padding: 80, duration: 800, pitch: mode === '3d' ? 60 : 0 })
+    }
+  }, [path, mode])
 
   return <div ref={containerRef} className="h-full w-full" role="application" aria-label="map" />
 }

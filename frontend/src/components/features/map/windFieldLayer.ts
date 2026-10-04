@@ -1,3 +1,4 @@
+import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl'
 import type { WindField } from '../../../types/routing'
 import { arrowFeatures, colorForSpeed, gridMeta, WIND_SPEED_STOPS } from '../../../utils/windField'
 
@@ -86,7 +87,7 @@ export function arrowChevronsGeoJson(field: WindField, stride = 3) {
 }
 
 /** افزودن source/لایه‌های میدان باد (فقط پس از «load»). */
-export function addWindLayers(map: mapboxgl.Map): void {
+export function addWindLayers(map: MapLibreMap): void {
   if (map.getSource(FIELD_SOURCE)) return
   map.addSource(FIELD_SOURCE, {
     type: 'geojson',
@@ -126,7 +127,7 @@ export function addWindLayers(map: mapboxgl.Map): void {
 }
 
 /** میدان باد زیر خط مسیر بنشیند (خط مسیر و چک‌پوینت‌ها رو باشد). */
-export function moveWindLayersBelowRoute(map: mapboxgl.Map): void {
+export function moveWindLayersBelowRoute(map: MapLibreMap): void {
   const routeLayer = 'route-line-layer' // همان ROUTE_LAYER_ID در MapView
   if (map.getLayer(FIELD_LAYER) && map.getLayer(routeLayer)) {
     map.moveLayer(FIELD_LAYER, routeLayer)
@@ -137,7 +138,7 @@ export function moveWindLayersBelowRoute(map: mapboxgl.Map): void {
 }
 
 /** حذف لایه‌های باد (وقتی هیچ لایه‌ای فعال نیست). */
-export function setWindLayersVisible(map: mapboxgl.Map, visible: boolean): void {
+export function setWindLayersVisible(map: MapLibreMap, visible: boolean): void {
   if (map.getLayer(FIELD_LAYER)) {
     map.setLayoutProperty(FIELD_LAYER, 'visibility', visible ? 'visible' : 'none')
   }
@@ -147,10 +148,10 @@ export function setWindLayersVisible(map: mapboxgl.Map, visible: boolean): void 
 }
 
 /** به‌روزرسانی دادهٔ میدان فعال. */
-export function updateWindField(map: mapboxgl.Map, field: WindField): void {
-  const fillSource = map.getSource(FIELD_SOURCE) as mapboxgl.GeoJSONSource | undefined
+export function updateWindField(map: MapLibreMap, field: WindField): void {
+  const fillSource = map.getSource(FIELD_SOURCE) as GeoJSONSource | undefined
   fillSource?.setData(fieldFillGeoJson(field))
-  const arrowSource = map.getSource(ARROW_SOURCE) as mapboxgl.GeoJSONSource | undefined
+  const arrowSource = map.getSource(ARROW_SOURCE) as GeoJSONSource | undefined
   arrowSource?.setData(arrowChevronsGeoJson(field))
 }
 
@@ -164,7 +165,7 @@ export function updateWindField(map: mapboxgl.Map, field: WindField): void {
  * اگر applyWindField خودش داخل هندلر load صدا زده شود، ثبت شنوندهٔ تازه روی
  * همان رویدادِ در حال انتشار هرگز اجرا نمی‌شود.
  */
-function whenStyleReady(map: mapboxgl.Map, fn: () => void, tries = 100): void {
+function whenStyleReady(map: MapLibreMap, fn: () => void, tries = 100): void {
   if (map.isStyleLoaded() || map.loaded()) {
     fn()
     return
@@ -174,7 +175,7 @@ function whenStyleReady(map: mapboxgl.Map, fn: () => void, tries = 100): void {
   }
 }
 
-export function applyWindField(map: mapboxgl.Map, field: WindField | null): void {
+export function applyWindField(map: MapLibreMap, field: WindField | null): void {
   if (!map.isStyleLoaded() && !map.loaded()) {
     whenStyleReady(map, () => applyWindField(map, field))
     return

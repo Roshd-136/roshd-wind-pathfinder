@@ -18,7 +18,7 @@ Capacitor (موبایل) و Tauri (دسکتاپ) بسته‌بندی می‌شو
 | کتابخانه UI | React 19 + TypeScript |
 | باندلر | Vite |
 | استایل | Tailwind CSS v4 (Design Tokens با `@theme`) |
-| نقشه | Mapbox GL JS (حالت 2D/3D) |
+| نقشه | MapLibre GL (انشعاب آزاد Mapbox — بدون توکن، کاشی OSM، ترن ۳بعدی DEM آزاد) |
 | مسیریابی | React Router |
 | حالت سراسری | Zustand (`useRouteStore`، `useUiStore`، `useSettingsStore`) |
 | داده/کش | TanStack Query |
