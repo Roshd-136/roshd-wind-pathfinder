@@ -79,3 +79,17 @@ export interface WindPointSample {
   speed_mps: number
   direction_deg: number
 }
+
+/** یک بردار باد روی شبکه — معادل schema `WindVector` در api/openapi.yaml. */
+export interface WindVector {
+  lat: number
+  lon: number
+  speed_mps: number
+  direction_deg: number
+}
+
+/** میدان برداری باد یک لایه — معادل schema `WindField` (GET /wind-layers/{alt}/field). */
+export interface WindField {
+  altitude_m: number
+  vectors: WindVector[]
+}

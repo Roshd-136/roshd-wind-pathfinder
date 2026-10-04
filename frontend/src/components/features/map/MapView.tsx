@@ -2,7 +2,8 @@ import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { Coordinate } from '../../../types/routing'
+import type { Coordinate, WindField } from '../../../types/routing'
+import { addWindLayers, applyWindField } from './windFieldLayer'
 
 interface MapViewProps {
   mode: '2d' | '3d'
@@ -10,6 +11,8 @@ interface MapViewProps {
   destination: Coordinate | null
   checkpoints?: Coordinate[]
   path: Coordinate[] | null
+  /** میدان باد لایهٔ فعال — نقشهٔ حرارتی + پیکان‌ها (اختیاری). */
+  windField?: WindField | null
   onMapClick: (coord: Coordinate) => void
   /** کلیک بعد از تعیین مبدأ/مقصد — نمایش لایه‌های باد در آن نقطه. */
   onPointInfo?: (coord: Coordinate) => void
@@ -19,6 +22,8 @@ interface MapViewProps {
 
 const ROUTE_SOURCE_ID = 'route-line'
 const ROUTE_LAYER_ID = 'route-line-layer'
+const ROUTE_DOTS_SOURCE_ID = 'route-dots'
+const ROUTE_DOTS_LAYER_ID = 'route-dots-layer'
 
 /**
  * نقشه اصلی (Mapbox GL JS) — مطابق mockup: کلیک اول = مبدأ (پین سبز)،
@@ -34,6 +39,7 @@ export function MapView({
   destination,
   checkpoints = [],
   path,
+  windField = null,
   onMapClick,
   onPointInfo,
   onLongPress,
@@ -54,6 +60,15 @@ export function MapView({
     handlersRef.current = { origin, destination, onMapClick, onPointInfo, onLongPress }
   })
 
+  // میدان باد در ref نگه داشته می‌شود تا وقتی map لایه‌هایش را افزود (به‌صورت
+  // ناهمگام بعد از load)، آخرین میدان بلافاصله اعمال شود.
+  const windFieldRef = useRef<WindField | null>(windField)
+  useEffect(() => {
+    windFieldRef.current = windField
+    const map = mapRef.current
+    if (map) applyWindField(map, windField)
+  }, [windField])
+
   useEffect(() => {
     if (!MAPBOX_TOKEN || !containerRef.current || mapRef.current) return
 
@@ -61,10 +76,10 @@ export function MapView({
     const map = new mapboxgl.Map({
       container: containerRef.current,
       style: 'mapbox://styles/mapbox/dark-v11',
-      center: [58.8, 36.2], // مرکز تقریبی ایستگاه‌های خراسان
-      zoom: 6,
+      center: [58.65, 36.18], // مرکز کریدور مسیریابی (مطابق میدان باد نمایشی)
+      zoom: 7,
     })
-    map.addControl(new mapboxgl.NavigationControl(), 'bottom-right')
+    map.addControl(new mapboxgl.NavigationControl(), document.documentElement.dir === 'rtl' ? 'bottom-left' : 'bottom-right')
 
     // long-press: نگه‌داشتن ۵۰۰ms بدون جابه‌جایی، بعد رها کردن بدون drag.
     // اگر long-press رخ دهد، کلیک بعدی نادیده گرفته می‌شود.
@@ -114,13 +129,36 @@ export function MapView({
         type: 'geojson',
         data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } },
       })
+      // خط مسیر سفید + نقاط سفید — مطابق mockup
       map.addLayer({
         id: ROUTE_LAYER_ID,
         type: 'line',
         source: ROUTE_SOURCE_ID,
         layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': '#3b82f6', 'line-width': 4 },
+        paint: {
+          'line-color': '#f8fafc',
+          'line-width': 4,
+          'line-blur': 0.2,
+        },
       })
+      map.addSource(ROUTE_DOTS_SOURCE_ID, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      })
+      map.addLayer({
+        id: ROUTE_DOTS_LAYER_ID,
+        type: 'circle',
+        source: ROUTE_DOTS_SOURCE_ID,
+        paint: {
+          'circle-radius': 3.2,
+          'circle-color': '#f8fafc',
+          'circle-stroke-color': 'rgba(10, 14, 26, 0.4)',
+          'circle-stroke-width': 1,
+        },
+      })
+      // میدان باد: نقشهٔ حرارتی + پیکان‌ها (زیر خط مسیر)
+      addWindLayers(map)
+      applyWindField(map, windFieldRef.current)
     })
 
     mapRef.current = map
@@ -178,7 +216,7 @@ export function MapView({
     })
   }, [checkpoints])
 
-  // رسم خط مسیر
+  // رسم خط مسیر + نقاط سفید روی آن (مطابق mockup)
   useEffect(() => {
     const map = mapRef.current
     if (!map || !map.isStyleLoaded()) return
@@ -190,6 +228,18 @@ export function MapView({
         type: 'LineString',
         coordinates: (path ?? []).map((c) => [c.lon, c.lat]),
       },
+    })
+    const dots = map.getSource(ROUTE_DOTS_SOURCE_ID) as mapboxgl.GeoJSONSource | undefined
+    dots?.setData({
+      type: 'FeatureCollection',
+      features: (path ?? [])
+        // هر n امین نقطه تا تراکم نقاط شبیه mockup بماند
+        .filter((_, i) => i % Math.max(1, Math.ceil((path?.length ?? 1) / 24)) === 0)
+        .map((c) => ({
+          type: 'Feature' as const,
+          properties: {},
+          geometry: { type: 'Point' as const, coordinates: [c.lon, c.lat] },
+        })),
     })
   }, [path])
 
