@@ -113,6 +113,8 @@ export function RoutingMapScreen({ mode }: RoutingMapScreenProps) {
       onLayerVisibilityChange={setLayerVisibility}
       constraints={constraints}
       onConstraintsChange={setConstraints}
+      origin={origin}
+      destination={destination}
       checkpoints={checkpoints}
       onRemoveCheckpoint={removeCheckpoint}
       onMoveCheckpoint={moveCheckpoint}

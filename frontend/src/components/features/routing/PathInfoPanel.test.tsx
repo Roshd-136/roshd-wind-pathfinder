@@ -9,6 +9,8 @@ const baseProps = {
   onLayerVisibilityChange: vi.fn(),
   constraints: { max_wind_speed_mps: 20, criterion: 'time' as const },
   onConstraintsChange: vi.fn(),
+  origin: { lat: 36.297, lon: 59.606 },
+  destination: { lat: 36.215, lon: 57.678 },
   checkpoints: [],
   onRemoveCheckpoint: vi.fn(),
   onMoveCheckpoint: vi.fn(),

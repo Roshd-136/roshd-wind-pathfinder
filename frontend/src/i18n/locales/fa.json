@@ -36,6 +36,14 @@
     "moveUp": "جابجایی به بالا",
     "moveDown": "جابجایی به پایین",
     "remove": "حذف",
+    "stepsTitle": "مراحل مسیر",
+    "stepOrigin": "۱. انتخاب مبدأ",
+    "stepDestination": "۲. انتخاب مقصد",
+    "stepOriginDone": "مبدأ",
+    "stepDestinationDone": "مقصد",
+    "catAltitude": "ارتفاع پرواز",
+    "catOptimization": "بهینه‌سازی",
+    "catAvoid": "اجتناب از مناطق",
     "demoRoute": "مسیر نمایشی — محاسبه‌شده روی داده واقعی ایستگاه‌ها (بدون بک‌اند)"
   },
   "legend": {

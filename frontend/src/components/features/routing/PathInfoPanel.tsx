@@ -1,5 +1,12 @@
 import { useTranslation } from 'react-i18next'
-import type { Algorithm, Checkpoint, RouteConstraints, RouteResult } from '../../../types/routing'
+import { Check } from 'lucide-react'
+import type {
+  Algorithm,
+  Checkpoint,
+  Coordinate,
+  RouteConstraints,
+  RouteResult,
+} from '../../../types/routing'
 import { Button } from '../../ui/Button'
 import { Card } from '../../ui/Card'
 import { Slider } from '../../ui/Slider'
@@ -15,6 +22,8 @@ interface PathInfoPanelProps {
   onLayerVisibilityChange: (value: LayerVisibility) => void
   constraints: RouteConstraints
   onConstraintsChange: (value: RouteConstraints) => void
+  origin: Coordinate | null
+  destination: Coordinate | null
   checkpoints: Checkpoint[]
   onRemoveCheckpoint: (index: number) => void
   onMoveCheckpoint: (index: number, direction: -1 | 1) => void
@@ -28,11 +37,64 @@ interface PathInfoPanelProps {
   resultIsDemo?: boolean
 }
 
+const fmt = (c: Coordinate) => `${c.lat.toFixed(3)}, ${c.lon.toFixed(3)}`
+
 /**
- * پنل سمت راست (کنترل + نتیجه) — ترکیب AlgorithmSelector، WindLayerControls،
- * مدیریت چک‌پوینت، فیلترهای پیشرفته، و دکمه اصلی، مطابق چیدمان mockup +
- * چک‌لیست کامل تسک (آیتم‌های ۶، ۱۰، ۱۱). بعد از محاسبه، خلاصه نتیجه هم
- * همین‌جا نمایش داده می‌شود.
+ * فهرست مراحل انتخاب (مثل ناوبری Uber) — «۱. انتخاب مبدأ / ۲. انتخاب مقصد»؛
+ * بعد از انتخاب هر نقطه، متن مرحله با مختصات انتخاب‌شده جایگزین می‌شود.
+ */
+function RouteSteps({
+  origin,
+  destination,
+}: {
+  origin: Coordinate | null
+  destination: Coordinate | null
+}) {
+  const { t } = useTranslation()
+
+  const steps = [
+    {
+      n: 1,
+      done: origin !== null,
+      pending: t('routing.stepOrigin'),
+      doneText: `${t('routing.stepOriginDone')}: ${origin ? fmt(origin) : ''}`,
+    },
+    {
+      n: 2,
+      done: destination !== null,
+      pending: t('routing.stepDestination'),
+      doneText: `${t('routing.stepDestinationDone')}: ${destination ? fmt(destination) : ''}`,
+    },
+  ]
+
+  return (
+    <ol className="space-y-2" aria-label={t('routing.stepsTitle')}>
+      {steps.map((s) => (
+        <li key={s.n} className="flex items-center gap-2 text-sm">
+          <span
+            aria-hidden
+            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
+              s.done
+                ? 'border-success bg-success/15 text-success'
+                : 'border-border bg-surface-raised text-text-muted'
+            }`}
+          >
+            {s.done ? <Check size={13} /> : s.n}
+          </span>
+          <span className={s.done ? 'text-text-primary' : 'text-text-muted'}>
+            {s.done ? s.doneText : s.pending}
+          </span>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+/**
+ * پنل کنار نقشه (کنترل + نتیجه) — ترکیب مراحل انتخاب، AlgorithmSelector،
+ * WindLayerControls، مدیریت چک‌پوینت، فیلترهای پیشرفته، و دکمه اصلی، مطابق
+ * چیدمان mockup + چک‌لیست کامل تسک (آیتم‌های ۶، ۱۰، ۱۱). بعد از محاسبه،
+ * خلاصه نتیجه هم همین‌جا نمایش داده می‌شود.
  */
 export function PathInfoPanel({
   algorithm,
@@ -41,6 +103,8 @@ export function PathInfoPanel({
   onLayerVisibilityChange,
   constraints,
   onConstraintsChange,
+  origin,
+  destination,
   checkpoints,
   onRemoveCheckpoint,
   onMoveCheckpoint,
@@ -56,6 +120,8 @@ export function PathInfoPanel({
 
   return (
     <Card className="flex w-72 shrink-0 flex-col gap-4 overflow-y-auto">
+      <RouteSteps origin={origin} destination={destination} />
+
       <AlgorithmSelector value={algorithm} onChange={onAlgorithmChange} />
 
       <WindLayerControls value={layerVisibility} onChange={onLayerVisibilityChange} />

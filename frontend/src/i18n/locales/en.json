@@ -36,6 +36,14 @@
     "moveUp": "Move up",
     "moveDown": "Move down",
     "remove": "Remove",
+    "stepsTitle": "Route steps",
+    "stepOrigin": "1. Select start",
+    "stepDestination": "2. Select end",
+    "stepOriginDone": "Start",
+    "stepDestinationDone": "End",
+    "catAltitude": "Flight altitude",
+    "catOptimization": "Optimization",
+    "catAvoid": "Avoid zones",
     "demoRoute": "Demo route — computed on real station data (no backend)"
   },
   "legend": {
