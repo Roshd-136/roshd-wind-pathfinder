@@ -24,6 +24,8 @@ interface PathInfoPanelProps {
   isCalculating: boolean
   canCalculate: boolean
   result: RouteResult | null
+  /** مسیر از فیکسچر نمایشی dev آمده (بدون بک‌اند) — با برچسب صریح. */
+  resultIsDemo?: boolean
 }
 
 /**
@@ -48,6 +50,7 @@ export function PathInfoPanel({
   isCalculating,
   canCalculate,
   result,
+  resultIsDemo = false,
 }: PathInfoPanelProps) {
   const { t } = useTranslation()
 
@@ -97,6 +100,11 @@ export function PathInfoPanel({
           className="space-y-1 rounded-md border border-border bg-surface-raised p-3 text-xs text-text-secondary"
           data-testid="route-result-summary"
         >
+          {resultIsDemo && (
+            <p className="mb-1 rounded bg-accent/10 px-2 py-1 text-accent">
+              {t('routing.demoRoute')}
+            </p>
+          )}
           <div className="flex justify-between">
             <span>{t('results.layerAltitude')}</span>
             <span className="text-text-primary">{result.layer_altitude_m} m</span>

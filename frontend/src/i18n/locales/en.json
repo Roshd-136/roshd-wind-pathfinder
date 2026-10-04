@@ -7,6 +7,8 @@
     "toggle2d": "2D",
     "toggle3d": "3D",
     "selectHint": "Select start and end points",
+    "selectOrigin": "Step 1 of 2 — pick the start point on the map",
+    "selectDestination": "Step 2 of 2 — pick the destination on the map",
     "clear": "Clear",
     "tokenMissing": "Error: {{code}} is not set — the map cannot load."
   },
@@ -33,7 +35,14 @@
     "checkpointHint": "After picking origin and destination, long-press the map to add a mandatory checkpoint.",
     "moveUp": "Move up",
     "moveDown": "Move down",
-    "remove": "Remove"
+    "remove": "Remove",
+    "demoRoute": "Demo route — computed on real station data (no backend)"
+  },
+  "legend": {
+    "title": "Wind Speed (m/s)"
+  },
+  "trip": {
+    "title": "Trip Settings"
   },
   "settings": {
     "theme": "Theme",

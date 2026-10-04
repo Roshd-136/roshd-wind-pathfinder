@@ -1,15 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MapModeToggle } from '../map/MapModeToggle'
 import { MapView } from '../map/MapView'
 import { PointInfoPopup } from '../map/PointInfoPopup'
+import { WindSpeedLegend } from '../layers/WindSpeedLegend'
 import { AppHeader } from '../../layout/AppHeader'
 import { MobileBottomSheet } from '../../layout/MobileBottomSheet'
 import { Button } from '../../ui/Button'
 import { usePathfinding } from '../../../hooks/usePathfinding'
-import { useWindAtPoint } from '../../../hooks/useWindData'
+import { useWindAtPoint, useWindFields } from '../../../hooks/useWindData'
 import { useRouteStore } from '../../../store/useRouteStore'
-import type { Coordinate } from '../../../types/routing'
+import { useUiStore } from '../../../store/useUiStore'
+import type { Coordinate, RouteResult } from '../../../types/routing'
 import { PathInfoPanel } from './PathInfoPanel'
 
 interface RoutingMapScreenProps {
@@ -47,8 +49,25 @@ export function RoutingMapScreen({ mode }: RoutingMapScreenProps) {
   } = useRouteStore()
 
   const [infoPoint, setInfoPoint] = useState<Coordinate | null>(null)
+  const [isDemoResult, setIsDemoResult] = useState(false)
   const pathfinding = usePathfinding()
-  const windAtPoint = useWindAtPoint(infoPoint)
+  const { fields } = useWindFields()
+  const windAtPoint = useWindAtPoint(infoPoint, fields)
+  const openMobileSheet = useUiStore((s) => s.openMobileSheet)
+
+  // جریان Uber-مانند: با کامل شدن مبدأ/مقصد، شیت «تنظیمات سفر» در موبایل بالا می‌آید
+  useEffect(() => {
+    if (origin && destination) openMobileSheet()
+  }, [origin, destination, openMobileSheet])
+
+  // لایهٔ فعال میدان باد = اولین لایهٔ قابل‌مشاهده (سطحی → میانی → بالا).
+  const activeField =
+    fields.find(
+      (f) =>
+        (layerVisibility.surface && f.altitude_m === 50) ||
+        (layerVisibility.mid && f.altitude_m === 200) ||
+        (layerVisibility.high && f.altitude_m === 500),
+    ) ?? null
 
   function handleMapClick(coord: Coordinate) {
     if (!origin) {
@@ -64,7 +83,25 @@ export function RoutingMapScreen({ mode }: RoutingMapScreenProps) {
     if (!origin || !destination) return
     pathfinding.mutate(
       { origin, destination, checkpoints, algorithm, constraints },
-      { onSuccess: setResult },
+      {
+        onSuccess: (routeResult) => {
+          setIsDemoResult(false)
+          setResult(routeResult)
+        },
+        // پیش‌نمایش dev بدون بک‌اند: مسیر نمایشی واقعی کریدور (خروجی
+        // `scripts/export_web_wind_fixture.py` از گراف چندلایه) با برچسب صریح.
+        onError: async () => {
+          if (!import.meta.env.DEV) return
+          try {
+            const response = await fetch('/mock/route-demo.json')
+            if (!response.ok) return
+            setIsDemoResult(true)
+            setResult((await response.json()) as RouteResult)
+          } catch {
+            // بک‌اند هم نیست، فیکسچر هم نیست — خطا به حالت خودش واگذار می‌شود
+          }
+        },
+      },
     )
   }
 
@@ -85,6 +122,7 @@ export function RoutingMapScreen({ mode }: RoutingMapScreenProps) {
       isCalculating={pathfinding.isPending}
       canCalculate={Boolean(origin && destination)}
       result={result}
+      resultIsDemo={isDemoResult}
     />
   )
 
@@ -99,10 +137,19 @@ export function RoutingMapScreen({ mode }: RoutingMapScreenProps) {
           destination={destination}
           checkpoints={checkpoints}
           path={result?.path ?? null}
+          windField={activeField}
           onMapClick={handleMapClick}
           onLongPress={addCheckpoint}
         />
         <MapModeToggle />
+        {activeField && (
+          <div className="absolute bottom-4 start-4 z-10 rounded-lg border border-border bg-surface/90 p-3 shadow-[var(--shadow-card)] backdrop-blur-sm">
+            <div className="mb-1 text-xs font-medium text-text-secondary">
+              {t('legend.title')}
+            </div>
+            <WindSpeedLegend />
+          </div>
+        )}
         {(origin || destination || checkpoints.length > 0) && (
           <Button
             variant="secondary"
@@ -112,9 +159,15 @@ export function RoutingMapScreen({ mode }: RoutingMapScreenProps) {
             {t('map.clear')}
           </Button>
         )}
-        {!origin && (
-          <div className="pointer-events-none absolute inset-x-0 top-16 text-center text-sm text-text-muted">
-            {t('map.selectHint')}
+        {/* راهنمای گام‌به‌گام انتخاب — مثل ناوبری Uber: اول مبدأ، بعد مقصد */}
+        {(origin === null || destination === null) && (
+          <div className="pointer-events-none absolute inset-x-0 top-16 z-10 flex justify-center px-4">
+            <div
+              role="status"
+              className="rounded-full border border-border bg-surface/95 px-4 py-2 text-sm text-text-primary shadow-[var(--shadow-card)] backdrop-blur-sm"
+            >
+              {origin === null ? t('map.selectOrigin') : t('map.selectDestination')}
+            </div>
           </div>
         )}
         {infoPoint && windAtPoint.data && (
@@ -123,7 +176,7 @@ export function RoutingMapScreen({ mode }: RoutingMapScreenProps) {
       </div>
 
       <div className="hidden p-4 md:block">{panel}</div>
-      <MobileBottomSheet>{panel}</MobileBottomSheet>
+      <MobileBottomSheet title={t('trip.title')}>{panel}</MobileBottomSheet>
       </div>
     </div>
   )

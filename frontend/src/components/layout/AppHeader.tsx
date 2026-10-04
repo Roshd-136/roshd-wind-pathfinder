@@ -16,7 +16,8 @@ export function AppHeader() {
   const toggleTheme = () => setTheme(isDark ? 'light' : 'dark')
 
   return (
-    <header className="flex items-center justify-between gap-4 border-b border-border bg-surface px-4 py-3">
+    // در موبایل نقشه مثل Uber/Snapp تمام‌صفحه است — نوار بالا فقط دسکتاپ.
+    <header className="hidden items-center justify-between gap-4 border-b border-border bg-surface px-4 py-3 md:flex">
       <div>
         <h1 className="text-base font-semibold text-text-primary">{t('map.title')}</h1>
         <p className="text-xs text-text-muted">{t('map.subtitle')}</p>
