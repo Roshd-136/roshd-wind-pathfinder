@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { MapModeToggle } from '../map/MapModeToggle'
 import { MapView } from '../map/MapView'
 import { PointInfoPopup } from '../map/PointInfoPopup'
+import { AppHeader } from '../../layout/AppHeader'
 import { MobileBottomSheet } from '../../layout/MobileBottomSheet'
 import { Button } from '../../ui/Button'
 import { usePathfinding } from '../../../hooks/usePathfinding'
@@ -88,7 +89,9 @@ export function RoutingMapScreen({ mode }: RoutingMapScreenProps) {
   )
 
   return (
-    <div className="relative flex h-full flex-col md:flex-row">
+    <div className="flex h-full flex-col">
+      <AppHeader />
+      <div className="relative flex flex-1 flex-col md:flex-row">
       <div className="relative flex-1">
         <MapView
           mode={mode}
@@ -106,7 +109,7 @@ export function RoutingMapScreen({ mode }: RoutingMapScreenProps) {
             className="absolute start-4 top-16 z-10"
             onClick={reset}
           >
-            پاک کردن
+            {t('map.clear')}
           </Button>
         )}
         {!origin && (
@@ -121,6 +124,7 @@ export function RoutingMapScreen({ mode }: RoutingMapScreenProps) {
 
       <div className="hidden p-4 md:block">{panel}</div>
       <MobileBottomSheet>{panel}</MobileBottomSheet>
+      </div>
     </div>
   )
 }
