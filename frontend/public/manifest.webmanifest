@@ -1,0 +1,19 @@
+{
+  "name": "WindPath — مسیریاب بادی",
+  "short_name": "WindPath",
+  "description": "مسیریاب بادی روشد — محاسبه مسیر بهینه با در نظر گرفتن جریان باد",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0e1a",
+  "theme_color": "#0a0e1a",
+  "lang": "fa",
+  "dir": "rtl",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

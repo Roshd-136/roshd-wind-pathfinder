@@ -66,8 +66,10 @@ Design Tokens استفاده می‌شود:
   تفاوت پلتفرم‌ها فقط در لایه بسته‌بندی (`tauri.conf.json`،
   `capacitor.config.ts`) و یک لایه نازک تشخیص پلتفرم (`src/platform/`)
   برای قابلیت‌های native (مثل file system یا notifications) است.
-- **Web/PWA:** خروجی مستقیم `vite build`؛ manifest.json + service worker
-  (`vite-plugin-pwa`) برای نصب‌پذیری و کش آفلاین.
+- **Web/PWA:** خروجی مستقیم `vite build`؛ مانیفست نصب‌پذیری در
+  `public/manifest.webmanifest` (نام، تم، آیکون) و لینک آن در `index.html`.
+  سرویس‌ورکر کش آفلاین با `vite-plugin-pwa` به تسک یکپارچه‌سازی نهایی
+  موکول است (افزودن وابستگی جدید نیازمند تأیید مالک پروژه است).
 - **Desktop (Tauri):** همان build وب داخل یک shell سبک Rust؛ در آینده
   (تسک بک‌اند) سرور FastAPI به‌صورت Tauri sidecar کنار اپ دسکتاپ اجرا
   می‌شود.
