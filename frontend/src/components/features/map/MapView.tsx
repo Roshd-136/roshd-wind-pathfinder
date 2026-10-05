@@ -116,7 +116,7 @@ export function MapView({
       zoom: 7,
     })
     // انتساب OSM (الزام مجوز) — گوشهٔ مقابل زوم و راهنما
-    map.addControl(new maplibregl.AttributionControl({ compact: true }), document.documentElement.dir === "rtl" ? "bottom-left" : "bottom-right")
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), document.documentElement.dir === "rtl" ? "bottom-right" : "bottom-left")
     map.addControl(new maplibregl.NavigationControl(), document.documentElement.dir === 'rtl' ? 'bottom-right' : 'bottom-left')
 
     // long-press: نگه‌داشتن ۵۰۰ms بدون جابه‌جایی، بعد رها کردن بدون drag.

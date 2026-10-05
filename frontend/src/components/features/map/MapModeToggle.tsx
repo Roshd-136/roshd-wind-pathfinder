@@ -20,7 +20,7 @@ export function MapModeToggle() {
     <div
       role="tablist"
       aria-label={t('map.title')}
-      className="absolute start-4 top-4 z-10 flex gap-1 rounded-lg border border-border bg-surface p-1"
+      className="absolute bottom-4 end-4 z-10 flex flex-col gap-1 rounded-lg border border-border bg-surface p-1"
     >
       <button
         type="button"

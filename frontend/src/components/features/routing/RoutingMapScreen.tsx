@@ -12,6 +12,7 @@ import { useRouteStore } from '../../../store/useRouteStore'
 import { useUiStore } from '../../../store/useUiStore'
 import type { Coordinate, RouteResult } from '../../../types/routing'
 import { PathInfoPanel } from './PathInfoPanel'
+import { StepsWizard } from './StepsWizard'
 
 interface RoutingMapScreenProps {
   mode: '2d' | '3d'
@@ -57,6 +58,7 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
   const { fields } = useWindFields()
   const windAtPoint = useWindAtPoint(infoPoint, fields)
   const openMobileSheet = useUiStore((s) => s.openMobileSheet)
+  const sidebarOpen = useUiStore((s) => s.isSidebarOpen)
 
   // جریان Uber-مانند: با کامل شدن مبدأ/مقصد، شیت «تنظیمات سفر» در موبایل بالا می‌آید
   useEffect(() => {
@@ -116,15 +118,11 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
       onLayerVisibilityChange={setLayerVisibility}
       constraints={constraints}
       onConstraintsChange={setConstraints}
-      origin={origin}
-      destination={destination}
       checkpoints={checkpoints}
       onRemoveCheckpoint={removeCheckpoint}
       onMoveCheckpoint={moveCheckpoint}
       onPointInfo={() => setInfoPoint(origin)}
       canPointInfo={Boolean(origin)}
-      onBack={() => goBackStep()}
-      canBack={Boolean(destination || result || origin)}
       onCalculate={handleCalculate}
       isCalculating={pathfinding.isPending}
       canCalculate={Boolean(origin && destination)}
@@ -161,30 +159,27 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
         {(origin || destination || checkpoints.length > 0) && (
           <Button
             variant="secondary"
-            className="absolute start-4 top-16 z-10"
+            className={`absolute top-16 z-10 ${sidebarOpen ? "start-4" : "start-16"}`}
             onClick={reset}
           >
             {t('map.clear')}
           </Button>
         )}
-        {/* راهنمای گام‌به‌گام انتخاب — مثل ناوبری Uber: اول مبدأ، بعد مقصد */}
-        {(origin === null || destination === null) && (
-          <div className="pointer-events-none absolute inset-x-0 top-16 z-10 flex justify-center px-4">
-            <div
-              role="status"
-              className="rounded-full border border-border bg-surface/95 px-4 py-2 text-sm text-text-primary shadow-[var(--shadow-card)] backdrop-blur-sm"
-            >
-              {origin === null ? t('map.selectOrigin') : t('map.selectDestination')}
-            </div>
-          </div>
-        )}
+        {/* ویزارد مراحل — قاب وسط بالا با اسلاید افقی */}
+        <StepsWizard
+          origin={origin}
+          destination={destination}
+          hasResult={Boolean(result)}
+          onBack={() => goBackStep()}
+          canBack={Boolean(destination || result || origin)}
+        />
         {infoPoint && windAtPoint.data && (
           <PointInfoPopup samples={windAtPoint.data} onClose={() => setInfoPoint(null)} />
         )}
       </div>
 
       {/* پنل شناور روی نقشه (دسکتاپ) — همیشه نمایان */}
-      <div className="absolute top-4 bottom-4 z-10 hidden w-[19.5rem] md:block end-4">
+      <div className="absolute top-4 bottom-20 z-10 hidden w-[19.5rem] md:block end-4">
         {panel}
       </div>
       <MobileBottomSheet title={t('trip.title')}>{panel}</MobileBottomSheet>

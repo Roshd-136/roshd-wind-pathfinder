@@ -1,7 +1,8 @@
-import { Map, Info, Menu, Settings, User } from 'lucide-react'
+import { Map, Info, Menu, Moon, Settings, Sun, User } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useUiStore } from '../../store/useUiStore'
+import { useSettingsStore } from '../../store/useSettingsStore'
 
 const NAV_ITEMS = [
   { to: '/', labelKey: 'nav.map', icon: Map },
@@ -22,6 +23,9 @@ export function AppShell() {
   const { t } = useTranslation()
   const isSidebarOpen = useUiStore((s) => s.isSidebarOpen)
   const toggleSidebar = useUiStore((s) => s.toggleSidebar)
+  const theme = useSettingsStore((s) => s.theme)
+  const setTheme = useSettingsStore((s) => s.setTheme)
+  const isDark = theme !== 'light'
 
   return (
     <div className="flex h-full">
@@ -68,7 +72,18 @@ export function AppShell() {
             </NavLink>
           ))}
         </nav>
+        {/* کلید تم — در سایدبار (سمت راست در RTL) */}
         <div className="mt-auto border-t border-border pt-2">
+          <button
+            type="button"
+            onClick={() => setTheme(isDark ? 'light' : 'dark')}
+            aria-label={t('settings.theme')}
+            title={t('settings.theme')}
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
+          >
+            {isDark ? <Sun size={18} aria-hidden /> : <Moon size={18} aria-hidden />}
+            {t('settings.theme')}
+          </button>
           <NavLink
             to={PROFILE_ITEM.to}
             className={({ isActive }) =>
