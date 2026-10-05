@@ -1,5 +1,7 @@
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, Moon, Sun } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { Check, Moon, Sun, Undo2 } from 'lucide-react'
 import type {
   Algorithm,
   Checkpoint,
@@ -11,6 +13,7 @@ import { Button } from '../../ui/Button'
 import { Card } from '../../ui/Card'
 import { Slider } from '../../ui/Slider'
 import { useSettingsStore } from '../../../store/useSettingsStore'
+import { reverseGeocode } from '../../../utils/geocode'
 import { WindLayerControls, type LayerVisibility } from '../layers/WindLayerControls'
 import { AlgorithmSelector } from './AlgorithmSelector'
 import { AdvancedFiltersPanel } from './AdvancedFiltersPanel'
@@ -48,6 +51,9 @@ interface PathInfoPanelProps {
   onMoveCheckpoint: (index: number, direction: -1 | 1) => void
   onPointInfo: () => void
   canPointInfo: boolean
+  /** گام عقب در ویزارد انتخاب (پاک‌کردن مقصد/مبدأ به ترتیب). */
+  onBack: () => void
+  canBack: boolean
   onCalculate: () => void
   isCalculating: boolean
   canCalculate: boolean
@@ -58,53 +64,101 @@ interface PathInfoPanelProps {
 
 const fmt = (c: Coordinate) => `${c.lat.toFixed(3)}, ${c.lon.toFixed(3)}`
 
+/** نام مکان یک نقطه (استان/شهر/خیابان) — با ژئوکدینگ معکوس آزاد OSM؛
+ *  در نبود شبکه به مختصات برمی‌گردد. */
+function PlaceLabel({ point }: { point: Coordinate }) {
+  const language = useSettingsStore((s) => s.language)
+  const { data } = useQuery({
+    queryKey: ['geocode', point.lat.toFixed(3), point.lon.toFixed(3), language],
+    queryFn: () => reverseGeocode(point.lat, point.lon, language),
+    staleTime: Infinity,
+  })
+  return <>{data ?? fmt(point)}</>
+}
+
 /**
- * فهرست مراحل انتخاب (مثل ناوبری Uber) — «۱. انتخاب مبدأ / ۲. انتخاب مقصد»؛
- * بعد از انتخاب هر نقطه، متن مرحله با مختصات انتخاب‌شده جایگزین می‌شود.
+ * ویزارد مراحل (مثل ناوبری Uber) — سه گام: ۱. انتخاب مبدأ، ۲. انتخاب مقصد،
+ * ۳. محاسبهٔ مسیر. عنوان گام جاری با فونت بزرگ و انیمیشن جابه‌جا می‌شود و
+ * فهرست کوچک وضعیت هر گام (انجام‌شده ✓/جاری/در انتظار) را نشان می‌دهد.
  */
 function RouteSteps({
   origin,
   destination,
+  hasResult,
 }: {
   origin: Coordinate | null
   destination: Coordinate | null
+  hasResult: boolean
 }) {
   const { t } = useTranslation()
+  const step = origin === null ? 1 : destination === null ? 2 : 3
 
-  const steps = [
+  // برچسب هر گام — برای گام‌های انجام‌شده: نام مکان (استان/شهر/خیابان)
+  const steps: { n: number; done: boolean; label: ReactNode }[] = [
     {
       n: 1,
       done: origin !== null,
-      pending: t('routing.stepOrigin'),
-      doneText: `${t('routing.stepOriginDone')}: ${origin ? fmt(origin) : ''}`,
+      label:
+        origin !== null ? (
+          <>
+            {t('routing.stepOriginDone')}: <PlaceLabel point={origin} />
+          </>
+        ) : (
+          t('routing.stepOrigin')
+        ),
     },
     {
       n: 2,
       done: destination !== null,
-      pending: t('routing.stepDestination'),
-      doneText: `${t('routing.stepDestinationDone')}: ${destination ? fmt(destination) : ''}`,
+      label:
+        destination !== null ? (
+          <>
+            {t('routing.stepDestinationDone')}: <PlaceLabel point={destination} />
+          </>
+        ) : (
+          t('routing.stepDestination')
+        ),
+    },
+    {
+      n: 3,
+      done: hasResult,
+      label: hasResult ? t('routing.stepComputeDone') : t('routing.stepCompute'),
     },
   ]
 
   return (
-    <ol className="space-y-2" aria-label={t('routing.stepsTitle')}>
-      {steps.map((s) => (
-        <li key={s.n} className="flex items-center gap-2 text-sm">
-          <span
-            aria-hidden
-            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
-              s.done
-                ? 'border-success bg-success/15 text-success'
-                : 'border-border bg-surface-raised text-text-muted'
-            }`}
-          >
-            {s.done ? <Check size={13} /> : s.n}
-          </span>
-          <span className={s.done ? 'text-text-primary' : 'text-text-muted'}>
-            {s.done ? s.doneText : s.pending}
-          </span>
-        </li>
-      ))}
+    <ol className="min-w-0 flex-1 space-y-2" aria-label={t('routing.stepsTitle')}>
+      {steps.map((s) => {
+        const isCurrent = s.n === step && !s.done
+        return (
+          <li key={s.n} className="flex items-center gap-2">
+            <span
+              aria-hidden
+              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
+                s.done
+                  ? 'border-success bg-success/15 text-success'
+                  : isCurrent
+                    ? 'border-accent bg-accent/15 text-accent'
+                    : 'border-border bg-surface-raised text-text-muted'
+              }`}
+            >
+              {s.done ? <Check size={12} /> : s.n}
+            </span>
+            <span
+              key={`${s.n}-${s.done}`}
+              className={`step-swap min-w-0 truncate ${
+                isCurrent
+                  ? 'text-base font-extrabold text-text-primary'
+                  : s.done
+                    ? 'text-xs text-text-secondary'
+                    : 'text-xs text-text-muted'
+              }`}
+            >
+              {s.label}
+            </span>
+          </li>
+        )
+      })}
     </ol>
   )
 }
@@ -129,6 +183,8 @@ export function PathInfoPanel({
   onMoveCheckpoint,
   onPointInfo,
   canPointInfo,
+  onBack,
+  canBack,
   onCalculate,
   isCalculating,
   canCalculate,
@@ -138,10 +194,23 @@ export function PathInfoPanel({
   const { t } = useTranslation()
 
   return (
-    <Card className="flex h-full w-full flex-col gap-4 overflow-y-auto">
+    <Card className="flex w-full flex-col gap-4 overflow-y-auto rounded-2xl shadow-[var(--shadow-card)] md:h-full">
       <div className="flex items-start justify-between gap-2">
-        <RouteSteps origin={origin} destination={destination} />
-        <ThemeToggle />
+        <RouteSteps origin={origin} destination={destination} hasResult={Boolean(result)} />
+        <div className="flex shrink-0 items-center gap-1.5">
+          {/* دکمهٔ بازگشت — جلوی کلید تم (برگشت به گام قبل ویرایش) */}
+          <button
+            type="button"
+            onClick={onBack}
+            disabled={!canBack}
+            aria-label={t('routing.back')}
+            title={t('routing.back')}
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface-raised text-text-secondary transition-colors hover:text-text-primary disabled:opacity-30"
+          >
+            <Undo2 size={15} aria-hidden />
+          </button>
+          <ThemeToggle />
+        </div>
       </div>
 
       <AlgorithmSelector value={algorithm} onChange={onAlgorithmChange} />

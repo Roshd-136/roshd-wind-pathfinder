@@ -46,12 +46,10 @@ function baseStyle(): maplibregl.StyleSpecification {
       // ارتفاع‌سنج آزاد AWS Terrarium — برای ترن سه‌بعدی و سایهٔ کوهستان
       terrain: {
         type: 'raster-dem',
-        tiles: [
-          'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png',
-        ],
+        tiles: ['https://demotiles.maplibre.org/terrain-tiles/{z}/{x}/{y}.png'],
         encoding: 'terrarium',
         tileSize: 256,
-        maxzoom: 14,
+        maxzoom: 12,
       },
     },
     layers: [
@@ -118,7 +116,7 @@ export function MapView({
       zoom: 7,
       attributionControl: { compact: true },
     })
-    map.addControl(new maplibregl.NavigationControl(), document.documentElement.dir === 'rtl' ? 'bottom-left' : 'bottom-right')
+    map.addControl(new maplibregl.NavigationControl(), document.documentElement.dir === 'rtl' ? 'bottom-right' : 'bottom-left')
 
     // long-press: نگه‌داشتن ۵۰۰ms بدون جابه‌جایی، بعد رها کردن بدون drag.
     // اگر long-press رخ دهد، کلیک بعدی نادیده گرفته می‌شود.
@@ -208,23 +206,29 @@ export function MapView({
     }
   }, [])
 
-  // حالت ۳بعدی: pitch + ترن واقعی (DEM آزاد) با بزرگ‌نمایی ارتفاع.
-  // setTerrain قبل از آماده‌شدن استایل خطا می‌دهد (قبلاً کل اپ را می‌انداخت) —
-  // پس با رویداد load همگام می‌شود.
+  // حالت ۲بعدی/۳بعدی — سوییچ درجا (بدون تغییر URL): در ۳بعدی فقط ترنِ
+  // واقعی + آب (کاشی خیابان خاموش) با pitch و بزرگ‌نمایی ارتفاع، مشابه
+  // صحنهٔ بصری‌سازی پروژه. setTerrain قبل از آماده‌شدن استایل خطا می‌دهد —
+  // با رویداد load همگام می‌شود.
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
     const applyMode = () => {
       try {
-        if (mode === '3d') {
-          map.easeTo({ pitch: 60, duration: 500 })
-          map.setTerrain({ source: 'terrain', exaggeration: 1.4 })
+        const is3d = mode === '3d'
+        map.setLayoutProperty('osm', 'visibility', is3d ? 'none' : 'visible')
+        map.setPaintProperty('bg', 'background-color', is3d ? '#123a5c' : '#e8e6e1')
+        // در ۳بعدی فقط ترن (سایهٔ کوهستان خاموش — دو برابر شدن هزینهٔ GPU)
+        map.setLayoutProperty('hillshade', 'visibility', is3d ? 'none' : 'visible')
+        if (is3d) {
+          map.setTerrain({ source: 'terrain', exaggeration: 1.2 })
+          map.easeTo({ pitch: 50, duration: 600 })
         } else {
           map.setTerrain(null)
           map.easeTo({ pitch: 0, duration: 400 })
         }
       } catch {
-        // استایل هنوز کامل نیست — در فراخوانی بعدی (load) اعمال می‌شود
+        // استایل هنوز کامل نیست — در رویداد load دوباره اعمال می‌شود
       }
     }
     if (map.isStyleLoaded()) applyMode()
@@ -275,40 +279,58 @@ export function MapView({
     })
   }, [checkpoints])
 
-  // رسم خط مسیر + نقاط سفید روی آن (مطابق mockup) + تنظیم کادر روی مسیر
+  // رسم خط مسیر + نقاط سفید روی آن (مطابق mockup) + تنظیم کادر روی مسیر.
+  // اگر استایل هنوز آماده نیست، به‌جای ردشدنِ بی‌صدا، با تایمر دوباره تلاش
+  // می‌شود (باگ قبلی: مسیر محاسبه‌شده گاهی رسم نمی‌شد).
   useEffect(() => {
-    const map = mapRef.current
-    if (!map || !map.isStyleLoaded()) return
-    const source = map.getSource(ROUTE_SOURCE_ID) as maplibregl.GeoJSONSource | undefined
-    source?.setData({
-      type: 'Feature',
-      properties: {},
-      geometry: {
-        type: 'LineString',
-        coordinates: (path ?? []).map((c) => [c.lon, c.lat]),
-      },
-    })
-    const dots = map.getSource(ROUTE_DOTS_SOURCE_ID) as maplibregl.GeoJSONSource | undefined
-    dots?.setData({
-      type: 'FeatureCollection',
-      features: (path ?? [])
-        // هر n امین نقطه تا تراکم نقاط شبیه mockup بماند
-        .filter((_, i) => i % Math.max(1, Math.ceil((path?.length ?? 1) / 24)) === 0)
-        .map((c) => ({
-          type: 'Feature' as const,
-          properties: {},
-          geometry: { type: 'Point' as const, coordinates: [c.lon, c.lat] },
-        })),
-    })
-    // پس از محاسبه، کادر نقشه روی مسیر تنظیم شود
-    if (path && path.length > 1) {
-      const lons = path.map((c) => c.lon)
-      const lats = path.map((c) => c.lat)
-      const bounds = new maplibregl.LngLatBounds(
-        [Math.min(...lons), Math.min(...lats)],
-        [Math.max(...lons), Math.max(...lats)],
-      )
-      map.fitBounds(bounds, { padding: 80, duration: 800, pitch: mode === '3d' ? 60 : 0 })
+    let cancelled = false
+    let attempts = 0
+    const draw = () => {
+      if (cancelled) return
+      const map = mapRef.current
+      if (!map) return
+      if (!map.isStyleLoaded()) {
+        if (attempts < 100) {
+          attempts += 1
+          setTimeout(draw, 150)
+        }
+        return
+      }
+      const source = map.getSource(ROUTE_SOURCE_ID) as maplibregl.GeoJSONSource | undefined
+      source?.setData({
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'LineString',
+          coordinates: (path ?? []).map((c) => [c.lon, c.lat]),
+        },
+      })
+      const dots = map.getSource(ROUTE_DOTS_SOURCE_ID) as maplibregl.GeoJSONSource | undefined
+      dots?.setData({
+        type: 'FeatureCollection',
+        features: (path ?? [])
+          // هر n امین نقطه تا تراکم نقاط شبیه mockup بماند
+          .filter((_, i) => i % Math.max(1, Math.ceil((path?.length ?? 1) / 24)) === 0)
+          .map((c) => ({
+            type: 'Feature' as const,
+            properties: {},
+            geometry: { type: 'Point' as const, coordinates: [c.lon, c.lat] },
+          })),
+      })
+      // پس از محاسبه، کادر نقشه روی مسیر تنظیم شود
+      if (path && path.length > 1) {
+        const lons = path.map((c) => c.lon)
+        const lats = path.map((c) => c.lat)
+        const bounds = new maplibregl.LngLatBounds(
+          [Math.min(...lons), Math.min(...lats)],
+          [Math.max(...lons), Math.max(...lats)],
+        )
+        map.fitBounds(bounds, { padding: 80, duration: 800, pitch: mode === '3d' ? 60 : 0 })
+      }
+    }
+    draw()
+    return () => {
+      cancelled = true
     }
   }, [path, mode])
 

@@ -1,6 +1,16 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { PathInfoPanel } from './PathInfoPanel'
+
+/** PlaceLabel داخل پنل از react-query استفاده می‌کند — ارائه‌دهندهٔ تست. */
+function withProviders(ui: ReactNode) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>)
+}
 
 const baseProps = {
   algorithm: 'a_star' as const,
@@ -16,6 +26,8 @@ const baseProps = {
   onMoveCheckpoint: vi.fn(),
   onPointInfo: vi.fn(),
   canPointInfo: true,
+  onBack: vi.fn(),
+  canBack: true,
   onCalculate: vi.fn(),
   isCalculating: false,
   result: null,
@@ -25,17 +37,17 @@ describe('PathInfoPanel', () => {
   const calculateButton = () => screen.getByRole('button', { name: /calculate|محاسبه/i })
 
   it('disables the calculate button when origin/destination are not both set', () => {
-    render(<PathInfoPanel {...baseProps} canCalculate={false} />)
+    withProviders(<PathInfoPanel {...baseProps} canCalculate={false} />)
     expect(calculateButton()).toBeDisabled()
   })
 
   it('enables the calculate button once both points are chosen', () => {
-    render(<PathInfoPanel {...baseProps} canCalculate={true} />)
+    withProviders(<PathInfoPanel {...baseProps} canCalculate={true} />)
     expect(calculateButton()).toBeEnabled()
   })
 
   it('shows the route result summary once a result is available', () => {
-    render(
+    withProviders(
       <PathInfoPanel
         {...baseProps}
         canCalculate={true}

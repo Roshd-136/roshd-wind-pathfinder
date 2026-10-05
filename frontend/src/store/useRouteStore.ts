@@ -19,6 +19,8 @@ interface RouteState {
   setConstraints: (c: RouteConstraints) => void
   setLayerVisibility: (v: LayerVisibility) => void
   setResult: (r: RouteResult | null) => void
+  /** گام عقب: مقصد/نتیجه را پاک می‌کند، وگرنه مبدأ را (ناوبری مراحل). */
+  goBackStep: () => void
   reset: () => void
 }
 
@@ -57,5 +59,17 @@ export const useRouteStore = create<RouteState>((set) => ({
   setConstraints: (constraints) => set({ constraints }),
   setLayerVisibility: (layerVisibility) => set({ layerVisibility }),
   setResult: (result) => set({ result }),
+  goBackStep: () =>
+    set((s) => {
+      if (s.destination !== null || s.result !== null) {
+        // گام ۳ → ۲: مقصد و نتیجه پاک می‌شود (مبدأ می‌ماند)
+        return { destination: null, result: null }
+      }
+      if (s.origin !== null) {
+        // گام ۲ → ۱
+        return { origin: null }
+      }
+      return s
+    }),
   reset: () => set({ origin: null, destination: null, checkpoints: [], result: null }),
 }))

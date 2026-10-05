@@ -25,7 +25,10 @@ interface RoutingMapScreenProps {
  * همه در `useRouteStore` نگه داشته می‌شود تا toggle دوحالته ۲/۳ بعدی
  * (ناوبری واقعی بین دو route) چیزی را از دست ندهد.
  */
-export function RoutingMapScreen({ mode }: RoutingMapScreenProps) {
+export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
+  // حالت نقشه از استور می‌آید تا سوییچ ۲/۳بعدی «درجا» باشد (بدون ناوبری)؛
+  // prop فقط مقدار اولیهٔ صفحات مستقل است.
+  const mode = useUiStore((s) => s.mapMode) || modeProp
   const { t } = useTranslation()
   const {
     origin,
@@ -44,6 +47,7 @@ export function RoutingMapScreen({ mode }: RoutingMapScreenProps) {
     setConstraints,
     setLayerVisibility,
     setResult,
+    goBackStep,
     reset,
   } = useRouteStore()
 
@@ -119,6 +123,8 @@ export function RoutingMapScreen({ mode }: RoutingMapScreenProps) {
       onMoveCheckpoint={moveCheckpoint}
       onPointInfo={() => setInfoPoint(origin)}
       canPointInfo={Boolean(origin)}
+      onBack={() => goBackStep()}
+      canBack={Boolean(destination || result || origin)}
       onCalculate={handleCalculate}
       isCalculating={pathfinding.isPending}
       canCalculate={Boolean(origin && destination)}

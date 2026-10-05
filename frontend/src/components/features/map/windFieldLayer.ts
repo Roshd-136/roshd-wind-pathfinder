@@ -1,71 +1,68 @@
-import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl'
+import type { GeoJSONSource, ImageSource, Map as MapLibreMap } from 'maplibre-gl'
 import type { WindField } from '../../../types/routing'
 import { arrowFeatures, colorForSpeed, gridMeta, WIND_SPEED_STOPS } from '../../../utils/windField'
 
 /**
- * رندر میدان باد روی Mapbox GL با هندسهٔ خالص (بدون texture/آیکون):
- *  ۱) نقشهٔ حرارتی سرعت = لایهٔ fill روی سلول‌های شبکه، رنگ داده‌محور از رمپ
- *     راهنما (همان توکن‌های `--wind-speed-*`)،
- *  ۲) پیکان‌های جهت باد = خطوط chevron با چرخش حساب‌شده در خود مختصات
+ * رندر میدان باد روی MapLibre GL:
+ *  ۱) نقشهٔ حرارتی «نرم» — تصویر canvas (درون‌یابی‌شده) روی image source،
+ *     بدون درز سلول‌ها (نسخهٔ قبلی با سلول‌های fill شبیه «گرید سبز» بود)،
+ *  ۲) پیکان‌های جهت باد = خطوط chevron با چرخش در مختصات
  *     (قرارداد هواشناسی: `direction_deg` از کجا می‌وزد؛ پیکان به سمت جریان،
  *     یعنی جهت + ۱۸۰).
- *
- * این ترکیب روی GPU نرم‌افزاری (SwiftShader) هم سبک است؛ لایه‌های image/symbol
- * (رستر + آیکون چرخان) در محیط‌های بدون GPU سخت‌افزاری گلوگاه می‌شوند.
  */
 
-const FIELD_SOURCE = 'wind-field-fill'
+const FIELD_SOURCE = 'wind-field-raster'
 const FIELD_LAYER = 'wind-field-layer'
 const ARROW_SOURCE = 'wind-arrows'
 const ARROW_LAYER = 'wind-arrows-layer'
 
-/** رنگ رمپ به‌صورت expression رنگی mapbox برای fill-color داده‌محور. */
-function speedColorExpression(): unknown[] {
-  const stops: unknown[] = ['interpolate', ['linear'], ['get', 'speed']]
-  for (const stop of WIND_SPEED_STOPS) {
-    const [r, g, b] = stop.color
-    stops.push(stop.value, `rgb(${r}, ${g}, ${b})`)
-  }
-  return stops
-}
-
-/** GeoJSON سلول‌های شبکهٔ میدان برای لایهٔ fill (نقشهٔ حرارتی). */
-export function fieldFillGeoJson(field: WindField) {
+/** تصویر نرم میدان از شبکه (canvas → dataURL) — رنگ از همان رمپ راهنما. */
+export function buildFieldImage(field: WindField, width = 420): string {
   const meta = gridMeta(field)
-  // هم‌پوشانی جزئی سلول‌ها تا درز آنتی‌الیاس بین چندضلعی‌ها دیده نشود
-  const halfLat = meta.latStep * 0.6
-  const halfLon = meta.lonStep * 0.6
-  const features = field.vectors.map((v) => ({
-    type: 'Feature' as const,
-    properties: { speed: v.speed_mps },
-    geometry: {
-      type: 'Polygon' as const,
-      coordinates: [
-        [
-          [v.lon - halfLon, v.lat - halfLat],
-          [v.lon + halfLon, v.lat - halfLat],
-          [v.lon + halfLon, v.lat + halfLat],
-          [v.lon - halfLon, v.lat + halfLat],
-          [v.lon - halfLon, v.lat - halfLat],
-        ],
-      ],
-    },
-  }))
-  return { type: 'FeatureCollection' as const, features }
+  const latSpan = meta.lats[meta.lats.length - 1] - meta.lats[0]
+  const lonSpan = meta.lons[meta.lons.length - 1] - meta.lons[0]
+  const height = Math.max(64, Math.round((width * latSpan) / Math.max(lonSpan, 1e-6)))
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return ''
+  const image = ctx.createImageData(width, height)
+
+  for (let py = 0; py < height; py += 1) {
+    // ردیف ۰ تصویر = شمال (بیشینهٔ عرض جغرافیایی)
+    const rowFloat = (1 - py / (height - 1)) * (meta.lats.length - 1)
+    const row = Math.min(Math.max(Math.round(rowFloat), 0), meta.lats.length - 1)
+    for (let px = 0; px < width; px += 1) {
+      const col = Math.min(
+        Math.max(Math.round((px / (width - 1)) * (meta.lons.length - 1)), 0),
+        meta.lons.length - 1,
+      )
+      const v = field.vectors[row * meta.lons.length + col]
+      if (!v) continue
+      const [r, g, b] = colorForSpeed(v.speed_mps)
+      const alpha = 80 + Math.round(70 * Math.min(v.speed_mps / 20, 1))
+      const offset = (py * width + px) * 4
+      image.data[offset] = r
+      image.data[offset + 1] = g
+      image.data[offset + 2] = b
+      image.data[offset + 3] = alpha
+    }
+  }
+  ctx.putImageData(image, 0, 0)
+  return canvas.toDataURL('image/png')
 }
 
 /** GeoJSON پیکان‌های chevron — چرخش در مختصات، جهت = downwind. */
 export function arrowChevronsGeoJson(field: WindField, stride = 3) {
   const arrows = arrowFeatures(field, stride)
-  // طول پیکان ~۰٫۰۴ درجه (حدود ۴ کیلومتر) — در زوم‌های کاری کریدور خوانا.
   const len = 0.045
-  const wing = 0.5 // نسبت بال‌های chevron
+  const wing = 0.5
   const features = arrows.map((a) => {
     const toRad = Math.PI / 180
-    const heading = (a.direction_deg + 180) * toRad // جهت جریان
+    const heading = (a.direction_deg + 180) * toRad
     const dx = Math.sin(heading) * len
     const dy = Math.cos(heading) * len
-    // نوک پیکان در جلو، دو بال به عقب
     const tipLat = a.lat + dy
     const tipLon = a.lon + dx
     const perpX = Math.cos(heading) * len * wing
@@ -86,23 +83,9 @@ export function arrowChevronsGeoJson(field: WindField, stride = 3) {
   return { type: 'FeatureCollection' as const, features }
 }
 
-/** افزودن source/لایه‌های میدان باد (فقط پس از «load»). */
+/** افزودن لایهٔ پیکان‌ها (منبع تصویر میدان با اولین میدان واقعی ساخته می‌شود). */
 export function addWindLayers(map: MapLibreMap): void {
-  if (map.getSource(FIELD_SOURCE)) return
-  map.addSource(FIELD_SOURCE, {
-    type: 'geojson',
-    data: { type: 'FeatureCollection', features: [] },
-  })
-  map.addLayer({
-    id: FIELD_LAYER,
-    type: 'fill',
-    source: FIELD_SOURCE,
-    paint: {
-      'fill-color': speedColorExpression() as never,
-      'fill-opacity': ['interpolate', ['linear'], ['get', 'speed'], 0, 0.35, 20, 0.6],
-    },
-  })
-
+  if (map.getSource(ARROW_SOURCE)) return
   map.addSource(ARROW_SOURCE, {
     type: 'geojson',
     data: { type: 'FeatureCollection', features: [] },
@@ -120,7 +103,7 @@ export function addWindLayers(map: MapLibreMap): void {
     paint: {
       'line-color': lineStops as never,
       'line-width': 2,
-      'line-opacity': 0.95,
+      'line-opacity': 0.9,
     },
   })
   moveWindLayersBelowRoute(map)
@@ -129,66 +112,74 @@ export function addWindLayers(map: MapLibreMap): void {
 /** میدان باد زیر خط مسیر بنشیند (خط مسیر و چک‌پوینت‌ها رو باشد). */
 export function moveWindLayersBelowRoute(map: MapLibreMap): void {
   const routeLayer = 'route-line-layer' // همان ROUTE_LAYER_ID در MapView
-  if (map.getLayer(FIELD_LAYER) && map.getLayer(routeLayer)) {
-    map.moveLayer(FIELD_LAYER, routeLayer)
-  }
-  if (map.getLayer(ARROW_LAYER) && map.getLayer(FIELD_LAYER)) {
-    map.moveLayer(ARROW_LAYER, FIELD_LAYER)
+  if (map.getLayer(ARROW_LAYER) && map.getLayer(routeLayer)) {
+    map.moveLayer(ARROW_LAYER, routeLayer)
   }
 }
 
-/** حذف لایه‌های باد (وقتی هیچ لایه‌ای فعال نیست). */
+/** پنهان/نمایان کردن لایه‌های باد. */
 export function setWindLayersVisible(map: MapLibreMap, visible: boolean): void {
-  if (map.getLayer(FIELD_LAYER)) {
-    map.setLayoutProperty(FIELD_LAYER, 'visibility', visible ? 'visible' : 'none')
-  }
   if (map.getLayer(ARROW_LAYER)) {
     map.setLayoutProperty(ARROW_LAYER, 'visibility', visible ? 'visible' : 'none')
   }
+  if (map.getLayer(FIELD_LAYER)) {
+    map.setLayoutProperty(FIELD_LAYER, 'visibility', visible ? 'visible' : 'none')
+  }
 }
 
-/** به‌روزرسانی دادهٔ میدان فعال. */
+/** به‌روزرسانی دادهٔ میدان فعال (تصویر نرم + پیکان‌ها). */
 export function updateWindField(map: MapLibreMap, field: WindField): void {
-  const fillSource = map.getSource(FIELD_SOURCE) as GeoJSONSource | undefined
-  fillSource?.setData(fieldFillGeoJson(field))
+  const imageSource = map.getSource(FIELD_SOURCE) as ImageSource | undefined
+  const meta = gridMeta(field)
+  const latMax = meta.lats[meta.lats.length - 1]
+  const latMin = meta.lats[0]
+  const lonMin = meta.lons[0]
+  const lonMax = meta.lons[meta.lons.length - 1]
+  const payload = {
+    url: buildFieldImage(field),
+    coordinates: [
+      [lonMin, latMax],
+      [lonMax, latMax],
+      [lonMax, latMin],
+      [lonMin, latMin],
+    ] as [[number, number], [number, number], [number, number], [number, number]],
+  }
+  if (imageSource) {
+    imageSource.updateImage(payload)
+  } else {
+    map.addSource(FIELD_SOURCE, { type: 'image', ...payload })
+    map.addLayer({
+      id: FIELD_LAYER,
+      type: 'raster',
+      source: FIELD_SOURCE,
+      paint: { 'raster-opacity': 0.85, 'raster-fade-duration': 0 },
+    })
+    moveWindLayersBelowRoute(map)
+  }
   const arrowSource = map.getSource(ARROW_SOURCE) as GeoJSONSource | undefined
   arrowSource?.setData(arrowChevronsGeoJson(field))
 }
 
 /**
- * اعمال میدان فعال: منبع/لایه‌ها فقط روی استایلِ آماده ساخته می‌شوند؛ اگر
- * هنوز «load» نخورده، هندلر load خودش میدان موجود را اعمال می‌کند. با
- * `null` لایه‌ها پنهان می‌شوند.
+ * اعمال میدان فعال — امن برای فراخوانی قبل از آماده‌شدن استایل
+ * (تایمری، نه رویداد load که در حین انتشار خودش شنونده نمی‌گیرد).
  */
-/**
- * اجرای تابع پس از آماده‌شدن استایل — بر پایهٔ تایمر، نه رویداد «load»:
- * اگر applyWindField خودش داخل هندلر load صدا زده شود، ثبت شنوندهٔ تازه روی
- * همان رویدادِ در حال انتشار هرگز اجرا نمی‌شود.
- */
-function whenStyleReady(map: MapLibreMap, fn: () => void, tries = 100): void {
-  if (map.isStyleLoaded() || map.loaded()) {
-    fn()
-    return
-  }
-  if (tries > 0) {
-    setTimeout(() => whenStyleReady(map, fn, tries - 1), 150)
-  }
-}
-
 export function applyWindField(map: MapLibreMap, field: WindField | null): void {
-  if (!map.isStyleLoaded() && !map.loaded()) {
-    whenStyleReady(map, () => applyWindField(map, field))
+  const retry = () => applyWindField(map, field)
+  if (!map.isStyleLoaded()) {
+    if (map.loaded()) {
+      retry()
+    } else {
+      setTimeout(retry, 150)
+    }
     return
   }
-  if (!map.getSource(FIELD_SOURCE)) {
-    if (!field) return
+  if (!field) {
+    setWindLayersVisible(map, false)
     addWindLayers(map)
+    return
   }
-  setWindLayersVisible(map, field !== null)
-  if (field) updateWindField(map, field)
-}
-
-/** رنگ RGB یک سرعت — برای تست/ابزارهای جانبی (خارج از نقشه). */
-export function speedColor(speedMps: number): [number, number, number] {
-  return colorForSpeed(speedMps)
+  addWindLayers(map)
+  setWindLayersVisible(map, true)
+  updateWindField(map, field)
 }

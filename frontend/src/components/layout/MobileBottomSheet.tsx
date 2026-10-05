@@ -18,8 +18,8 @@ export function MobileBottomSheet({ children, title }: MobileBottomSheetProps) {
 
   return (
     <div
-      className={`fixed inset-x-0 bottom-0 z-20 max-h-[85dvh] overflow-y-auto rounded-t-xl border-t border-border bg-surface p-4 shadow-[var(--shadow-card)] transition-transform duration-300 md:hidden ${
-        isMobileSheetOpen ? 'translate-y-0' : 'translate-y-[calc(100%-3.5rem)]'
+      className={`fixed inset-x-0 bottom-0 z-20 max-h-[80dvh] overflow-y-auto rounded-t-2xl border-t border-border bg-surface p-4 shadow-[var(--shadow-card)] transition-transform duration-300 md:hidden ${
+        isMobileSheetOpen ? 'translate-y-0' : 'translate-y-[calc(100%-4.5rem)]'
       }`}
     >
       <button
