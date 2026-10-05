@@ -146,9 +146,9 @@ function RouteSteps({
             </span>
             <span
               key={`${s.n}-${s.done}`}
-              className={`step-swap min-w-0 truncate ${
+              className={`step-swap min-w-0 ${
                 isCurrent
-                  ? 'text-base font-extrabold text-text-primary'
+                  ? 'text-xl font-extrabold leading-tight text-text-primary'
                   : s.done
                     ? 'text-xs text-text-secondary'
                     : 'text-xs text-text-muted'
@@ -195,9 +195,8 @@ export function PathInfoPanel({
 
   return (
     <Card className="flex w-full flex-col gap-4 overflow-y-auto rounded-2xl shadow-[var(--shadow-card)] md:h-full">
-      <div className="flex items-start justify-between gap-2">
-        <RouteSteps origin={origin} destination={destination} hasResult={Boolean(result)} />
-        <div className="flex shrink-0 items-center gap-1.5">
+      <div className="flex items-center justify-between gap-1.5">
+        <div className="flex items-center gap-1.5">
           {/* دکمهٔ بازگشت — جلوی کلید تم (برگشت به گام قبل ویرایش) */}
           <button
             type="button"
@@ -212,6 +211,7 @@ export function PathInfoPanel({
           <ThemeToggle />
         </div>
       </div>
+      <RouteSteps origin={origin} destination={destination} hasResult={Boolean(result)} />
 
       <AlgorithmSelector value={algorithm} onChange={onAlgorithmChange} />
 

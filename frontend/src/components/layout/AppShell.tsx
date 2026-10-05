@@ -1,6 +1,7 @@
-import { Map, Info, Settings, User } from 'lucide-react'
+import { Map, Info, Menu, Settings, User } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useUiStore } from '../../store/useUiStore'
 
 const NAV_ITEMS = [
   { to: '/', labelKey: 'nav.map', icon: Map },
@@ -19,10 +20,34 @@ const PROFILE_ITEM = { to: '/profile', labelKey: 'nav.profile', icon: User }
  */
 export function AppShell() {
   const { t } = useTranslation()
+  const isSidebarOpen = useUiStore((s) => s.isSidebarOpen)
+  const toggleSidebar = useUiStore((s) => s.toggleSidebar)
 
   return (
     <div className="flex h-full">
-      <aside className="hidden w-56 flex-col border-e border-border bg-surface p-4 md:flex">
+      {/* دکمهٔ سه‌خط — وقتی سایدبار بسته است تنها راه بازکردن آن */}
+      {!isSidebarOpen && (
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          aria-label={t('nav.menu')}
+          title={t('nav.menu')}
+          className="absolute start-4 top-4 z-30 flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface/95 text-text-secondary shadow-[var(--shadow-card)] backdrop-blur-sm transition-colors hover:text-text-primary"
+        >
+          <Menu size={20} aria-hidden />
+        </button>
+      )}
+      {isSidebarOpen && (
+      <aside className="relative hidden w-56 shrink-0 flex-col border-e border-border bg-surface p-4 md:flex">
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          aria-label={t('nav.menu')}
+          title={t('nav.menu')}
+          className="absolute end-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:text-text-primary"
+        >
+          <Menu size={18} aria-hidden />
+        </button>
         <div className="mb-6 text-lg font-bold text-text-primary">{t('app.name')}</div>
         <nav className="flex flex-col gap-1">
           {NAV_ITEMS.map(({ to, labelKey, icon: Icon }) => (
@@ -59,6 +84,7 @@ export function AppShell() {
           </NavLink>
         </div>
       </aside>
+      )}
       <main className="flex-1 overflow-hidden">
         <Outlet />
       </main>

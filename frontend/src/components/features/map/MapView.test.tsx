@@ -32,7 +32,7 @@ vi.mock('maplibre-gl', () => {
   }
   class LngLatBounds {}
   class NavigationControl {}
-  return { default: { Map, Marker, NavigationControl, LngLatBounds } }
+  return { default: { Map, Marker, NavigationControl, AttributionControl: class {}, LngLatBounds } }
 })
 vi.mock('maplibre-gl/dist/maplibre-gl.css', () => ({}))
 

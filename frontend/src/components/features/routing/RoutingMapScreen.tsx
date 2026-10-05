@@ -150,8 +150,9 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
         />
         <MapModeToggle />
         {activeField && (
-          <div className="absolute bottom-4 start-4 z-10 rounded-lg border border-border bg-surface/90 p-3 shadow-[var(--shadow-card)] backdrop-blur-sm">
-            <div className="mb-1 text-xs font-medium text-text-secondary">
+          // راهنمای سرعت باد — وسط پایین و پهن، دور از زوم و انتساب
+          <div className="absolute bottom-4 left-1/2 z-10 w-80 -translate-x-1/2 rounded-xl border border-border bg-surface/90 p-3 shadow-[var(--shadow-card)] backdrop-blur-sm">
+            <div className="mb-1 text-center text-xs font-medium text-text-secondary">
               {t('legend.title')}
             </div>
             <WindSpeedLegend />
@@ -182,7 +183,7 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
         )}
       </div>
 
-      {/* پنل شناور روی نقشه (دسکتاپ) — سمت مقابل راهنما/زوم */}
+      {/* پنل شناور روی نقشه (دسکتاپ) — همیشه نمایان */}
       <div className="absolute top-4 bottom-4 z-10 hidden w-[19.5rem] md:block end-4">
         {panel}
       </div>

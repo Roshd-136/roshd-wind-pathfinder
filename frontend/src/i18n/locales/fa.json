@@ -1,6 +1,14 @@
 {
-  "app": { "name": "مسیریاب بادی" },
-  "nav": { "map": "نقشه", "settings": "تنظیمات", "about": "درباره", "profile": "پروفایل" },
+  "app": {
+    "name": "مسیریاب بادی"
+  },
+  "nav": {
+    "menu": "منو",
+    "map": "نقشه",
+    "settings": "تنظیمات",
+    "about": "درباره",
+    "profile": "پروفایل"
+  },
   "map": {
     "title": "مسیریابی",
     "subtitle": "مسیریابی با در نظر گرفتن جریان باد",
@@ -37,13 +45,15 @@
     "moveDown": "جابجایی به پایین",
     "remove": "حذف",
     "stepsTitle": "مراحل مسیر",
-    "stepOrigin": "۱. انتخاب مبدأ",
-    "stepDestination": "۲. انتخاب مقصد",
+    "stepOrigin": "انتخاب مبدأ",
+    "stepDestination": "انتخاب مقصد",
     "stepOriginDone": "مبدأ",
     "stepDestinationDone": "مقصد",
-    "stepCompute": "۳. محاسبهٔ مسیر",
+    "stepCompute": "محاسبهٔ مسیر",
     "stepComputeDone": "مسیر محاسبه شد",
     "back": "بازگشت و ویرایش گام قبل",
+    "collapsePanel": "بستن پنل",
+    "openPanel": "نمایش پنل کنترل",
     "catAltitude": "ارتفاع پرواز",
     "catOptimization": "بهینه‌سازی",
     "catAvoid": "اجتناب از مناطق",

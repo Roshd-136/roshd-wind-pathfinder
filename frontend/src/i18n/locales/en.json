@@ -1,6 +1,14 @@
 {
-  "app": { "name": "WindPath" },
-  "nav": { "map": "Map", "settings": "Settings", "about": "About", "profile": "Profile" },
+  "app": {
+    "name": "WindPath"
+  },
+  "nav": {
+    "menu": "Menu",
+    "map": "Map",
+    "settings": "Settings",
+    "about": "About",
+    "profile": "Profile"
+  },
   "map": {
     "title": "Path Finding",
     "subtitle": "Wind-aware route planning",
@@ -37,13 +45,15 @@
     "moveDown": "Move down",
     "remove": "Remove",
     "stepsTitle": "Route steps",
-    "stepOrigin": "1. Select start",
-    "stepDestination": "2. Select end",
+    "stepOrigin": "Select start",
+    "stepDestination": "Select end",
     "stepOriginDone": "Start",
     "stepDestinationDone": "End",
-    "stepCompute": "3. Compute route",
+    "stepCompute": "Compute route",
     "stepComputeDone": "Route computed",
     "back": "Back to previous step",
+    "collapsePanel": "Hide panel",
+    "openPanel": "Show control panel",
     "catAltitude": "Flight altitude",
     "catOptimization": "Optimization",
     "catAvoid": "Avoid zones",
