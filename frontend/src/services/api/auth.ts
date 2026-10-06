@@ -1,4 +1,4 @@
-import { apiFetch, setAccessToken } from './client'
+import { apiFetch, setAccessToken, setRefreshToken } from './client'
 
 export interface AuthTokens {
   access_token: string
@@ -24,6 +24,7 @@ export function register(input: { email: string; password: string; name: string 
 export async function login(input: { email: string; password: string }): Promise<AuthTokens> {
   const tokens = await apiFetch<AuthTokens>('/auth/login', { method: 'POST', body: input })
   setAccessToken(tokens.access_token)
+  setRefreshToken(tokens.refresh_token)
   return tokens
 }
 
@@ -45,8 +46,13 @@ export function verifyEmail(token: string): Promise<void> {
   return apiFetch<void>('/auth/verify-email/confirm', { method: 'POST', body: { token } })
 }
 
-/** POST /auth/logout */
+/** POST /auth/logout — ابطال refresh token ذخیره‌شده (اگر باشد). */
 export async function logout(): Promise<void> {
-  await apiFetch<void>('/auth/logout', { method: 'POST' })
+  const refresh_token = localStorage.getItem('windpath-refresh-token')
+  await apiFetch<void>('/auth/logout', {
+    method: 'POST',
+    body: refresh_token ? { refresh_token } : undefined,
+  })
   setAccessToken(null)
+  setRefreshToken(null)
 }

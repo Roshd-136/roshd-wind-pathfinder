@@ -54,7 +54,7 @@ export function PathInfoPanel({
   const { t } = useTranslation()
 
   return (
-    <Card className="flex w-full flex-col gap-4 overflow-y-auto rounded-2xl shadow-[var(--shadow-card)] md:h-full">
+    <Card className="flex max-h-[calc(100vh-2rem)] w-full flex-col gap-4 overflow-y-auto rounded-2xl shadow-[var(--shadow-card)]">
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-0">
 
       <AlgorithmSelector value={algorithm} onChange={onAlgorithmChange} />

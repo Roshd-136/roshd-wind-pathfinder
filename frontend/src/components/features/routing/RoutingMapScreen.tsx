@@ -187,7 +187,7 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
       </div>
 
       {/* پنل شناور روی نقشه (دسکتاپ) — همیشه نمایان */}
-      <div className="absolute top-4 bottom-4 z-10 hidden w-[19.5rem] md:block end-4">
+      <div className="absolute top-4 z-10 hidden max-h-[calc(100%-2rem)] w-[19.5rem] md:block end-4">
         {panel}
       </div>
       <MapTools

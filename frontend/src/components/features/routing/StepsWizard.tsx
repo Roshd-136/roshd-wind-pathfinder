@@ -87,9 +87,10 @@ export function StepsWizard({
           disabled={!canBack}
           aria-label={t('routing.back')}
           title={t('routing.back')}
-          className="flex h-7 w-7 items-center justify-center rounded-full border border-border bg-surface-raised text-text-secondary transition-colors hover:text-text-primary disabled:opacity-30"
+          className="flex h-9 items-center gap-1.5 rounded-lg bg-accent px-3 text-sm font-bold text-white transition-colors hover:bg-accent-hover disabled:opacity-40"
         >
-          <Undo2 size={13} aria-hidden />
+          <Undo2 size={16} aria-hidden />
+          {t('routing.back')}
         </button>
       </div>
 
@@ -127,9 +128,15 @@ export function StepsWizard({
           />
         ))}
       </div>
-      <Button className="w-full" onClick={onCalculate} disabled={!canCalculate || isCalculating}>
-        {isCalculating ? t('common.loading') : t('routing.calculatePath')}
-      </Button>
+      <div className="-mx-px -mb-px overflow-hidden rounded-b-2xl">
+        <Button
+          className="!w-full !rounded-none !border-0 !shadow-none"
+          onClick={onCalculate}
+          disabled={!canCalculate || isCalculating}
+        >
+          {isCalculating ? t('common.loading') : t('routing.calculatePath')}
+        </Button>
+      </div>
     </div>
   )
 }
