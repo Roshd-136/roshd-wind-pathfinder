@@ -31,7 +31,12 @@ export function MapTools({ panelOpen, onTogglePanel, onZoomIn, onZoomOut }: MapT
   const activeBtn = 'flex h-10 w-10 items-center justify-center rounded-lg border border-accent bg-accent text-white shadow-[var(--shadow-card)]'
 
   return (
-    <div className="absolute top-4 z-10 flex flex-col gap-1.5 end-[21.5rem]">
+    // با جمع‌شدن پنل، نوار ابزار به لبهٔ نقشه می‌لغزد (transition هماهنگ با پنل)
+    <div
+      className={`absolute top-4 z-10 flex flex-col gap-1.5 transition-all duration-300 ${
+        panelOpen ? 'end-[21.5rem]' : 'end-4'
+      }`}
+    >
       {/* نمایش/جمع‌کردن پنل — فلش جمع‌شدن وقتی پنل باز است */}
       <button
         type="button"

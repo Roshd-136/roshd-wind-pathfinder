@@ -5,6 +5,10 @@ interface CheckpointManagerProps {
   checkpoints: Checkpoint[]
   onRemove: (index: number) => void
   onMove: (index: number, direction: -1 | 1) => void
+  /** حالت افزودن با کلیک (به‌جای long-press). */
+  adding?: boolean
+  onToggleAdd?: () => void
+  canAdd?: boolean
 }
 
 /**
@@ -12,15 +16,45 @@ interface CheckpointManagerProps {
  * مبدأ/مقصد)، حذف، جابجایی ترتیب، و نمایش شماره ترتیب هر کدام
  * (چک‌لیست آیتم ۱۰).
  */
-export function CheckpointManager({ checkpoints, onRemove, onMove }: CheckpointManagerProps) {
+export function CheckpointManager({
+  checkpoints,
+  onRemove,
+  onMove,
+  adding = false,
+  onToggleAdd,
+  canAdd = true,
+}: CheckpointManagerProps) {
   const { t } = useTranslation()
 
+  const addButton = (
+    <button
+      type="button"
+      onClick={onToggleAdd}
+      disabled={!canAdd}
+      aria-pressed={adding}
+      className={`w-full rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+        adding
+          ? 'border-accent bg-accent/15 text-accent'
+          : 'border-border bg-surface-raised text-text-secondary hover:text-text-primary disabled:opacity-40'
+      }`}
+    >
+      {adding ? t('routing.addingCheckpoint') : t('routing.addCheckpoint')}
+    </button>
+  )
+
   if (checkpoints.length === 0) {
-    return <p className="text-xs text-text-muted">{t('routing.checkpointHint')}</p>
+    return (
+      <div className="space-y-2">
+        {addButton}
+        <p className="text-xs text-text-muted">{t('routing.checkpointHint')}</p>
+      </div>
+    )
   }
 
   return (
-    <ul className="space-y-1">
+    <div className="space-y-2">
+      {addButton}
+      <ul className="space-y-1">
       {checkpoints.map((cp, i) => (
         <li
           key={`${cp.lat}-${cp.lon}-${i}`}
@@ -59,6 +93,7 @@ export function CheckpointManager({ checkpoints, onRemove, onMove }: CheckpointM
           </span>
         </li>
       ))}
-    </ul>
+      </ul>
+    </div>
   )
 }

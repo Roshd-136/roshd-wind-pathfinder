@@ -2,7 +2,7 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEffect, useRef } from 'react'
 import type { Coordinate, WindField } from '../../../types/routing'
-import { addWindLayers, applyWindField } from './windFieldLayer'
+import { applyWindField } from './windFieldLayer'
 
 interface MapViewProps {
   mode: '2d' | '3d'
@@ -15,8 +15,6 @@ interface MapViewProps {
   onMapClick: (coord: Coordinate) => void
   /** کلیک بعد از تعیین مبدأ/مقصد — نمایش لایه‌های باد در آن نقطه. */
   onPointInfo?: (coord: Coordinate) => void
-  /** long-press روی نقشه — برای افزودن چک‌پوینت یا اطلاعات نقطه. */
-  onLongPress?: (coord: Coordinate) => void
   /** نقشهٔ ساخته‌شده — برای ابزارهای بیرونی (زوم سفارشی). */
   onReady?: (map: maplibregl.Map) => void
 }
@@ -48,10 +46,10 @@ function baseStyle(): maplibregl.StyleSpecification {
       // ارتفاع‌سنج آزاد AWS Terrarium — برای ترن سه‌بعدی و سایهٔ کوهستان
       terrain: {
         type: 'raster-dem',
-        tiles: ['https://demotiles.maplibre.org/terrain-tiles/{z}/{x}/{y}.png'],
+        tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
         encoding: 'terrarium',
         tileSize: 256,
-        maxzoom: 12,
+        maxzoom: 14,
       },
     },
     layers: [
@@ -85,7 +83,6 @@ export function MapView({
   windField = null,
   onMapClick,
   onPointInfo,
-  onLongPress,
   onReady,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -95,9 +92,9 @@ export function MapView({
   const checkpointMarkersRef = useRef<maplibregl.Marker[]>([])
   // هندلرهای کلیک در ref نگه داشته می‌شوند تا map فقط یک‌بار ساخته شود
   // ولی همیشه آخرین کلوژرها را صدا بزند.
-  const handlersRef = useRef({ origin, destination, onMapClick, onPointInfo, onLongPress })
+  const handlersRef = useRef({ origin, destination, onMapClick, onPointInfo })
   useEffect(() => {
-    handlersRef.current = { origin, destination, onMapClick, onPointInfo, onLongPress }
+    handlersRef.current = { origin, destination, onMapClick, onPointInfo }
   })
 
   // میدان باد در ref نگه داشته می‌شود تا وقتی map لایه‌هایش را افزود (به‌صورت
@@ -126,56 +123,39 @@ export function MapView({
     // انتساب OSM (الزام مجوز) — گوشهٔ پایین
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right")
     onReadyRef.current?.(map)
-
-    // long-press: نگه‌داشتن ۵۰۰ms بدون جابه‌جایی، بعد رها کردن بدون drag.
-    // اگر long-press رخ دهد، کلیک بعدی نادیده گرفته می‌شود.
-    let pressTimer: ReturnType<typeof setTimeout> | null = null
-    let pressStart: maplibregl.Point | null = null
-    let longPressFired = false
-
-    const clearPress = () => {
-      if (pressTimer) clearTimeout(pressTimer)
-      pressTimer = null
-      pressStart = null
+    // دسترسی dev برای دیباگ زندهٔ لایه‌ها (مثلاً از طریق CDP)
+    if (import.meta.env.DEV) {
+      ;(window as unknown as { __map?: maplibregl.Map }).__map = map
     }
-
-    map.on('mousedown', (e) => {
-      if (e.originalEvent.button !== 0) return
-      longPressFired = false
-      pressStart = e.point
-      pressTimer = setTimeout(() => {
-        longPressFired = true
-        handlersRef.current.onLongPress?.({ lat: e.lngLat.lat, lon: e.lngLat.lng })
-      }, 500)
-    })
-
-    map.on('mousemove', (e) => {
-      if (!pressStart || !pressTimer) return
-      if (e.point.dist(pressStart) > 6) clearPress()
-    })
-
-    map.on('mouseup', clearPress)
-    map.on('dragstart', clearPress)
 
     map.on('click', (e) => {
       // ترتیب اولویت کلیک: مبدأ → مقصد → اطلاعات نقطه (mockup: «View wind
-      // Layers at Point»). چک‌پوینت با long-press اضافه می‌شود.
-      if (longPressFired) {
-        longPressFired = false
-        return
-      }
+      // Layers at Point»). چک‌پوینت با دکمهٔ «افزودن چک‌پوینت» پنل گذاشته
+      // می‌شود، نه با نگه‌داشتن کلیک.
       const coord = { lat: e.lngLat.lat, lon: e.lngLat.lng }
       const h = handlersRef.current
       if (!h.origin || !h.destination) h.onMapClick(coord)
       else h.onPointInfo?.(coord)
     })
 
-    map.on('load', () => {
+    mapRef.current = map
+    return () => {
+      map.remove()
+      mapRef.current = null
+    }
+  }, [])
+
+  // منبع/لایه‌های مسیر — بازگشت‌پذیر؛ رویداد load در محیط‌های کند (صف DEM)
+  // دیر می‌رسد، پس ساخت منبع‌ها به اولین تلاشِ رسم منتقل شده است.
+  const ensureRouteSources = (map: maplibregl.Map): void => {
+    if (!map.getSource(ROUTE_SOURCE_ID)) {
       map.addSource(ROUTE_SOURCE_ID, {
         type: 'geojson',
         data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } },
       })
-      // خط مسیر سفید + نقاط سفید — مطابق mockup
+    }
+    // خط مسیر سفید + نقاط سفید — مطابق mockup
+    if (!map.getLayer(ROUTE_LAYER_ID)) {
       map.addLayer({
         id: ROUTE_LAYER_ID,
         type: 'line',
@@ -187,10 +167,14 @@ export function MapView({
           'line-blur': 0.2,
         },
       })
+    }
+    if (!map.getSource(ROUTE_DOTS_SOURCE_ID)) {
       map.addSource(ROUTE_DOTS_SOURCE_ID, {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
       })
+    }
+    if (!map.getLayer(ROUTE_DOTS_LAYER_ID)) {
       map.addLayer({
         id: ROUTE_DOTS_LAYER_ID,
         type: 'circle',
@@ -202,27 +186,25 @@ export function MapView({
           'circle-stroke-width': 1,
         },
       })
-      // میدان باد: نقشهٔ حرارتی + پیکان‌ها (زیر خط مسیر)
-      addWindLayers(map)
-      applyWindField(map, windFieldRef.current)
-    })
-
-    mapRef.current = map
-    return () => {
-      clearPress()
-      map.remove()
-      mapRef.current = null
     }
-  }, [])
+    // وقتی استایل در وضعیت نیمه‌لود (صف DEM) است، addLayer گاهی تا رندر
+    // بعدی بی‌اثر می‌ماند — یک رندر صریح تضمین می‌کند خط مسیر همان لحظه
+    // دیده شود.
+    map.triggerRepaint()
+  }
 
   // حالت ۲بعدی/۳بعدی — سوییچ درجا (بدون تغییر URL): در ۳بعدی فقط ترنِ
   // واقعی + آب (کاشی خیابان خاموش) با pitch و بزرگ‌نمایی ارتفاع، مشابه
-  // صحنهٔ بصری‌سازی پروژه. setTerrain قبل از آماده‌شدن استایل خطا می‌دهد —
-  // با رویداد load همگام می‌شود.
+  // صحنهٔ بصری‌سازی پروژه. به‌جای گیتِ `isStyleLoaded` (که با منبع DEM مدت‌ها
+  // false می‌ماند و سوییچ ۳بعدی را فلج می‌کرد) مستقیم تلاش می‌کنیم و روی
+  // خطا با تایمر برمی‌گردیم.
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
+    let cancelled = false
+    let attempts = 0
     const applyMode = () => {
+      if (cancelled) return
       try {
         const is3d = mode === '3d'
         map.setLayoutProperty('osm', 'visibility', is3d ? 'none' : 'visible')
@@ -232,18 +214,24 @@ export function MapView({
         map.setPaintProperty('hillshade', 'hillshade-exaggeration', is3d ? 0.6 : 0.35)
         map.setPaintProperty('hillshade', 'hillshade-shadow-color', is3d ? '#6b4a2f' : '#473b2d')
         if (is3d) {
-          map.setTerrain({ source: 'terrain', exaggeration: 1.2 })
-          map.easeTo({ pitch: 50, duration: 600 })
+          map.setTerrain({ source: 'terrain', exaggeration: 2 })
+          map.easeTo({ pitch: 55, duration: 600 })
         } else {
           map.setTerrain(null)
           map.easeTo({ pitch: 0, duration: 400 })
         }
       } catch {
-        // استایل هنوز کامل نیست — در رویداد load دوباره اعمال می‌شود
+        // استایل هنوز کامل نیست — دوباره تلاش می‌شود
+        if (attempts < 100) {
+          attempts += 1
+          setTimeout(applyMode, 150)
+        }
       }
     }
-    if (map.isStyleLoaded()) applyMode()
-    else map.once('load', applyMode)
+    applyMode()
+    return () => {
+      cancelled = true
+    }
   }, [mode])
 
   // نشانگر مبدأ
@@ -291,8 +279,9 @@ export function MapView({
   }, [checkpoints])
 
   // رسم خط مسیر + نقاط سفید روی آن (مطابق mockup) + تنظیم کادر روی مسیر.
-  // اگر استایل هنوز آماده نیست، به‌جای ردشدنِ بی‌صدا، با تایمر دوباره تلاش
-  // می‌شود (باگ قبلی: مسیر محاسبه‌شده گاهی رسم نمی‌شد).
+  // منبع‌ها با اولین تلاشِ رسم ساخته می‌شوند (بازگشت‌پذیر) و روی خطا با تایمر
+  // دوباره تلاش می‌شود — بدون گیتِ isStyleLoaded (باگ قبلی: مسیر محاسبه‌شده
+  // گاهی رسم نمی‌شد).
   useEffect(() => {
     let cancelled = false
     let attempts = 0
@@ -300,43 +289,49 @@ export function MapView({
       if (cancelled) return
       const map = mapRef.current
       if (!map) return
-      if (!map.isStyleLoaded()) {
-        if (attempts < 100) {
+      try {
+        ensureRouteSources(map)
+        const source = map.getSource(ROUTE_SOURCE_ID) as maplibregl.GeoJSONSource
+        source.setData({
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: (path ?? []).map((c) => [c.lon, c.lat]),
+          },
+        })
+        const dots = map.getSource(ROUTE_DOTS_SOURCE_ID) as maplibregl.GeoJSONSource
+        dots.setData({
+          type: 'FeatureCollection',
+          features: (path ?? [])
+            // هر n امین نقطه تا تراکم نقاط شبیه mockup بماند
+            .filter((_, i) => i % Math.max(1, Math.ceil((path?.length ?? 1) / 24)) === 0)
+            .map((c) => ({
+              type: 'Feature' as const,
+              properties: {},
+              geometry: { type: 'Point' as const, coordinates: [c.lon, c.lat] },
+            })),
+        })
+        // پس از محاسبه، کادر نقشه روی مسیر تنظیم شود
+        if (path && path.length > 1) {
+          const lons = path.map((c) => c.lon)
+          const lats = path.map((c) => c.lat)
+          const bounds = new maplibregl.LngLatBounds(
+            [Math.min(...lons), Math.min(...lats)],
+            [Math.max(...lons), Math.max(...lats)],
+          )
+          map.fitBounds(bounds, { padding: 80, duration: 800, pitch: mode === '3d' ? 60 : 0 })
+        }
+        // وقتی استایل در وضعیت نیمه‌لود (صف DEM) است، setData گاهی تا
+        // رندر بعدی بی‌اثر می‌ماند — یک رندر صریح تضمین می‌کند خط مسیر
+        // همان لحظه دیده شود.
+        map.triggerRepaint()
+      } catch {
+        // استایل هنوز کامل نیست — دوباره تلاش می‌شود
+        if (attempts < 200) {
           attempts += 1
           setTimeout(draw, 150)
         }
-        return
-      }
-      const source = map.getSource(ROUTE_SOURCE_ID) as maplibregl.GeoJSONSource | undefined
-      source?.setData({
-        type: 'Feature',
-        properties: {},
-        geometry: {
-          type: 'LineString',
-          coordinates: (path ?? []).map((c) => [c.lon, c.lat]),
-        },
-      })
-      const dots = map.getSource(ROUTE_DOTS_SOURCE_ID) as maplibregl.GeoJSONSource | undefined
-      dots?.setData({
-        type: 'FeatureCollection',
-        features: (path ?? [])
-          // هر n امین نقطه تا تراکم نقاط شبیه mockup بماند
-          .filter((_, i) => i % Math.max(1, Math.ceil((path?.length ?? 1) / 24)) === 0)
-          .map((c) => ({
-            type: 'Feature' as const,
-            properties: {},
-            geometry: { type: 'Point' as const, coordinates: [c.lon, c.lat] },
-          })),
-      })
-      // پس از محاسبه، کادر نقشه روی مسیر تنظیم شود
-      if (path && path.length > 1) {
-        const lons = path.map((c) => c.lon)
-        const lats = path.map((c) => c.lat)
-        const bounds = new maplibregl.LngLatBounds(
-          [Math.min(...lons), Math.min(...lats)],
-          [Math.max(...lons), Math.max(...lats)],
-        )
-        map.fitBounds(bounds, { padding: 80, duration: 800, pitch: mode === '3d' ? 60 : 0 })
       }
     }
     draw()

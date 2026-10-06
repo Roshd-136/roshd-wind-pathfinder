@@ -23,6 +23,9 @@ interface PathInfoPanelProps {
   checkpoints: Checkpoint[]
   onRemoveCheckpoint: (index: number) => void
   onMoveCheckpoint: (index: number, direction: -1 | 1) => void
+  addingCheckpoint: boolean
+  onToggleAddCheckpoint: () => void
+  canAddCheckpoint: boolean
   onPointInfo: () => void
   canPointInfo: boolean
   result: RouteResult | null
@@ -46,6 +49,9 @@ export function PathInfoPanel({
   checkpoints,
   onRemoveCheckpoint,
   onMoveCheckpoint,
+  addingCheckpoint,
+  onToggleAddCheckpoint,
+  canAddCheckpoint,
   onPointInfo,
   canPointInfo,
   result,
@@ -79,6 +85,9 @@ export function PathInfoPanel({
           checkpoints={checkpoints}
           onRemove={onRemoveCheckpoint}
           onMove={onMoveCheckpoint}
+          adding={addingCheckpoint}
+          onToggleAdd={onToggleAddCheckpoint}
+          canAdd={canAddCheckpoint}
         />
       </div>
 

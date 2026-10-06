@@ -23,9 +23,10 @@ interface RoutingMapScreenProps {
  * پیاده‌سازی مشترک صفحات Map2D/Map3D — همان چیدمان و منطق، فقط `mode`
  * فرق می‌کند. جریان روی نقشه: کلیک ۱=مبدأ، کلیک ۲=مقصد، کلیک‌های بعدی=
  * نمایش اطلاعات باد آن نقطه (mockup: «View wind Layers at Point»)، و
- * long-press=افزودن چک‌پوینت اجباری. دکمه «پاک کردن» همه را ریست می‌کند.
- * همه در `useRouteStore` نگه داشته می‌شود تا toggle دوحالته ۲/۳ بعدی
- * (ناوبری واقعی بین دو route) چیزی را از دست ندهد.
+ * چک‌پوینت اجباری فقط با دکمهٔ «افزودن چک‌پوینت» پنل (کلیک بعدی روی نقشه).
+ * دکمه «پاک کردن» همه را ریست می‌کند. همه در `useRouteStore` نگه داشته
+ * می‌شود تا toggle دوحالته ۲/۳ بعدی (ناوبری واقعی بین دو route) چیزی را
+ * از دست ندهد.
  */
 export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
   // حالت نقشه از استور می‌آید تا سوییچ ۲/۳بعدی «درجا» باشد (بدون ناوبری)؛
@@ -78,7 +79,15 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
         (layerVisibility.high && f.altitude_m === 500),
     ) ?? null
 
+  // حالت «افزودن چک‌پوینت»: کلیک بعدی روی نقشه چک‌پوینت می‌گذارد (بدون نگه‌داشتن)
+  const [placingCheckpoint, setPlacingCheckpoint] = useState(false)
+
   function handleMapClick(coord: Coordinate) {
+    if (placingCheckpoint) {
+      addCheckpoint(coord)
+      setPlacingCheckpoint(false)
+      return
+    }
     if (!origin) {
       setOrigin(coord)
     } else if (!destination) {
@@ -127,6 +136,9 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
       onMoveCheckpoint={moveCheckpoint}
       onPointInfo={() => setInfoPoint(origin)}
       canPointInfo={Boolean(origin)}
+      addingCheckpoint={placingCheckpoint}
+      onToggleAddCheckpoint={() => setPlacingCheckpoint((v) => !v)}
+      canAddCheckpoint={Boolean(origin && destination)}
       result={result}
       resultIsDemo={isDemoResult}
     />
@@ -145,7 +157,9 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
           path={result?.path ?? null}
           windField={activeField}
           onMapClick={handleMapClick}
-          onLongPress={addCheckpoint}
+          // بعد از تعیین مبدأ/مقصد، کلیک عادی = اطلاعات نقطه؛ ولی در حالت
+          // «افزودن چک‌پوینت» همان کلیک باید چک‌پوینت بگذارد.
+          onPointInfo={placingCheckpoint ? handleMapClick : (coord) => setInfoPoint(coord)}
           onReady={(m) => {
             mapRef.current = m
           }}
@@ -168,7 +182,7 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
             {t('map.clear')}
           </Button>
         )}
-        {/* ویزارد مراحل — قاب وسط بالا با اسلاید افقی */}
+        {/* ویزارد مراحل — قاب وسط بالا با اسلاید افقی و فلش‌های دو سو */}
         <StepsWizard
           origin={origin}
           destination={destination}
@@ -184,8 +198,13 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
         )}
       </div>
 
-      {/* پنل شناور روی نقشه (دسکتاپ) — همیشه نمایان */}
-      <div className="absolute top-4 z-10 hidden max-h-[calc(100%-2rem)] w-[19.5rem] md:block end-4">
+      {/* پنل شناور روی نقشه (دسکتاپ) — با دکمهٔ نوار ابزار تا لبه جمع می‌شود */}
+      <div
+        className={`absolute top-4 z-10 hidden max-h-[calc(100%-2rem)] overflow-hidden transition-all duration-300 md:block end-4 ${
+          isControlPanelOpen ? 'w-[19.5rem] opacity-100' : 'w-0 opacity-0'
+        }`}
+        aria-hidden={!isControlPanelOpen}
+      >
         {panel}
       </div>
       <MapTools

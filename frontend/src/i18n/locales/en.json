@@ -40,7 +40,9 @@
     "criterionBalanced": "Balanced",
     "avoidZones": "Avoid marked zones",
     "checkpoints": "Mandatory checkpoints",
-    "checkpointHint": "After picking origin and destination, long-press the map to add a mandatory checkpoint.",
+    "checkpointHint": "After picking origin and destination, press “Add checkpoint” and then click on the map.",
+    "addCheckpoint": "Add checkpoint",
+    "addingCheckpoint": "Click on the map…",
     "moveUp": "Move up",
     "moveDown": "Move down",
     "remove": "Remove",
@@ -52,6 +54,7 @@
     "stepCompute": "Compute route",
     "stepComputeDone": "Route computed",
     "back": "Previous step",
+    "next": "Next step",
     "collapsePanel": "Hide panel",
     "openPanel": "Show control panel",
     "catAltitude": "Flight altitude",
@@ -64,6 +67,9 @@
   },
   "trip": {
     "title": "Trip Settings"
+  },
+  "wizard": {
+    "searchPlaceholder": "Search a place…"
   },
   "settings": {
     "theme": "Theme",

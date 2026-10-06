@@ -40,7 +40,9 @@
     "criterionBalanced": "متعادل",
     "avoidZones": "اجتناب از مناطق علامت‌گذاری‌شده",
     "checkpoints": "چک‌پوینت‌های اجباری",
-    "checkpointHint": "بعد از انتخاب مبدأ/مقصد، برای افزودن چک‌پوینت اجباری روی نقشه کلیک نگه دارید (long-press).",
+    "checkpointHint": "بعد از انتخاب مبدأ و مقصد، دکمهٔ «افزودن چک‌پوینت» را بزنید و سپس روی نقشه کلیک کنید.",
+    "addCheckpoint": "افزودن چک‌پوینت",
+    "addingCheckpoint": "روی نقشه کلیک کنید…",
     "moveUp": "جابجایی به بالا",
     "moveDown": "جابجایی به پایین",
     "remove": "حذف",
@@ -52,6 +54,7 @@
     "stepCompute": "محاسبهٔ مسیر",
     "stepComputeDone": "مسیر محاسبه شد",
     "back": "مرحله قبل",
+    "next": "گام بعد",
     "collapsePanel": "بستن پنل",
     "openPanel": "نمایش پنل کنترل",
     "catAltitude": "ارتفاع پرواز",
@@ -64,6 +67,9 @@
   },
   "trip": {
     "title": "تنظیمات سفر"
+  },
+  "wizard": {
+    "searchPlaceholder": "جستجوی مکان…"
   },
   "settings": {
     "theme": "تم",
