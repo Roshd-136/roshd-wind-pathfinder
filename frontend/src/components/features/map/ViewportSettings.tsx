@@ -27,7 +27,7 @@ export function ViewportSettings() {
     <div
       role="dialog"
       aria-label={t('viewport.title')}
-      className="absolute top-1/2 left-1/2 z-20 w-64 -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-surface/95 p-3 shadow-[var(--shadow-card)] backdrop-blur-sm"
+      className="absolute top-0 left-[calc(100%+0.5rem)] z-20 w-64 rounded-2xl border border-border bg-surface/95 p-3 shadow-[var(--shadow-card)] backdrop-blur-sm"
     >
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-semibold text-text-primary">{t('viewport.title')}</span>
