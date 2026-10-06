@@ -56,16 +56,6 @@ export function MapTools({ panelOpen, onTogglePanel, onZoomIn, onZoomOut }: MapT
         {panelOpen ? <PanelRightClose size={18} aria-hidden /> : <PanelRightOpen size={18} aria-hidden />}
       </button>
 
-      <button
-        type="button"
-        onClick={toggleViewportSettings}
-        aria-label={t('viewport.title')}
-        title={t('viewport.title')}
-        aria-pressed={isViewportSettingsOpen}
-        className={isViewportSettingsOpen ? activeBtn : btn}
-      >
-        <SlidersHorizontal size={18} aria-hidden />
-      </button>
 
       <button
         type="button"
@@ -89,6 +79,19 @@ export function MapTools({ panelOpen, onTogglePanel, onZoomIn, onZoomOut }: MapT
       </button>
 
       <div className="my-1 h-px bg-border" aria-hidden />
+
+      {/* تنظیمات «نمای نقشه» — زیر جداکننده و بالای زوم */}
+      <button
+        type="button"
+        onClick={toggleViewportSettings}
+        aria-label={t('viewport.title')}
+        title={t('viewport.title')}
+        aria-pressed={isViewportSettingsOpen}
+        className={isViewportSettingsOpen ? activeBtn : btn}
+      >
+        <SlidersHorizontal size={18} aria-hidden />
+      </button>
+
       <button type="button" onClick={onZoomIn} aria-label="Zoom in" title="Zoom in" className={btn}>
         <Plus size={18} aria-hidden />
       </button>
