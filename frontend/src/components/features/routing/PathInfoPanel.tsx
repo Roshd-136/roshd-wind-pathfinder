@@ -55,8 +55,6 @@ export function PathInfoPanel({
 
   return (
     <Card className="no-scrollbar flex max-h-[calc(100vh-2rem)] w-full flex-col gap-4 overflow-y-auto rounded-2xl shadow-[var(--shadow-card)]">
-      <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-0">
-
       <AlgorithmSelector value={algorithm} onChange={onAlgorithmChange} />
 
       <WindLayerControls value={layerVisibility} onChange={onLayerVisibilityChange} />
@@ -120,7 +118,6 @@ export function PathInfoPanel({
           </div>
         </div>
       )}
-      </div>
     </Card>
   )
 }

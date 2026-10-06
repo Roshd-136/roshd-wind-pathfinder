@@ -142,3 +142,32 @@ export function speedBucket(speedMps: number): '0' | '5' | '10' | '15' | '20' {
   if (speedMps < 20) return '15'
   return '20'
 }
+
+/**
+ * بازهٔ [min,max] سرعت خود میدان — برای رنگ‌آمیزی نسبی (مثل رفتار
+ * `arrowscale` نسبی صحنهٔ بصری‌سازی).
+ */
+export function fieldSpeedRange(field: WindField): [number, number] {
+  let min = Infinity
+  let max = -Infinity
+  for (const v of field.vectors) {
+    if (v.speed_mps < min) min = v.speed_mps
+    if (v.speed_mps > max) max = v.speed_mps
+  }
+  if (!Number.isFinite(min) || max - min < 0.5) {
+    const mid = Number.isFinite(min) ? min : 0
+    return [Math.max(0, mid - 0.5), mid + 1]
+  }
+  return [min, max]
+}
+
+/** رنگ نسبی سرعت روی بازهٔ خود میدان (min → آبی، max → قرمز). */
+export function colorForFieldSpeed(
+  speedMps: number,
+  range: [number, number],
+): [number, number, number] {
+  const [min, max] = range
+  const t = Math.min(Math.max((speedMps - min) / Math.max(max - min, 1e-6), 0), 1)
+  // t=0 → آبی و t=1 → قرمزِ رمپ (نه بازگشت به سرعت مطلق)
+  return colorForSpeed(t * 20)
+}

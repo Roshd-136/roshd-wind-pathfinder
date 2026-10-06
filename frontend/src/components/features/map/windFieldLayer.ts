@@ -1,6 +1,12 @@
 import type { GeoJSONSource, ImageSource, Map as MapLibreMap } from 'maplibre-gl'
 import type { WindField } from '../../../types/routing'
-import { arrowFeatures, colorForSpeed, gridMeta, WIND_SPEED_STOPS } from '../../../utils/windField'
+import {
+  arrowFeatures,
+  colorForFieldSpeed,
+  fieldSpeedRange,
+  gridMeta,
+  WIND_SPEED_STOPS,
+} from '../../../utils/windField'
 
 /**
  * رندر میدان باد روی MapLibre GL:
@@ -16,8 +22,9 @@ const FIELD_LAYER = 'wind-field-layer'
 const ARROW_SOURCE = 'wind-arrows'
 const ARROW_LAYER = 'wind-arrows-layer'
 
-/** تصویر نرم میدان از شبکه (canvas → dataURL) — رنگ از همان رمپ راهنما. */
+/** تصویر نرم میدان از شبکه (canvas → dataURL) — رنگ نسبی بازهٔ میدان. */
 export function buildFieldImage(field: WindField, width = 420): string {
+  const range = fieldSpeedRange(field)
   const meta = gridMeta(field)
   const latSpan = meta.lats[meta.lats.length - 1] - meta.lats[0]
   const lonSpan = meta.lons[meta.lons.length - 1] - meta.lons[0]
@@ -40,8 +47,8 @@ export function buildFieldImage(field: WindField, width = 420): string {
       )
       const v = field.vectors[row * meta.lons.length + col]
       if (!v) continue
-      const [r, g, b] = colorForSpeed(v.speed_mps)
-      const alpha = 80 + Math.round(70 * Math.min(v.speed_mps / 20, 1))
+      const [r, g, b] = colorForFieldSpeed(v.speed_mps, range)
+      const alpha = 80 + Math.round(70 * Math.min((v.speed_mps - range[0]) / Math.max(range[1] - range[0], 1e-6), 1))
       const offset = (py * width + px) * 4
       image.data[offset] = r
       image.data[offset + 1] = g
@@ -57,7 +64,19 @@ export function buildFieldImage(field: WindField, width = 420): string {
  * GeoJSON پیکان‌های «توپر» (شکل فلش ۷نقطه‌ای) — مثل پیکان‌های صحنهٔ نمونه.
  * چرخش در مختصات؛ جهت = downwind (direction_deg + ۱۸۰).
  */
-export function arrowChevronsGeoJson(field: WindField, stride = 3) {
+/** رنگ نسبی به‌صورت expression رنگی maplibre (بازهٔ خود میدان). */
+function fieldColorExpression(field: WindField): unknown[] {
+  const [min, max] = fieldSpeedRange(field)
+  const stops: unknown[] = ['interpolate', ['linear'], ['get', 'speed']]
+  for (const stop of WIND_SPEED_STOPS) {
+    const [r, g, b] = stop.color
+    const value = min + ((max - min) * stop.value) / 20
+    stops.push(Number(value.toFixed(2)), `rgb(${r}, ${g}, ${b})`)
+  }
+  return stops
+}
+
+export function arrowChevronsGeoJson(field: WindField, stride = 2) {
   const arrows = arrowFeatures(field, stride)
   const len = 0.055 // طول کل فلش (درجه)
   const shaft = 0.011 // نیم‌عرض ساقه
@@ -166,6 +185,10 @@ export function updateWindField(map: MapLibreMap, field: WindField): void {
   }
   const arrowSource = map.getSource(ARROW_SOURCE) as GeoJSONSource | undefined
   arrowSource?.setData(arrowChevronsGeoJson(field))
+  // رنگ پیکان‌ها نسبت به بازهٔ خود میدان به‌روز می‌شود
+  if (map.getLayer(ARROW_LAYER)) {
+    map.setPaintProperty(ARROW_LAYER, 'fill-color', fieldColorExpression(field) as never)
+  }
 }
 
 /**

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { WindField } from '../types/routing'
 import {
   arrowFeatures,
+  colorForFieldSpeed,
   colorForSpeed,
   gridMeta,
   sampleWindAtPoint,
@@ -88,5 +89,27 @@ describe('gridMeta', () => {
     expect(meta.lons).toEqual([58.0, 58.05, 58.1])
     expect(meta.latStep).toBeCloseTo(0.05)
     expect(meta.lonStep).toBeCloseTo(0.05)
+  })
+})
+
+describe('colorForFieldSpeed (relative coloring — like the routing scene)', () => {
+  // بازهٔ سرعت خود میدان — همان دادهٔ واقعی کریدور (حدود ۵ تا ۷٫۹ m/s)
+  const range: [number, number] = [4.98, 7.86]
+
+  it('maps field minimum to the blue stop and maximum to the red stop', () => {
+    const low = colorForFieldSpeed(range[0], range)
+    const high = colorForFieldSpeed(range[1], range)
+    // آبی (37،99،235) و قرمز (239،68،68)
+    expect(low[2]).toBeGreaterThan(200)
+    expect(high[0]).toBeGreaterThan(200)
+    expect(low[0]).toBeLessThan(high[0])
+  })
+
+  it('produces distinct colors across the field (no single-color field)', () => {
+    const a = colorForFieldSpeed(5.0, range)
+    const b = colorForFieldSpeed(6.4, range)
+    const c = colorForFieldSpeed(7.8, range)
+    expect(a).not.toEqual(b)
+    expect(b).not.toEqual(c)
   })
 })
