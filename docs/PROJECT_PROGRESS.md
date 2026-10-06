@@ -1204,3 +1204,13 @@ src/pathfinding/routing.py     86    3   30    6   92%
 - **شواهد:** ۳۱/۳۱ تست + lint/typecheck/build موفق؛ جریان واقعی مسیر (۱۳۴.۱ km)
   با API زنده تأیید شد.
 - **PR:** [#24](https://github.com/Roshd-136/roshd-wind-pathfinder/pull/24)
+
+## Task: «بازخورد UX دور هشتم» — گام ۱۵
+
+- **یک انتساب OSM** (حذف کنترل تکراری؛ نمونهٔ صریح پایین-چپ).
+- **حذف سوییچ مستقل ۲/۳بعدی** — آیکون‌های نقشه/کوه در نوار ابزار کنار پنل.
+- **متن بازگشت کوتاه:** «مرحله قبل» / «Previous step».
+- **اسکرول‌بار پنل نامرئی** (`.no-scrollbar` — اسکرول کار می‌کند).
+- **شواهد:** ۳۱/۳۱ تست + build/lint موفق؛ تأیید DOM (یک انتساب، متن کوتاه،
+  scrollbar-width:none).
+- **PR:** [#24](https://github.com/Roshd-136/roshd-wind-pathfinder/pull/24)

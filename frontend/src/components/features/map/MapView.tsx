@@ -121,9 +121,10 @@ export function MapView({
       style: baseStyle(),
       center: Khorasan_CENTER,
       zoom: 7,
+      attributionControl: false, // فقط یک کنترل صریح (پایین) — بدون تکرار
     })
-    // انتساب OSM (الزام مجوز) — گوشهٔ مقابل زوم و راهنما
-    map.addControl(new maplibregl.AttributionControl({ compact: true }), document.documentElement.dir === "rtl" ? "bottom-right" : "bottom-left")
+    // انتساب OSM (الزام مجوز) — گوشهٔ پایین
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right")
     onReadyRef.current?.(map)
 
     // long-press: نگه‌داشتن ۵۰۰ms بدون جابه‌جایی، بعد رها کردن بدون drag.

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type maplibregl from 'maplibre-gl'
-import { MapModeToggle } from '../map/MapModeToggle'
 import { MapView } from '../map/MapView'
 import { PointInfoPopup } from '../map/PointInfoPopup'
 import { WindSpeedLegend } from '../layers/WindSpeedLegend'
@@ -151,7 +150,6 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
             mapRef.current = m
           }}
         />
-        <MapModeToggle />
         {activeField && (
           // راهنمای سرعت باد — وسط پایین و پهن، دور از زوم و انتساب
           <div className="absolute bottom-4 left-1/2 z-10 w-80 -translate-x-1/2 rounded-xl border border-border bg-surface/90 p-3 shadow-[var(--shadow-card)] backdrop-blur-sm">

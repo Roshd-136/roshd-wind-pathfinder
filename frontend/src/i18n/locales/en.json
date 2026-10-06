@@ -51,7 +51,7 @@
     "stepDestinationDone": "End",
     "stepCompute": "Compute route",
     "stepComputeDone": "Route computed",
-    "back": "Back to previous step",
+    "back": "Previous step",
     "collapsePanel": "Hide panel",
     "openPanel": "Show control panel",
     "catAltitude": "Flight altitude",

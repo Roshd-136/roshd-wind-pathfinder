@@ -94,3 +94,11 @@ body {
 .step-swap {
   animation: step-in 320ms ease;
 }
+
+/* اسکرول‌بار نامرئی (اسکرول با چرخ/لمس کار می‌کند) */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
