@@ -1319,3 +1319,11 @@ src/pathfinding/routing.py     86    3   30    6   92%
   کل یا سرِ پیکان.
 - **شواهد:** ۳۸/۳۸ تست + lint/typecheck/build موفق.
 - **PR:** [#24](https://github.com/Roshd-136/roshd-wind-pathfinder/pull/24)
+
+## Task: «پیکان‌های پررنگ‌تر با همان طول کوتاه» — گام ۱۹
+
+- **تسک:** همان 86bc860cq.
+- **ضخامت/اندازه ×۱٫۲** (ساقه ۹٫۴۵px، نیم‌عرض سر ۰٫۱۹، sizeStops ×۱٫۲) —
+  طول فلش همان نسخهٔ کوتاه (baseY ۰٫۶۲) دست‌نخورده ماند.
+- **شواهد:** ۳۸/۳۸ تست + lint/typecheck/build موفق.
+- **PR:** [#24](https://github.com/Roshd-136/roshd-wind-pathfinder/pull/24)
