@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { Coordinate } from '../../../types/routing'
 import { reverseGeocode } from '../../../utils/geocode'
 import { useSettingsStore } from '../../../store/useSettingsStore'
+import { Button } from '../../ui/Button'
 
 /** نام مکان یک نقطه (استان/شهر/خیابان) — ژئوکدینگ معکوس آزاد OSM. */
 function PlaceLabel({ point }: { point: Coordinate }) {
@@ -23,6 +24,9 @@ interface StepsWizardProps {
   hasResult: boolean
   onBack: () => void
   canBack: boolean
+  onCalculate: () => void
+  canCalculate: boolean
+  isCalculating: boolean
 }
 
 /**
@@ -30,7 +34,16 @@ interface StepsWizardProps {
  * گام، نوار گام‌ها به‌صورت افقی به گام بعدی می‌لغزد (در RTL برعکس). گام‌ها:
  * ۱. انتخاب مبدأ، ۲. انتخاب مقصد، ۳. محاسبهٔ مسیر.
  */
-export function StepsWizard({ origin, destination, hasResult, onBack, canBack }: StepsWizardProps) {
+export function StepsWizard({
+  origin,
+  destination,
+  hasResult,
+  onBack,
+  canBack,
+  onCalculate,
+  canCalculate,
+  isCalculating,
+}: StepsWizardProps) {
   const { t } = useTranslation()
   const step = origin === null ? 1 : destination === null ? 2 : 3
   const isRtl = document.documentElement.dir === 'rtl'
@@ -62,7 +75,7 @@ export function StepsWizard({ origin, destination, hasResult, onBack, canBack }:
 
   return (
     <div
-      className="absolute top-4 left-1/2 z-10 w-[30rem] max-w-[92vw] -translate-x-1/2 rounded-2xl border border-border bg-surface/95 shadow-[var(--shadow-card)] backdrop-blur-sm"
+      className="absolute top-4 left-1/2 z-10 w-[22rem] max-w-[92vw] -translate-x-1/2 rounded-2xl border border-border bg-surface/95 shadow-[var(--shadow-card)] backdrop-blur-sm"
       role="status"
       aria-label={t('routing.stepsTitle')}
     >
@@ -81,18 +94,18 @@ export function StepsWizard({ origin, destination, hasResult, onBack, canBack }:
       </div>
 
       {/* نوار افقی گام‌ها — با تغییر گام به سمت بعدی می‌لغزد */}
-      <div className="overflow-hidden px-4 py-3">
+      <div className="overflow-hidden px-3 py-2">
         <div
           className="flex transition-transform duration-500 ease-out"
           style={{ transform: `translateX(${slideSign * (step - 1) * 100}%)` }}
         >
           {slides.map((s) => (
             <div key={s.n} className="w-full shrink-0 px-1">
-              <p className="truncate text-2xl font-extrabold leading-tight text-text-primary">
+              <p className="truncate text-center text-2xl font-extrabold leading-tight text-text-primary">
                 {s.title}
               </p>
               {s.done && s.placeLabel && (
-                <p className="step-swap mt-1 truncate text-sm text-text-secondary">
+                <p className="step-swap mt-1 truncate text-center text-sm text-text-secondary">
                   {s.placeLabel}
                   {s.point ? <>: <PlaceLabel point={s.point} /></> : null}
                 </p>
@@ -103,7 +116,7 @@ export function StepsWizard({ origin, destination, hasResult, onBack, canBack }:
       </div>
 
       {/* نشانگر پیشرفت */}
-      <div className="flex items-center justify-center gap-1.5 pb-3">
+      <div className="flex items-center justify-center gap-1.5 pb-2">
         {slides.map((s) => (
           <span
             key={s.n}
@@ -114,6 +127,9 @@ export function StepsWizard({ origin, destination, hasResult, onBack, canBack }:
           />
         ))}
       </div>
+      <Button className="w-full" onClick={onCalculate} disabled={!canCalculate || isCalculating}>
+        {isCalculating ? t('common.loading') : t('routing.calculatePath')}
+      </Button>
     </div>
   )
 }

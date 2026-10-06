@@ -25,9 +25,6 @@ interface PathInfoPanelProps {
   onMoveCheckpoint: (index: number, direction: -1 | 1) => void
   onPointInfo: () => void
   canPointInfo: boolean
-  onCalculate: () => void
-  isCalculating: boolean
-  canCalculate: boolean
   result: RouteResult | null
   /** مسیر از فیکسچر نمایشی dev آمده (بدون بک‌اند) — با برچسب صریح. */
   resultIsDemo?: boolean
@@ -51,16 +48,13 @@ export function PathInfoPanel({
   onMoveCheckpoint,
   onPointInfo,
   canPointInfo,
-  onCalculate,
-  isCalculating,
-  canCalculate,
   result,
   resultIsDemo = false,
 }: PathInfoPanelProps) {
   const { t } = useTranslation()
 
   return (
-    <Card className="flex max-h-[70dvh] w-full flex-col rounded-2xl shadow-[var(--shadow-card)] md:max-h-none md:h-full">
+    <Card className="flex w-full flex-col gap-4 overflow-y-auto rounded-2xl shadow-[var(--shadow-card)] md:h-full">
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-0">
 
       <AlgorithmSelector value={algorithm} onChange={onAlgorithmChange} />
@@ -126,17 +120,6 @@ export function PathInfoPanel({
           </div>
         </div>
       )}
-
-      </div>
-      {/* دکمهٔ محاسبه همیشه نمایان است — بیرون ناحیهٔ اسکرول */}
-      <div className="mt-3 border-t border-border pt-3">
-        <Button
-          className="w-full"
-          onClick={onCalculate}
-          disabled={!canCalculate || isCalculating}
-        >
-          {isCalculating ? t('common.loading') : t('routing.calculatePath')}
-        </Button>
       </div>
     </Card>
   )

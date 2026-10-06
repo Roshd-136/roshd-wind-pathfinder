@@ -17,6 +17,8 @@ interface MapViewProps {
   onPointInfo?: (coord: Coordinate) => void
   /** long-press روی نقشه — برای افزودن چک‌پوینت یا اطلاعات نقطه. */
   onLongPress?: (coord: Coordinate) => void
+  /** نقشهٔ ساخته‌شده — برای ابزارهای بیرونی (زوم سفارشی). */
+  onReady?: (map: maplibregl.Map) => void
 }
 
 const ROUTE_SOURCE_ID = 'route-line'
@@ -84,6 +86,7 @@ export function MapView({
   onMapClick,
   onPointInfo,
   onLongPress,
+  onReady,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -99,6 +102,10 @@ export function MapView({
 
   // میدان باد در ref نگه داشته می‌شود تا وقتی map لایه‌هایش را افزود (به‌صورت
   // ناهمگام بعد از load)، آخرین میدان بلافاصله اعمال شود.
+  const onReadyRef = useRef(onReady)
+  useEffect(() => {
+    onReadyRef.current = onReady
+  })
   const windFieldRef = useRef<WindField | null>(windField)
   useEffect(() => {
     windFieldRef.current = windField
@@ -117,7 +124,7 @@ export function MapView({
     })
     // انتساب OSM (الزام مجوز) — گوشهٔ مقابل زوم و راهنما
     map.addControl(new maplibregl.AttributionControl({ compact: true }), document.documentElement.dir === "rtl" ? "bottom-right" : "bottom-left")
-    map.addControl(new maplibregl.NavigationControl(), document.documentElement.dir === 'rtl' ? 'bottom-right' : 'bottom-left')
+    onReadyRef.current?.(map)
 
     // long-press: نگه‌داشتن ۵۰۰ms بدون جابه‌جایی، بعد رها کردن بدون drag.
     // اگر long-press رخ دهد، کلیک بعدی نادیده گرفته می‌شود.
@@ -218,9 +225,11 @@ export function MapView({
       try {
         const is3d = mode === '3d'
         map.setLayoutProperty('osm', 'visibility', is3d ? 'none' : 'visible')
-        map.setPaintProperty('bg', 'background-color', is3d ? '#123a5c' : '#e8e6e1')
-        // در ۳بعدی فقط ترن (سایهٔ کوهستان خاموش — دو برابر شدن هزینهٔ GPU)
-        map.setLayoutProperty('hillshade', 'visibility', is3d ? 'none' : 'visible')
+        // ۳بعدی مثل صحنهٔ بصری‌سازی: زمین سبز + سایهٔ قهوه‌ای کوهستان
+        map.setPaintProperty('bg', 'background-color', is3d ? '#7fb069' : '#e8e6e1')
+        map.setLayoutProperty('hillshade', 'visibility', 'visible')
+        map.setPaintProperty('hillshade', 'hillshade-exaggeration', is3d ? 0.6 : 0.35)
+        map.setPaintProperty('hillshade', 'hillshade-shadow-color', is3d ? '#6b4a2f' : '#473b2d')
         if (is3d) {
           map.setTerrain({ source: 'terrain', exaggeration: 1.2 })
           map.easeTo({ pitch: 50, duration: 600 })

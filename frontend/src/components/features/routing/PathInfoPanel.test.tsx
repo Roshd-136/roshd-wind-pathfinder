@@ -34,23 +34,10 @@ const baseProps = {
 }
 
 describe('PathInfoPanel', () => {
-  const calculateButton = () => screen.getByRole('button', { name: /calculate|محاسبه/i })
-
-  it('disables the calculate button when origin/destination are not both set', () => {
-    withProviders(<PathInfoPanel {...baseProps} canCalculate={false} />)
-    expect(calculateButton()).toBeDisabled()
-  })
-
-  it('enables the calculate button once both points are chosen', () => {
-    withProviders(<PathInfoPanel {...baseProps} canCalculate={true} />)
-    expect(calculateButton()).toBeEnabled()
-  })
-
   it('shows the route result summary once a result is available', () => {
     withProviders(
       <PathInfoPanel
         {...baseProps}
-        canCalculate={true}
         result={{
           route_id: 'r1',
           path: [],

@@ -16,7 +16,7 @@ interface UiState {
 export const useUiStore = create<UiState>((set) => ({
   isControlPanelOpen: true,
   isMobileSheetOpen: true,
-  isSidebarOpen: true,
+  isSidebarOpen: false,
   mapMode: '2d',
   toggleControlPanel: () => set((s) => ({ isControlPanelOpen: !s.isControlPanelOpen })),
   toggleSidebar: () => set((s) => ({ isSidebarOpen: !s.isSidebarOpen })),

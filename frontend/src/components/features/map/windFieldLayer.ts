@@ -53,31 +53,41 @@ export function buildFieldImage(field: WindField, width = 420): string {
   return canvas.toDataURL('image/png')
 }
 
-/** GeoJSON پیکان‌های chevron — چرخش در مختصات، جهت = downwind. */
+/**
+ * GeoJSON پیکان‌های «توپر» (شکل فلش ۷نقطه‌ای) — مثل پیکان‌های صحنهٔ نمونه.
+ * چرخش در مختصات؛ جهت = downwind (direction_deg + ۱۸۰).
+ */
 export function arrowChevronsGeoJson(field: WindField, stride = 3) {
   const arrows = arrowFeatures(field, stride)
-  const len = 0.045
-  const wing = 0.5
+  const len = 0.055 // طول کل فلش (درجه)
+  const shaft = 0.011 // نیم‌عرض ساقه
+  const head = 0.024 // نیم‌عرض نوک
+  const headLen = 0.032 // طول نوک
+  const toRad = Math.PI / 180
   const features = arrows.map((a) => {
-    const toRad = Math.PI / 180
     const heading = (a.direction_deg + 180) * toRad
-    const dx = Math.sin(heading) * len
-    const dy = Math.cos(heading) * len
-    const tipLat = a.lat + dy
-    const tipLon = a.lon + dx
-    const perpX = Math.cos(heading) * len * wing
-    const perpY = -Math.sin(heading) * len * wing
+    const dx = Math.sin(heading)
+    const dy = Math.cos(heading)
+    const px = Math.cos(heading)
+    const py = -Math.sin(heading)
+    const tipLat = a.lat + dy * len
+    const tipLon = a.lon + dx * len
+    const shaftLat = a.lat + dy * (len - headLen)
+    const shaftLon = a.lon + dx * (len - headLen)
+    const ring = [
+      [a.lon + px * shaft, a.lat + py * shaft],
+      [shaftLon + px * head, shaftLat + py * head],
+      [tipLon, tipLat],
+      [shaftLon - px * head, shaftLat - py * head],
+      [a.lon - px * shaft, a.lat - py * shaft],
+      [a.lon - dx * len * 0.35 - px * shaft * 0.6, a.lat - dy * len * 0.35 - py * shaft * 0.6],
+      [a.lon - dx * len * 0.35 + px * shaft * 0.6, a.lat - dy * len * 0.35 + py * shaft * 0.6],
+      [a.lon + px * shaft, a.lat + py * shaft],
+    ]
     return {
       type: 'Feature' as const,
       properties: { speed: a.speed_mps },
-      geometry: {
-        type: 'LineString' as const,
-        coordinates: [
-          [a.lon - dx / 2 - perpX / 2, a.lat - dy / 2 - perpY / 2],
-          [tipLon, tipLat],
-          [a.lon - dx / 2 + perpX / 2, a.lat - dy / 2 + perpY / 2],
-        ],
-      },
+      geometry: { type: 'Polygon' as const, coordinates: [ring] },
     }
   })
   return { type: 'FeatureCollection' as const, features }
@@ -97,13 +107,11 @@ export function addWindLayers(map: MapLibreMap): void {
   }
   map.addLayer({
     id: ARROW_LAYER,
-    type: 'line',
+    type: 'fill',
     source: ARROW_SOURCE,
-    layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint: {
-      'line-color': lineStops as never,
-      'line-width': 2,
-      'line-opacity': 0.9,
+      'fill-color': lineStops as never,
+      'fill-opacity': 0.95,
     },
   })
   moveWindLayersBelowRoute(map)

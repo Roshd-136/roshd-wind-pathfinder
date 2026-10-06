@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import type maplibregl from 'maplibre-gl'
 import { MapModeToggle } from '../map/MapModeToggle'
 import { MapView } from '../map/MapView'
 import { PointInfoPopup } from '../map/PointInfoPopup'
@@ -13,6 +14,7 @@ import { useUiStore } from '../../../store/useUiStore'
 import type { Coordinate, RouteResult } from '../../../types/routing'
 import { PathInfoPanel } from './PathInfoPanel'
 import { StepsWizard } from './StepsWizard'
+import { MapTools } from '../map/MapTools'
 
 interface RoutingMapScreenProps {
   mode: '2d' | '3d'
@@ -59,6 +61,9 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
   const windAtPoint = useWindAtPoint(infoPoint, fields)
   const openMobileSheet = useUiStore((s) => s.openMobileSheet)
   const sidebarOpen = useUiStore((s) => s.isSidebarOpen)
+  const mapRef = useRef<maplibregl.Map | null>(null)
+  const isControlPanelOpen = useUiStore((s) => s.isControlPanelOpen)
+  const toggleControlPanel = useUiStore((s) => s.toggleControlPanel)
 
   // جریان Uber-مانند: با کامل شدن مبدأ/مقصد، شیت «تنظیمات سفر» در موبایل بالا می‌آید
   useEffect(() => {
@@ -123,9 +128,6 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
       onMoveCheckpoint={moveCheckpoint}
       onPointInfo={() => setInfoPoint(origin)}
       canPointInfo={Boolean(origin)}
-      onCalculate={handleCalculate}
-      isCalculating={pathfinding.isPending}
-      canCalculate={Boolean(origin && destination)}
       result={result}
       resultIsDemo={isDemoResult}
     />
@@ -145,6 +147,9 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
           windField={activeField}
           onMapClick={handleMapClick}
           onLongPress={addCheckpoint}
+          onReady={(m) => {
+            mapRef.current = m
+          }}
         />
         <MapModeToggle />
         {activeField && (
@@ -172,6 +177,9 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
           hasResult={Boolean(result)}
           onBack={() => goBackStep()}
           canBack={Boolean(destination || result || origin)}
+          onCalculate={handleCalculate}
+          canCalculate={Boolean(origin && destination)}
+          isCalculating={pathfinding.isPending}
         />
         {infoPoint && windAtPoint.data && (
           <PointInfoPopup samples={windAtPoint.data} onClose={() => setInfoPoint(null)} />
@@ -179,9 +187,15 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
       </div>
 
       {/* پنل شناور روی نقشه (دسکتاپ) — همیشه نمایان */}
-      <div className="absolute top-4 bottom-20 z-10 hidden w-[19.5rem] md:block end-4">
+      <div className="absolute top-4 bottom-4 z-10 hidden w-[19.5rem] md:block end-4">
         {panel}
       </div>
+      <MapTools
+        panelOpen={isControlPanelOpen}
+        onTogglePanel={toggleControlPanel}
+        onZoomIn={() => mapRef.current?.zoomIn()}
+        onZoomOut={() => mapRef.current?.zoomOut()}
+      />
       <MobileBottomSheet title={t('trip.title')}>{panel}</MobileBottomSheet>
     </div>
   )
