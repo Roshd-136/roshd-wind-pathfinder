@@ -42,6 +42,14 @@ export function MapTools({ panelOpen, onTogglePanel, onZoomIn, onZoomOut }: MapT
         panelOpen ? 'end-[21.5rem]' : 'end-4'
       }`}
     >
+      {/* کلیک بیرون پاپ‌آور → فقط بستن؛ کلیک به نقشه/سایر عناصر عبور نمی‌کند */}
+      {isViewportSettingsOpen && (
+        <div
+          aria-hidden
+          className="fixed inset-0 z-[15]"
+          onClick={toggleViewportSettings}
+        />
+      )}
       {/* قاب تنظیمات نمای نقشه — کنار نوار ابزار باز می‌شود */}
       {isViewportSettingsOpen && <ViewportSettings />}
 
