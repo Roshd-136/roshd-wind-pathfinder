@@ -24,6 +24,8 @@ const baseProps = {
   onMoveCheckpoint: vi.fn(),
   onPointInfo: vi.fn(),
   canPointInfo: true,
+  onClear: vi.fn(),
+  canClear: true,
   addingCheckpoint: false,
   onToggleAddCheckpoint: vi.fn(),
   canAddCheckpoint: true,

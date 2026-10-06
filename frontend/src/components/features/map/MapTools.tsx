@@ -5,9 +5,11 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Plus,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useUiStore } from '../../../store/useUiStore'
+import { ViewportSettings } from './ViewportSettings'
 
 interface MapToolsProps {
   /** جمع/بازکردن پنل شناور (آیکون فلش وقتی پنل باز است). */
@@ -19,12 +21,15 @@ interface MapToolsProps {
 
 /**
  * نوار ابزار عمودی — هم‌تراز با لبهٔ بیرونی پنل شناور: کلید نمایش/جمع‌کردن
- * پنل (فلش)، ۲بعدی/۳بعدی (آیکون) و زوم (+/−). همه آیکونی، بدون متن.
+ * پنل (فلش)، تنظیمات «نمای نقشه» (قاب کناری با نقشهٔ پایه و کلیدهای
+ * نمایش)، ۲بعدی/۳بعدی (آیکون) و زوم (+/−). همه آیکونی، بدون متن.
  */
 export function MapTools({ panelOpen, onTogglePanel, onZoomIn, onZoomOut }: MapToolsProps) {
   const { t } = useTranslation()
   const mode = useUiStore((s) => s.mapMode)
   const setMapMode = useUiStore((s) => s.setMapMode)
+  const isViewportSettingsOpen = useUiStore((s) => s.isViewportSettingsOpen)
+  const toggleViewportSettings = useUiStore((s) => s.toggleViewportSettings)
 
   const btn =
     'flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface/95 text-text-secondary shadow-[var(--shadow-card)] backdrop-blur-sm transition-colors hover:text-text-primary'
@@ -37,6 +42,9 @@ export function MapTools({ panelOpen, onTogglePanel, onZoomIn, onZoomOut }: MapT
         panelOpen ? 'end-[21.5rem]' : 'end-4'
       }`}
     >
+      {/* قاب تنظیمات نمای نقشه — کنار نوار ابزار باز می‌شود */}
+      {isViewportSettingsOpen && <ViewportSettings />}
+
       {/* نمایش/جمع‌کردن پنل — فلش جمع‌شدن وقتی پنل باز است */}
       <button
         type="button"
@@ -46,6 +54,17 @@ export function MapTools({ panelOpen, onTogglePanel, onZoomIn, onZoomOut }: MapT
         className={btn}
       >
         {panelOpen ? <PanelRightClose size={18} aria-hidden /> : <PanelRightOpen size={18} aria-hidden />}
+      </button>
+
+      <button
+        type="button"
+        onClick={toggleViewportSettings}
+        aria-label={t('viewport.title')}
+        title={t('viewport.title')}
+        aria-pressed={isViewportSettingsOpen}
+        className={isViewportSettingsOpen ? activeBtn : btn}
+      >
+        <SlidersHorizontal size={18} aria-hidden />
       </button>
 
       <button

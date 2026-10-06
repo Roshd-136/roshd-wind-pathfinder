@@ -118,7 +118,8 @@
   "common": {
     "loading": "در حال بارگذاری…",
     "error": "خطایی رخ داد",
-    "retry": "تلاش دوباره"
+    "retry": "تلاش دوباره",
+    "close": "بستن"
   },
   "auth": {
     "login": "ورود",
@@ -141,5 +142,14 @@
     "verifyEmailHint": "لینک تایید به ایمیل شما ارسال شده است.",
     "verifySuccess": "ایمیل با موفقیت تایید شد.",
     "registerSuccess": "ثبت‌نام موفق — ایمیل تایید ارسال شد."
+  },
+  "viewport": {
+    "title": "نمای نقشه",
+    "mapStyle": "نقشهٔ پایه",
+    "styleSimple": "ساده",
+    "styleSatellite": "ماهواره‌ای",
+    "showArrows": "پیکان‌های باد",
+    "showHeatmap": "نقشهٔ رنگی باد",
+    "showHillshade": "سایهٔ کوهستان"
   }
 }

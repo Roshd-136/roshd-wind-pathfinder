@@ -1,5 +1,4 @@
 import { ChevronLeft, ChevronRight, Search, Undo2 } from 'lucide-react'
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import type { Coordinate } from '../../../types/routing'
@@ -23,35 +22,35 @@ interface StepsWizardProps {
   origin: Coordinate | null
   destination: Coordinate | null
   hasResult: boolean
-  /** گام قبلی (فلش راست) — دادهٔ گام‌های بعدی پاک می‌شود تا «تغییر» ممکن باشد. */
+  /** گام فعال (از استور) — تعیین می‌کند کدام عنوان می‌لغزد و جستجو کی دیده شود. */
+  step: 1 | 2 | 3
+  /** گام قبل — انتخاب فعلی سر جایش می‌ماند؛ کلیک بعدی جایگزینش می‌کند. */
   onBack: () => void
-  canBack: boolean
+  /** گام بعد — فقط جابجایی نما؛ داده‌ای تغییر نمی‌کند. */
+  onNext: () => void
   onCalculate: () => void
   canCalculate: boolean
   isCalculating: boolean
 }
 
 /**
- * ویزارد مراحل — قاب شناور وسطِ بالای نقشه: جستجوی مکان (فقط رابط) در بالا،
- * عنوان بزرگ گامِ فعال با اسلاید افقی، و دو فلش **در دو سو** قاب: راست =
- * گام قبل (برای تغییر انتخاب‌ها)، چپ = گام بعد (بازتولید مسیر). بدون
- * هم‌پوشانی: عنوان در ناحیهٔ میانی می‌لغزد و فلش‌ها بیرون از آن‌اند.
+ * ویزارد مراحل — قاب شناور وسطِ بالای نقشه: جستجوی مکان (فقط در گام‌های
+ * ۱ و ۲ — در گام محاسبه پنهان است)، عنوان بزرگ گامِ فعال با اسلاید افقی، و
+ * دو فلش **در دو سو** قاب: راست = گام قبل (برای تغییر انتخاب — انتخاب فعلی
+ * پاک نمی‌شود، کلیک بعدی جایگزینش می‌کند)، چپ = گام بعد. بدون هم‌پوشانی.
  */
 export function StepsWizard({
   origin,
   destination,
   hasResult,
+  step,
   onBack,
-  canBack,
+  onNext,
   onCalculate,
   canCalculate,
   isCalculating,
 }: StepsWizardProps) {
   const { t } = useTranslation()
-  const achieved = origin === null ? 1 : destination === null ? 2 : 3
-  // گام انتخابی هرگز جلوتر از گام «به‌دست‌آمده» نمی‌رود (حالت مشتق — بدون effect)
-  const [selectedStep, setSelectedStep] = useState<1 | 2 | 3>(3)
-  const step = Math.min(selectedStep, achieved) as 1 | 2 | 3
   const isRtl = document.documentElement.dir === 'rtl'
   const slideSign = isRtl ? 1 : -1
   const NextIcon = isRtl ? ChevronLeft : ChevronRight
@@ -89,26 +88,25 @@ export function StepsWizard({
       role="status"
       aria-label={t('routing.stepsTitle')}
     >
-      {/* جستجوی مکان — فقط رابط کاربری (منطق جستجو بعداً وصل می‌شود) */}
-      <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
-        <Search size={15} aria-hidden className="shrink-0 text-text-muted" />
-        <input
-          type="search"
-          placeholder={t('wizard.searchPlaceholder')}
-          aria-label={t('wizard.searchPlaceholder')}
-          className="w-full bg-transparent text-sm text-text-primary outline-none placeholder:text-text-muted"
-        />
-      </div>
+      {/* جستجوی مکان — فقط رابط کاربری؛ در گام محاسبه پنهان می‌شود */}
+      {step !== 3 && (
+        <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
+          <Search size={15} aria-hidden className="shrink-0 text-text-muted" />
+          <input
+            type="search"
+            placeholder={t('wizard.searchPlaceholder')}
+            aria-label={t('wizard.searchPlaceholder')}
+            className="w-full bg-transparent text-sm text-text-primary outline-none placeholder:text-text-muted"
+          />
+        </div>
+      )}
 
       {/* ناحیهٔ گام — فلش‌ها در دو سو، عنوان میانی بدون هم‌پوشانی می‌لغزد */}
       <div className="relative px-12 py-3">
         <button
           type="button"
-          onClick={() => {
-            setSelectedStep(Math.max(1, step - 1) as 1 | 2 | 3)
-            onBack()
-          }}
-          disabled={!canBack}
+          onClick={onBack}
+          disabled={step <= 1}
           aria-label={t('routing.back')}
           title={t('routing.back')}
           className={`${arrowBtn} start-2`}
@@ -117,8 +115,8 @@ export function StepsWizard({
         </button>
         <button
           type="button"
-          onClick={() => setSelectedStep(Math.min(3, step + 1) as 1 | 2 | 3)}
-          disabled={step >= achieved}
+          onClick={onNext}
+          disabled={step >= 3}
           aria-label={t('routing.next')}
           title={t('routing.next')}
           className={`${arrowBtn} end-2`}

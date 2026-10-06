@@ -2,7 +2,8 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEffect, useRef } from 'react'
 import type { Coordinate, WindField } from '../../../types/routing'
-import { applyWindField } from './windFieldLayer'
+import type { ViewportSettings } from '../../../store/useUiStore'
+import { applyWindFields, setWindOverlaysVisible } from './windFieldLayer'
 
 interface MapViewProps {
   mode: '2d' | '3d'
@@ -10,11 +11,11 @@ interface MapViewProps {
   destination: Coordinate | null
   checkpoints?: Coordinate[]
   path: Coordinate[] | null
-  /** میدان باد لایهٔ فعال — نقشهٔ حرارتی + پیکان‌ها (اختیاری). */
-  windField?: WindField | null
+  /** میدان‌های بادِ نمایان (مرتب بر ارتفاع) — نقشهٔ حرارتی + پیکان‌ها. */
+  windFields?: WindField[]
+  viewport: ViewportSettings
+  /** هر کلیک نقشه — صفحه تصمیم می‌گیرد مبدأ/مقصد/جایگزینی/اطلاعات نقطه است. */
   onMapClick: (coord: Coordinate) => void
-  /** کلیک بعد از تعیین مبدأ/مقصد — نمایش لایه‌های باد در آن نقطه. */
-  onPointInfo?: (coord: Coordinate) => void
   /** نقشهٔ ساخته‌شده — برای ابزارهای بیرونی (زوم سفارشی). */
   onReady?: (map: maplibregl.Map) => void
 }
@@ -27,9 +28,9 @@ const ROUTE_DOTS_LAYER_ID = 'route-dots-layer'
 const Khorasan_CENTER: [number, number] = [58.65, 36.18]
 
 /**
- * استایل نقشه — کاشی‌های آزاد OpenStreetMap (بدون نیاز به هیچ توکن/کلید) با
- * تم هماهنگ برنامه؛ در تم تاریک با فیلتر CSS روی بوم نقشه تیره می‌شود
- * (global.css). مشابه Google Maps اما آزاد و خودمیزبان از نظر کلید.
+ * استایل نقشه — کاشی‌های آزاد OpenStreetMap و تصویر ماهواره‌ای Esri (هر دو
+ * بدون توکن) با تم هماهنگ برنامه؛ در تم تاریک با فیلتر CSS روی بوم نقشه
+ * تیره می‌شود (global.css).
  */
 function baseStyle(): maplibregl.StyleSpecification {
   return {
@@ -43,6 +44,15 @@ function baseStyle(): maplibregl.StyleSpecification {
         maxzoom: 19,
         attribution: '© OpenStreetMap contributors',
       },
+      satellite: {
+        type: 'raster',
+        tiles: [
+          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        ],
+        tileSize: 256,
+        maxzoom: 19,
+        attribution: 'Esri, Maxar, Earthstar Geographics',
+      },
       // ارتفاع‌سنج آزاد AWS Terrarium — برای ترن سه‌بعدی و سایهٔ کوهستان
       terrain: {
         type: 'raster-dem',
@@ -54,6 +64,7 @@ function baseStyle(): maplibregl.StyleSpecification {
     },
     layers: [
       { id: 'bg', type: 'background', paint: { 'background-color': '#e8e6e1' } },
+      { id: 'satellite', type: 'raster', source: 'satellite', layout: { visibility: 'none' } },
       { id: 'osm', type: 'raster', source: 'osm' },
       {
         id: 'hillshade',
@@ -69,10 +80,10 @@ function baseStyle(): maplibregl.StyleSpecification {
 }
 
 /**
- * نقشهٔ اصلی (MapLibre GL — بدون توکن، کاشی آزاد OSM) — کلیک اول = مبدأ
- * (پین سبز)، کلیک دوم = مقصد (پین قرمز)، مسیر با خط سفید + نقاط سفید رسم
- * می‌شود و کادر نقشه روی مسیر تنظیم می‌گردد. حالت ۳بعدی با ترن واقعی
- * (raster-dem آزاد) + pitch فعال می‌شود — مشابه صحنهٔ بصری‌سازی پروژه.
+ * نقشهٔ اصلی (MapLibre GL — بدون توکن، کاشی آزاد) — کلیک روی نقشه به صفحهٔ
+ * بالادست واگذار می‌شود (مبدأ/مقصد/جایگزینی/اطلاعات نقطه). مسیر با خط سفید +
+ * نقاط سفید رسم می‌شود و کادر نقشه روی مسیر تنظیم می‌گردد. حالت ۳بعدی با ترن
+ * واقعی (raster-dem آزاد) + pitch فعال می‌شود — مشابه صحنهٔ بصری‌سازی پروژه.
  */
 export function MapView({
   mode,
@@ -80,9 +91,9 @@ export function MapView({
   destination,
   checkpoints = [],
   path,
-  windField = null,
+  windFields = [],
+  viewport,
   onMapClick,
-  onPointInfo,
   onReady,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -90,25 +101,37 @@ export function MapView({
   const originMarkerRef = useRef<maplibregl.Marker | null>(null)
   const destinationMarkerRef = useRef<maplibregl.Marker | null>(null)
   const checkpointMarkersRef = useRef<maplibregl.Marker[]>([])
-  // هندلرهای کلیک در ref نگه داشته می‌شوند تا map فقط یک‌بار ساخته شود
-  // ولی همیشه آخرین کلوژرها را صدا بزند.
-  const handlersRef = useRef({ origin, destination, onMapClick, onPointInfo })
+  // هندلر کلیک در ref نگه داشته می‌شود تا map فقط یک‌بار ساخته شود ولی
+  // همیشه آخرین کلوژر را صدا بزند.
+  const handlersRef = useRef({ onMapClick })
   useEffect(() => {
-    handlersRef.current = { origin, destination, onMapClick, onPointInfo }
+    handlersRef.current = { onMapClick }
   })
 
-  // میدان باد در ref نگه داشته می‌شود تا وقتی map لایه‌هایش را افزود (به‌صورت
-  // ناهمگام بعد از load)، آخرین میدان بلافاصله اعمال شود.
+  // میدان‌های باد در ref نگه داشته می‌شوند تا وقتی map لایه‌هایش را افزود
+  // (به‌صورت ناهمگام)، آخرین داده بلافاصله اعمال شود.
   const onReadyRef = useRef(onReady)
   useEffect(() => {
     onReadyRef.current = onReady
   })
-  const windFieldRef = useRef<WindField | null>(windField)
+  const windFieldsRef = useRef<WindField[]>(windFields)
   useEffect(() => {
-    windFieldRef.current = windField
+    windFieldsRef.current = windFields
     const map = mapRef.current
-    if (map) applyWindField(map, windField)
-  }, [windField])
+    if (map) {
+      applyWindFields(map, windFields, {
+        multiLayer: mode === '3d',
+        showHeatmap: viewport.showHeatmap,
+        showArrows: viewport.showArrows,
+      })
+    }
+  }, [windFields, mode, viewport.showHeatmap, viewport.showArrows])
+
+  // کلیدهای نمایش باد (تنظیمات viewport) — بدون بازسازی داده
+  useEffect(() => {
+    const map = mapRef.current
+    if (map) setWindOverlaysVisible(map, { heatmap: viewport.showHeatmap, arrows: viewport.showArrows })
+  }, [viewport.showHeatmap, viewport.showArrows])
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
@@ -129,13 +152,10 @@ export function MapView({
     }
 
     map.on('click', (e) => {
-      // ترتیب اولویت کلیک: مبدأ → مقصد → اطلاعات نقطه (mockup: «View wind
-      // Layers at Point»). چک‌پوینت با دکمهٔ «افزودن چک‌پوینت» پنل گذاشته
-      // می‌شود، نه با نگه‌داشتن کلیک.
+      // هر کلیک به صفحهٔ بالادست واگذار می‌شود: مبدأ/مقصد، جایگزینی انتخاب،
+      // چک‌پوینت (با دکمهٔ پنل) یا اطلاعات نقطه — بسته به گامِ ویزارد.
       const coord = { lat: e.lngLat.lat, lon: e.lngLat.lng }
-      const h = handlersRef.current
-      if (!h.origin || !h.destination) h.onMapClick(coord)
-      else h.onPointInfo?.(coord)
+      handlersRef.current.onMapClick(coord)
     })
 
     mapRef.current = map
@@ -193,11 +213,12 @@ export function MapView({
     map.triggerRepaint()
   }
 
-  // حالت ۲بعدی/۳بعدی — سوییچ درجا (بدون تغییر URL): در ۳بعدی فقط ترنِ
-  // واقعی + آب (کاشی خیابان خاموش) با pitch و بزرگ‌نمایی ارتفاع، مشابه
-  // صحنهٔ بصری‌سازی پروژه. به‌جای گیتِ `isStyleLoaded` (که با منبع DEM مدت‌ها
-  // false می‌ماند و سوییچ ۳بعدی را فلج می‌کرد) مستقیم تلاش می‌کنیم و روی
-  // خطا با تایمر برمی‌گردیم.
+  // حالت ۲بعدی/۳بعدی + نقشهٔ پایه — سوییچ درجا (بدون تغییر URL): در ۳بعدی
+  // ترنِ واقعی با pitch و بزرگ‌نمایی ارتفاع فعال می‌شود (مثل صحنهٔ
+  // بصری‌سازی) و کاشی ساده خاموش است؛ اگر کاربر نقشهٔ ماهواره‌ای انتخاب
+  // کرده باشد، تصویر ماهواره‌ای روی ترن می‌نشیند. به‌جای گیتِ
+  // `isStyleLoaded` (که با منبع DEM مدت‌ها false می‌ماند و سوییچ ۳بعدی را
+  // فلج می‌کرد) مستقیم تلاش می‌کنیم و روی خطا با تایمر برمی‌گردیم.
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -207,10 +228,12 @@ export function MapView({
       if (cancelled) return
       try {
         const is3d = mode === '3d'
-        map.setLayoutProperty('osm', 'visibility', is3d ? 'none' : 'visible')
+        const sat = viewport.mapStyle === 'satellite'
+        map.setLayoutProperty('osm', 'visibility', !is3d && !sat ? 'visible' : 'none')
+        // تصویر ماهواره‌ای حتی در ۳بعدی روی ترن می‌نشیند (ترنِ عکس‌دار)
+        map.setLayoutProperty('satellite', 'visibility', sat ? 'visible' : 'none')
         // ۳بعدی مثل صحنهٔ بصری‌سازی: زمین سبز + سایهٔ قهوه‌ای کوهستان
-        map.setPaintProperty('bg', 'background-color', is3d ? '#7fb069' : '#e8e6e1')
-        map.setLayoutProperty('hillshade', 'visibility', 'visible')
+        map.setPaintProperty('bg', 'background-color', is3d && !sat ? '#7fb069' : '#e8e6e1')
         map.setPaintProperty('hillshade', 'hillshade-exaggeration', is3d ? 0.6 : 0.35)
         map.setPaintProperty('hillshade', 'hillshade-shadow-color', is3d ? '#6b4a2f' : '#473b2d')
         if (is3d) {
@@ -232,7 +255,30 @@ export function MapView({
     return () => {
       cancelled = true
     }
-  }, [mode])
+  }, [mode, viewport.mapStyle])
+
+  // سایهٔ کوهستان — کلید مستقل تنظیمات (در هر دو حالت)
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    let cancelled = false
+    let attempts = 0
+    const apply = () => {
+      if (cancelled) return
+      try {
+        map.setLayoutProperty('hillshade', 'visibility', viewport.showHillshade ? 'visible' : 'none')
+      } catch {
+        if (attempts < 100) {
+          attempts += 1
+          setTimeout(apply, 150)
+        }
+      }
+    }
+    apply()
+    return () => {
+      cancelled = true
+    }
+  }, [viewport.showHillshade])
 
   // نشانگر مبدأ
   useEffect(() => {

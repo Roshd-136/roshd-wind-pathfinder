@@ -14,8 +14,9 @@ const base = {
   origin: { lat: 36.297, lon: 59.606 },
   destination: { lat: 36.215, lon: 57.678 },
   hasResult: false,
+  step: 1 as 1 | 2 | 3,
   onBack: vi.fn(),
-  canBack: true,
+  onNext: vi.fn(),
   canCalculate: true,
   onCalculate: vi.fn(),
   isCalculating: false,
@@ -37,13 +38,18 @@ describe('StepsWizard', () => {
   })
 
   it('shows the big title of the current step', () => {
-    withProviders(<StepsWizard {...base} hasResult={true} />)
+    withProviders(<StepsWizard {...base} step={3} hasResult={true} />)
     expect(screen.getByText('Compute route')).toBeInTheDocument()
   })
 
-  it('renders the place search input (ui-only)', () => {
-    withProviders(<StepsWizard {...base} />)
+  it('renders the place search input on picking steps (ui-only)', () => {
+    withProviders(<StepsWizard {...base} step={1} />)
     expect(screen.getByPlaceholderText('Search a place…')).toBeInTheDocument()
+  })
+
+  it('hides the place search input on the compute step', () => {
+    withProviders(<StepsWizard {...base} step={3} hasResult={true} />)
+    expect(screen.queryByPlaceholderText('Search a place…')).not.toBeInTheDocument()
   })
 
   it('does not show the steps title as visible text', () => {
@@ -52,27 +58,24 @@ describe('StepsWizard', () => {
     expect(screen.queryByText('Route steps')).not.toBeInTheDocument()
   })
 
-  it('goes one step back with the side arrow and calls onBack', async () => {
-    const user = userEvent.setup()
-    const onBack = vi.fn()
-    withProviders(<StepsWizard {...base} hasResult={true} onBack={onBack} />)
-    await user.click(prevButton())
-    expect(onBack).toHaveBeenCalledTimes(1)
-    // بعد از بازگشت، فلش بعد فعال می‌شود (بازتولید گام‌ها)
+  it('disables the back arrow on the first step and the next arrow on the last', () => {
+    const first = withProviders(<StepsWizard {...base} step={1} />)
+    expect(prevButton()).toBeDisabled()
     expect(nextButton()).toBeEnabled()
-  })
-
-  it('disables the next arrow while the last reached step is shown', () => {
-    withProviders(<StepsWizard {...base} hasResult={true} />)
+    first.unmount()
+    withProviders(<StepsWizard {...base} step={3} hasResult={true} />)
+    expect(prevButton()).toBeEnabled()
     expect(nextButton()).toBeDisabled()
   })
 
-  it('moves forward again with the next arrow after going back', async () => {
+  it('fires onBack and onNext without clearing data (replace-on-click model)', async () => {
     const user = userEvent.setup()
-    withProviders(<StepsWizard {...base} hasResult={true} />)
+    const onBack = vi.fn()
+    const onNext = vi.fn()
+    withProviders(<StepsWizard {...base} step={2} onBack={onBack} onNext={onNext} />)
     await user.click(prevButton())
-    expect(screen.getByText('Select end')).toBeInTheDocument()
+    expect(onBack).toHaveBeenCalledTimes(1)
     await user.click(nextButton())
-    expect(screen.getByText('Compute route')).toBeInTheDocument()
+    expect(onNext).toHaveBeenCalledTimes(1)
   })
 })

@@ -13,6 +13,7 @@ vi.mock('maplibre-gl', () => {
     once = vi.fn()
     easeTo = vi.fn()
     setTerrain = vi.fn()
+    triggerRepaint = vi.fn()
     remove = vi.fn()
     isStyleLoaded = vi.fn(() => false)
     loaded = vi.fn(() => false)
@@ -41,7 +42,14 @@ describe('MapView', () => {
     // MapLibre GL آزاد است — برخلاف mapbox نیازی به VITE_MAPBOX_TOKEN ندارد؛
     // نقشه در هر محیطی رندر می‌شود.
     render(
-      <MapView mode="2d" origin={null} destination={null} path={null} onMapClick={() => {}} />,
+      <MapView
+        mode="2d"
+        origin={null}
+        destination={null}
+        path={null}
+        viewport={{ mapStyle: 'simple', showArrows: true, showHeatmap: true, showHillshade: true }}
+        onMapClick={() => {}}
+      />,
     )
     expect(screen.getByRole('application', { name: 'map' })).toBeInTheDocument()
   })

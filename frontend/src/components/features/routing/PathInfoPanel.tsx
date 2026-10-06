@@ -1,3 +1,4 @@
+import { Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type {
   Algorithm,
@@ -28,6 +29,9 @@ interface PathInfoPanelProps {
   canAddCheckpoint: boolean
   onPointInfo: () => void
   canPointInfo: boolean
+  /** پاک‌کردن کل انتخاب‌ها — دکمه در خود پنل است (نه شناور روی نقشه). */
+  onClear: () => void
+  canClear: boolean
   result: RouteResult | null
   /** مسیر از فیکسچر نمایشی dev آمده (بدون بک‌اند) — با برچسب صریح. */
   resultIsDemo?: boolean
@@ -54,6 +58,8 @@ export function PathInfoPanel({
   canAddCheckpoint,
   onPointInfo,
   canPointInfo,
+  onClear,
+  canClear,
   result,
   resultIsDemo = false,
 }: PathInfoPanelProps) {
@@ -61,7 +67,21 @@ export function PathInfoPanel({
 
   return (
     <Card className="no-scrollbar flex max-h-[calc(100vh-2rem)] w-full flex-col gap-4 overflow-y-auto rounded-2xl shadow-[var(--shadow-card)]">
-      <AlgorithmSelector value={algorithm} onChange={onAlgorithmChange} />
+      <div className="flex items-end justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <AlgorithmSelector value={algorithm} onChange={onAlgorithmChange} />
+        </div>
+        <button
+          type="button"
+          onClick={onClear}
+          disabled={!canClear}
+          aria-label={t('map.clear')}
+          title={t('map.clear')}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-raised text-text-muted transition-colors hover:border-danger hover:text-danger disabled:pointer-events-none disabled:opacity-30"
+        >
+          <Trash2 size={15} aria-hidden />
+        </button>
+      </div>
 
       <WindLayerControls value={layerVisibility} onChange={onLayerVisibilityChange} />
 

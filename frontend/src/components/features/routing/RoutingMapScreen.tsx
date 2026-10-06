@@ -5,12 +5,11 @@ import { MapView } from '../map/MapView'
 import { PointInfoPopup } from '../map/PointInfoPopup'
 import { WindSpeedLegend } from '../layers/WindSpeedLegend'
 import { MobileBottomSheet } from '../../layout/MobileBottomSheet'
-import { Button } from '../../ui/Button'
 import { usePathfinding } from '../../../hooks/usePathfinding'
 import { useWindAtPoint, useWindFields } from '../../../hooks/useWindData'
 import { useRouteStore } from '../../../store/useRouteStore'
 import { useUiStore } from '../../../store/useUiStore'
-import type { Coordinate, RouteResult } from '../../../types/routing'
+import type { Coordinate, RouteResult, WindField } from '../../../types/routing'
 import { PathInfoPanel } from './PathInfoPanel'
 import { StepsWizard } from './StepsWizard'
 import { MapTools } from '../map/MapTools'
@@ -19,14 +18,16 @@ interface RoutingMapScreenProps {
   mode: '2d' | '3d'
 }
 
+/** لایه‌های باد در بازهٔ هر چک‌باکس (AGL) — برای فیلتر میدان‌های نمایان. */
+const LAYER_ALTITUDES = [50, 200, 500] as const
+
 /**
  * پیاده‌سازی مشترک صفحات Map2D/Map3D — همان چیدمان و منطق، فقط `mode`
- * فرق می‌کند. جریان روی نقشه: کلیک ۱=مبدأ، کلیک ۲=مقصد، کلیک‌های بعدی=
- * نمایش اطلاعات باد آن نقطه (mockup: «View wind Layers at Point»)، و
- * چک‌پوینت اجباری فقط با دکمهٔ «افزودن چک‌پوینت» پنل (کلیک بعدی روی نقشه).
- * دکمه «پاک کردن» همه را ریست می‌کند. همه در `useRouteStore` نگه داشته
- * می‌شود تا toggle دوحالته ۲/۳ بعدی (ناوبری واقعی بین دو route) چیزی را
- * از دست ندهد.
+ * فرق می‌کند. کلیک روی نقشه بسته به گامِ ویزارد عمل می‌کند: گام ۱ =
+ * مبدأ (یا جایگزینی مبدأ)، گام ۲ = مقصد (یا جایگزینی مقصد)، گام ۳ =
+ * اطلاعات باد نقطه (mockup: «View wind Layers at Point»)؛ و در حالت
+ * «افزودن چک‌پوینت» = گذاشتن چک‌پوینت. بازگشتِ ویزارد انتخاب‌ها را پاک
+ * نمی‌کند — انتخاب فعلی سر جایش می‌ماند تا کلیک بعدی جایگزینش کند.
  */
 export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
   // حالت نقشه از استور می‌آید تا سوییچ ۲/۳بعدی «درجا» باشد (بدون ناوبری)؛
@@ -41,6 +42,7 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
     constraints,
     layerVisibility,
     result,
+    wizardStep,
     setOrigin,
     setDestination,
     addCheckpoint,
@@ -50,7 +52,7 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
     setConstraints,
     setLayerVisibility,
     setResult,
-    goBackStep,
+    setWizardStep,
     reset,
   } = useRouteStore()
 
@@ -60,24 +62,32 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
   const { fields } = useWindFields()
   const windAtPoint = useWindAtPoint(infoPoint, fields)
   const openMobileSheet = useUiStore((s) => s.openMobileSheet)
-  const sidebarOpen = useUiStore((s) => s.isSidebarOpen)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const isControlPanelOpen = useUiStore((s) => s.isControlPanelOpen)
   const toggleControlPanel = useUiStore((s) => s.toggleControlPanel)
+  const viewport = useUiStore((s) => s.viewport)
 
   // جریان Uber-مانند: با کامل شدن مبدأ/مقصد، شیت «تنظیمات سفر» در موبایل بالا می‌آید
   useEffect(() => {
     if (origin && destination) openMobileSheet()
   }, [origin, destination, openMobileSheet])
 
-  // لایهٔ فعال میدان باد = اولین لایهٔ قابل‌مشاهده (سطحی → میانی → بالا).
-  const activeField =
-    fields.find(
-      (f) =>
-        (layerVisibility.surface && f.altitude_m === 50) ||
-        (layerVisibility.mid && f.altitude_m === 200) ||
-        (layerVisibility.high && f.altitude_m === 500),
-    ) ?? null
+  // میدان‌های باد نمایان بر اساس چک‌باکس لایه‌ها — مرتب بر ارتفاع.
+  // نقشهٔ رنگی و تک‌لایهٔ ۲بعدی از اولین (پایین‌ترین) می‌آید؛ در ۳بعدی همه
+  // با رنگ لایه رسم می‌شوند (مثل صحنهٔ بصری‌سازی).
+  const visibleFields: WindField[] = fields
+    .filter((f) =>
+      LAYER_ALTITUDES.some(
+        (a, i) =>
+          f.altitude_m === a &&
+          (i === 0
+            ? layerVisibility.surface
+            : i === 1
+              ? layerVisibility.mid
+              : layerVisibility.high),
+      ),
+    )
+    .sort((a, b) => a.altitude_m - b.altitude_m)
 
   // حالت «افزودن چک‌پوینت»: کلیک بعدی روی نقشه چک‌پوینت می‌گذارد (بدون نگه‌داشتن)
   const [placingCheckpoint, setPlacingCheckpoint] = useState(false)
@@ -88,13 +98,30 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
       setPlacingCheckpoint(false)
       return
     }
-    if (!origin) {
+    // نتایج کهنه بعد از تغییر نقاط اعتبار ندارند — پاک می‌شوند؛ خودِ
+    // انتخاب‌ها سر جایشان می‌مانند (جایگزینی، نه حذف).
+    const invalidate = () => {
+      if (result) setResult(null)
+      setIsDemoResult(false)
+    }
+    if (wizardStep === 1) {
+      invalidate()
       setOrigin(coord)
-    } else if (!destination) {
+      setWizardStep(2)
+    } else if (wizardStep === 2) {
+      invalidate()
       setDestination(coord)
+      setWizardStep(3)
     } else {
       setInfoPoint(coord)
     }
+  }
+
+  function handleClear() {
+    reset()
+    setIsDemoResult(false)
+    setInfoPoint(null)
+    setPlacingCheckpoint(false)
   }
 
   function handleCalculate() {
@@ -123,6 +150,8 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
     )
   }
 
+  const canClear = Boolean(origin || destination || checkpoints.length > 0 || result)
+
   const panel = (
     <PathInfoPanel
       algorithm={algorithm}
@@ -139,6 +168,8 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
       addingCheckpoint={placingCheckpoint}
       onToggleAddCheckpoint={() => setPlacingCheckpoint((v) => !v)}
       canAddCheckpoint={Boolean(origin && destination)}
+      onClear={handleClear}
+      canClear={canClear}
       result={result}
       resultIsDemo={isDemoResult}
     />
@@ -155,16 +186,14 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
           destination={destination}
           checkpoints={checkpoints}
           path={result?.path ?? null}
-          windField={activeField}
+          windFields={visibleFields}
+          viewport={viewport}
           onMapClick={handleMapClick}
-          // بعد از تعیین مبدأ/مقصد، کلیک عادی = اطلاعات نقطه؛ ولی در حالت
-          // «افزودن چک‌پوینت» همان کلیک باید چک‌پوینت بگذارد.
-          onPointInfo={placingCheckpoint ? handleMapClick : (coord) => setInfoPoint(coord)}
           onReady={(m) => {
             mapRef.current = m
           }}
         />
-        {activeField && (
+        {visibleFields.length > 0 && (
           // راهنمای سرعت باد — وسط پایین و پهن، دور از زوم و انتساب
           <div className="absolute bottom-4 left-1/2 z-10 w-80 -translate-x-1/2 rounded-xl border border-border bg-surface/90 p-3 shadow-[var(--shadow-card)] backdrop-blur-sm">
             <div className="mb-1 text-center text-xs font-medium text-text-secondary">
@@ -173,22 +202,14 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
             <WindSpeedLegend />
           </div>
         )}
-        {(origin || destination || checkpoints.length > 0) && (
-          <Button
-            variant="secondary"
-            className={`absolute top-16 z-10 ${sidebarOpen ? "start-4" : "start-16"}`}
-            onClick={reset}
-          >
-            {t('map.clear')}
-          </Button>
-        )}
-        {/* ویزارد مراحل — قاب وسط بالا با اسلاید افقی و فلش‌های دو سو */}
+        {/* ویزارد مراحل — قاب وسط بالا؛ بازگشت انتخاب را پاک نمی‌کند */}
         <StepsWizard
           origin={origin}
           destination={destination}
           hasResult={Boolean(result)}
-          onBack={() => goBackStep()}
-          canBack={Boolean(destination || result || origin)}
+          step={wizardStep}
+          onBack={() => setWizardStep(Math.max(1, wizardStep - 1) as 1 | 2 | 3)}
+          onNext={() => setWizardStep(Math.min(3, wizardStep + 1) as 1 | 2 | 3)}
           onCalculate={handleCalculate}
           canCalculate={Boolean(origin && destination)}
           isCalculating={pathfinding.isPending}

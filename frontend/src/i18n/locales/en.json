@@ -118,7 +118,8 @@
   "common": {
     "loading": "Loading…",
     "error": "Something went wrong",
-    "retry": "Retry"
+    "retry": "Retry",
+    "close": "Close"
   },
   "auth": {
     "login": "Log in",
@@ -141,5 +142,14 @@
     "verifyEmailHint": "A verification link has been sent to your email.",
     "verifySuccess": "Your email has been verified.",
     "registerSuccess": "Registration complete — a verification email was sent."
+  },
+  "viewport": {
+    "title": "Map display",
+    "mapStyle": "Base map",
+    "styleSimple": "Simple",
+    "styleSatellite": "Satellite",
+    "showArrows": "Wind arrows",
+    "showHeatmap": "Wind color map",
+    "showHillshade": "Hillshade"
   }
 }
