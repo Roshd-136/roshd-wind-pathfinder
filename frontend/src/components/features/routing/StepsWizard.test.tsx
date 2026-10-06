@@ -17,6 +17,7 @@ const base = {
   step: 1 as 1 | 2 | 3,
   onBack: vi.fn(),
   onNext: vi.fn(),
+  canNext: true,
   canCalculate: true,
   onCalculate: vi.fn(),
   isCalculating: false,

@@ -26,8 +26,9 @@ interface StepsWizardProps {
   step: 1 | 2 | 3
   /** گام قبل — انتخاب فعلی سر جایش می‌ماند؛ کلیک بعدی جایگزینش می‌کند. */
   onBack: () => void
-  /** گام بعد — فقط جابجایی نما؛ داده‌ای تغییر نمی‌کند. */
+  /** گام بعد — فقط وقتی گام جاری ورودی دارد (در غیر این صورت غیرفعال). */
   onNext: () => void
+  canNext: boolean
   onCalculate: () => void
   canCalculate: boolean
   isCalculating: boolean
@@ -46,6 +47,7 @@ export function StepsWizard({
   step,
   onBack,
   onNext,
+  canNext,
   onCalculate,
   canCalculate,
   isCalculating,
@@ -116,7 +118,7 @@ export function StepsWizard({
         <button
           type="button"
           onClick={onNext}
-          disabled={step >= 3}
+          disabled={!canNext || step >= 3}
           aria-label={t('routing.next')}
           title={t('routing.next')}
           className={`${arrowBtn} end-2`}

@@ -1,5 +1,6 @@
 import type { GeoJSONSource, ImageSource, Map as MapLibreMap } from 'maplibre-gl'
 import type { WindField } from '../../../types/routing'
+import { WIND_ARROW_CONFIG } from '../../../config/mapDisplay'
 import {
   arrowFeatures,
   colorForFieldSpeed,
@@ -93,16 +94,8 @@ export function buildFieldImage(field: WindField, width = 420): string {
 
 const ARROW_IMAGE_PREFIX = 'wind-arrow-'
 const LAYER_IMAGE_PREFIX = 'wind-layer-arrow-'
-/** ابعاد بوم اسپرایت (پیکسل فیزیکی؛ با pixelRatio:۲ یعنی ~۲۲ پیکسل CSS). */
-const ARROW_SPRITE_SIZE = 44
-
-/** مسافتی که هر پیکان در یک چرخهٔ انیمیشن جلو می‌رود (کیلومتر). */
-const ARROW_TRAVEL_KM = 3
-/** طول یک چرخهٔ «حرکت + محو» (میلی‌ثانیه). */
-const ARROW_CYCLE_MS = 1800
-/** گام نمونه‌برداری پیکان‌ها از شبکهٔ میدان (چندلایه متراکم‌تر می‌شود). */
-const ARROW_STRIDE = 2
-const ARROW_STRIDE_MULTILAYER = 3
+/** ثابت‌های ظاهری/انیمیشن پیکان‌ها — از فایل تنظیمات `config/mapDisplay`. */
+const ARROW_CFG = WIND_ARROW_CONFIG
 
 function kmToDegLat(km: number): number {
   return km / 111.32
@@ -140,7 +133,7 @@ let layerSpritesCache: Record<string, ImageData> | null = null
 /** اسپرایت‌های پیکان به رنگ سطل‌های رمپ سرعت — یک‌بار ساخته و کش می‌شود. */
 function buildSpeedArrowSprites(): Record<string, ImageData> {
   if (speedSpritesCache) return speedSpritesCache
-  const size = ARROW_SPRITE_SIZE
+  const size = ARROW_CFG.spriteSize
   const sprites: Record<string, ImageData> = {}
   const canvas = document.createElement('canvas')
   canvas.width = size
@@ -159,7 +152,7 @@ function buildSpeedArrowSprites(): Record<string, ImageData> {
 /** اسپرایت‌های پیکان به رنگ لایه‌های ارتفاعی (پالت صحنهٔ مسیریابی). */
 function buildLayerArrowSprites(): Record<string, ImageData> {
   if (layerSpritesCache) return layerSpritesCache
-  const size = ARROW_SPRITE_SIZE
+  const size = ARROW_CFG.spriteSize
   const sprites: Record<string, ImageData> = {}
   const canvas = document.createElement('canvas')
   canvas.width = size
@@ -216,8 +209,8 @@ export function arrowChevronsGeoJson(field: WindField, opts: ArrowGeoJsonOptions
     const heading = (a.direction_deg + 180) * (Math.PI / 180)
     const dx = Math.sin(heading)
     const dy = Math.cos(heading)
-    const travelLat = kmToDegLat(ARROW_TRAVEL_KM) * t
-    const travelLon = kmToDegLon(ARROW_TRAVEL_KM, a.lat) * t
+    const travelLat = kmToDegLat(ARROW_CFG.travelKm) * t
+    const travelLon = kmToDegLon(ARROW_CFG.travelKm, a.lat) * t
     // محو: ورود سریع، خروج نرم — «بروز» ناگهانی ندارد
     const opacity = Math.min(1, t * 5) * (1 - t)
     return {
@@ -288,7 +281,7 @@ function drawArrows() {
       src.setData(
         arrowChevronsGeoJson(field, {
           phase,
-          stride: multiLayer ? ARROW_STRIDE_MULTILAYER : ARROW_STRIDE,
+          stride: multiLayer ? ARROW_CFG.strideMultiLayer : ARROW_CFG.stride,
           iconFor: multiLayer
             ? () => `${LAYER_IMAGE_PREFIX}${index % LAYER_COLORS.length}`
             : (speed) => `${ARROW_IMAGE_PREFIX}${relativeBucket(speed, fieldSpeedRange(field))}`,
@@ -307,7 +300,7 @@ function tickArrows(now: number) {
   if (!arrowAnim) return
   const dt = arrowAnim.lastTick === 0 ? 0 : now - arrowAnim.lastTick
   arrowAnim.lastTick = now
-  arrowAnim.phase = (arrowAnim.phase + dt / ARROW_CYCLE_MS) % 1
+  arrowAnim.phase = (arrowAnim.phase + dt / ARROW_CFG.cycleMs) % 1
   // سقف ~۳۰ به‌روزرسانی در ثانیه — روان است و منابع را هدر نمی‌دهد
   if (now - arrowAnim.lastDraw >= 33) {
     arrowAnim.lastDraw = now
@@ -404,7 +397,7 @@ export function applyWindFields(
         src.setData(
           arrowChevronsGeoJson(field, {
             phase: arrowAnim?.phase ?? 0,
-            stride: opts.multiLayer ? ARROW_STRIDE_MULTILAYER : ARROW_STRIDE,
+            stride: opts.multiLayer ? ARROW_CFG.strideMultiLayer : ARROW_CFG.stride,
             iconFor: opts.multiLayer
               ? () => `${LAYER_IMAGE_PREFIX}${layerIdx % LAYER_COLORS.length}`
               : (speed) => `${ARROW_IMAGE_PREFIX}${relativeBucket(speed, fieldSpeedRange(field))}`,

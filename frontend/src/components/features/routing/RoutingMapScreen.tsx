@@ -209,7 +209,13 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
           hasResult={Boolean(result)}
           step={wizardStep}
           onBack={() => setWizardStep(Math.max(1, wizardStep - 1) as 1 | 2 | 3)}
-          onNext={() => setWizardStep(Math.min(3, wizardStep + 1) as 1 | 2 | 3)}
+          onNext={() => {
+            // گام بعدی فقط وقتی گام جاری ورودی خود را دارد
+            const hasInput = wizardStep === 1 ? origin !== null : wizardStep === 2 ? destination !== null : true
+            if (!hasInput) return
+            setWizardStep(Math.min(3, wizardStep + 1) as 1 | 2 | 3)
+          }}
+          canNext={wizardStep === 1 ? origin !== null : wizardStep === 2 ? destination !== null : true}
           onCalculate={handleCalculate}
           canCalculate={Boolean(origin && destination)}
           isCalculating={pathfinding.isPending}
