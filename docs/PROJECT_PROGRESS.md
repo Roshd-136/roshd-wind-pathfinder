@@ -1310,3 +1310,12 @@ src/pathfinding/routing.py     86    3   30    6   92%
 - **پیکان‌ها ۱٫۵ برابر** (spriteSize 99، ساقه ۷٫۸۷۵، sizeStops ×۱٫۵).
 - **شواهد:** ۳۸/۳۸ تست + lint/typecheck/build موفق.
 - **PR:** [#24](https://github.com/Roshd-136/roshd-wind-pathfinder/pull/24)
+
+## Task: «فلش‌های کوتاه‌تر» — گام ۱۸ (بازخورد UX دور دهم)
+
+- **تسک:** همان 86bc860cq.
+- **طول فلش‌های باد کوتاه شد:** هندسهٔ اسپرایت در `config/mapDisplay.ts`
+  (baseY از ۰٫۸۶۴ به ۰٫۶۲ — ساقهٔ کوتاه‌تر با همان سر)؛ بدون تغییر اندازهٔ
+  کل یا سرِ پیکان.
+- **شواهد:** ۳۸/۳۸ تست + lint/typecheck/build موفق.
+- **PR:** [#24](https://github.com/Roshd-136/roshd-wind-pathfinder/pull/24)
