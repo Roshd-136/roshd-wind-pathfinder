@@ -9,25 +9,35 @@ import {
 } from '../../../utils/windField'
 
 /**
- * رندر میدان باد روی MapLibre GL:
- *  ۱) نقشهٔ حرارتی «نرم» — تصویر canvas با درون‌یابی دوخطی روی شبکه، بدون درز
- *     سلول و بدون نوارهای تیز؛ رنگ نسبت به بازهٔ خود میدان (مثل صحنهٔ
- *     بصری‌سازی).
- *  ۲) پیکان‌های باد — لایهٔ symbol با اسپرایت باریک ثابت‌اندازه (ساقهٔ نازک +
- *     سر کوچک) که «کمی جلو می‌روند، محو می‌شوند و از نو شروع می‌کنند» تا
- *     جهت جریان دقیقاً دیده شود. در ۳بعدی همهٔ لایه‌های نمایان هم‌زمان رسم
- *     می‌شوند و رنگ هر لایه از پالت صحنهٔ مسیریابی می‌آید (در ۲بعدی تک‌لایه
- *     با رنگ سطل سرعت). قرارداد هواشناسی: `direction_deg` از کجا می‌وزد؛
- *     پیکان به سمت جریان، یعنی جهت + ۱۸۰.
+ * رندر میدان باد روی MapLibre GL — **همهٔ لایه‌ها از ابتدا در استایل پایه
+ * تعریف شده‌اند** (نقشهٔ رنگی، پیکان‌های سه ارتفاع) و این‌جا فقط دادهٔ
+ * آن‌ها به‌روز می‌شود؛ افزودن لایه در زمان اجرا وقتی استایل در وضعیت
+ * نیمه‌لود (صف DEM) است گاهی بی‌اثر می‌ماند و لایه هرگز رسم نمی‌شد — با
+ * درخت لایهٔ ایستا این دسته باگ کلاً حذف شده است.
+ *
+ *  ۱) نقشهٔ حرارتی «نرم» — تصویر canvas با درون‌یابی دوخطی روی شبکه، رنگ
+ *     نسبت به بازهٔ خود میدان (مثل صحنهٔ بصری‌سازی)،
+ *  ۲) پیکان‌های باد — لایهٔ symbol با اسپرایت باریک ثابت‌اندازه که «کمی
+ *     جلو می‌روند، محو می‌شوند و از نو شروع می‌کنند». در ۳بعدی همهٔ لایه‌های
+ *     نمایان هم‌زمان رسم می‌شوند و رنگ هر لایه از پالت صحنهٔ مسیریابی
+ *     می‌آید (در ۲بعدی تک‌لایه با رنگ سطل سرعت). قرارداد هواشناسی:
+ *     `direction_deg` از کجا می‌وزد؛ پیکان به سمت جریان (جهت + ۱۸۰).
  */
 
 const FIELD_SOURCE = 'wind-field-raster'
 const FIELD_LAYER = 'wind-field-layer'
 const ARROW_SOURCE_PREFIX = 'wind-arrows-'
 const ARROW_LAYER_PREFIX = 'wind-arrows-layer-'
+/** لایه‌های ارتفاعی باد — باید با لایه‌های تعریف‌شده در baseStyle یکی باشد. */
+const WIND_ALTITUDES = [50, 200, 500] as const
 
 /** پالت رنگ لایه‌های ارتفاعی — همان `_LAYER_PALETTE` صحنهٔ مسیریابی. */
-const LAYER_COLORS: ReadonlyArray<string> = ['#74b9ff', '#00cec9', '#fdcb6e', '#e84393']
+const LAYER_COLORS: ReadonlyArray<[number, number, number]> = [
+  [0x74, 0xb9, 0xff],
+  [0x00, 0xce, 0xc9],
+  [0xfd, 0xcb, 0x6e],
+  [0xe8, 0x43, 0x93],
+]
 
 /** تصویر نرم میدان از شبکه (canvas → dataURL) — درون‌یابی دوخطی + رنگ نسبی. */
 export function buildFieldImage(field: WindField, width = 420): string {
@@ -80,9 +90,6 @@ export function buildFieldImage(field: WindField, width = 420): string {
 }
 
 // --- پیکان‌های sprite — اندازهٔ ثابت روی صفحه، چرخش با جهت باد ---
-// پیکان‌ها به‌جای چندضلعیِ درجه‌ای (که با زوم غول می‌شد)، لایهٔ symbol با
-// آیکون باریک ثابت‌اندازه‌اند. دو خانواده اسپرایت: سطل سرعت (تک‌لایهٔ ۲بعدی)
-// و رنگ لایهٔ ارتفاعی (چندلایهٔ ۳بعدی، پالت صحنهٔ مسیریابی).
 
 const ARROW_IMAGE_PREFIX = 'wind-arrow-'
 const LAYER_IMAGE_PREFIX = 'wind-layer-arrow-'
@@ -159,18 +166,27 @@ function buildLayerArrowSprites(): Record<string, ImageData> {
   canvas.height = size
   const ctx = canvas.getContext('2d')
   if (!ctx) return sprites
-  for (const [index, colorHex] of LAYER_COLORS.entries()) {
+  for (const [index, color] of LAYER_COLORS.entries()) {
     ctx.clearRect(0, 0, size, size)
-    const value = colorHex.replace('#', '')
-    drawArrow(ctx, size, [
-      parseInt(value.slice(0, 2), 16),
-      parseInt(value.slice(2, 4), 16),
-      parseInt(value.slice(4, 6), 16),
-    ] as [number, number, number])
+    drawArrow(ctx, size, color)
     sprites[`${LAYER_IMAGE_PREFIX}${index}`] = ctx.getImageData(0, 0, size, size)
   }
   layerSpritesCache = sprites
   return sprites
+}
+
+/** ثبت اسپرایت‌ها روی نقشه — بازگشت‌پذیر؛ هر کدام فقط اگر نبود اضافه می‌شود. */
+function ensureArrowSprites(map: MapLibreMap): void {
+  for (const [name, image] of Object.entries(buildSpeedArrowSprites())) {
+    if (!map.hasImage(name)) {
+      map.addImage(name, image, { pixelRatio: 2 })
+    }
+  }
+  for (const [name, image] of Object.entries(buildLayerArrowSprites())) {
+    if (!map.hasImage(name)) {
+      map.addImage(name, image, { pixelRatio: 2 })
+    }
+  }
 }
 
 /** سطل رنگ نسبی یک سرعت روی بازهٔ خود میدان (اندیس رمپ ۰ تا ۴). */
@@ -221,90 +237,6 @@ export function arrowChevronsGeoJson(field: WindField, opts: ArrowGeoJsonOptions
   return { type: 'FeatureCollection' as const, features }
 }
 
-// پاک‌سازی انیمیشن با حذف نقشه — یک‌بار برای هر نقشه ثبت می‌شود
-const removeHooked = new WeakSet<MapLibreMap>()
-/** شناسه لایه‌های پیکان ساخته‌شده روی هر نقشه (برای نمایش/پنهان‌سازی گروهی). */
-const arrowLayerRegistry = new WeakMap<MapLibreMap, Set<string>>()
-
-function registerArrowLayer(map: MapLibreMap, layerId: string): void {
-  let set = arrowLayerRegistry.get(map)
-  if (!set) {
-    set = new Set()
-    arrowLayerRegistry.set(map, set)
-  }
-  set.add(layerId)
-}
-
-function arrowLayerIds(map: MapLibreMap): string[] {
-  return [...(arrowLayerRegistry.get(map) ?? [])]
-}
-
-/**
- * منبع/لایهٔ پیکان یک لایهٔ ارتفاعی را می‌سازد — بازگشت‌پذیر؛ هر قطعه فقط
- * اگر نبود اضافه می‌شود.
- */
-function ensureArrowLayer(map: MapLibreMap, altitude: number): void {
-  const sourceId = `${ARROW_SOURCE_PREFIX}${altitude}`
-  const layerId = `${ARROW_LAYER_PREFIX}${altitude}`
-  if (!map.getSource(sourceId)) {
-    map.addSource(sourceId, {
-      type: 'geojson',
-      data: { type: 'FeatureCollection', features: [] },
-    })
-  }
-  for (const [name, image] of Object.entries(buildSpeedArrowSprites())) {
-    if (!map.hasImage(name)) {
-      map.addImage(name, image, { pixelRatio: 2 })
-    }
-  }
-  for (const [name, image] of Object.entries(buildLayerArrowSprites())) {
-    if (!map.hasImage(name)) {
-      map.addImage(name, image, { pixelRatio: 2 })
-    }
-  }
-  if (!map.getLayer(layerId)) {
-    map.addLayer({
-      id: layerId,
-      type: 'symbol',
-      source: sourceId,
-      layout: {
-        'symbol-placement': 'point',
-        'icon-image': ['get', 'icon'],
-        'icon-rotate': ['get', 'heading'],
-        // چرخش با زمین (جهت واقعی جریان روی صفحه) ولی شکل پیکان همیشه
-        // رو‌به‌بیننده می‌ماند تا در ۳بعدی هم همان شکل ۲بعدی دیده شود
-        'icon-rotation-alignment': 'map',
-        'icon-pitch-alignment': 'viewport',
-        'icon-allow-overlap': true,
-        'icon-ignore-placement': true,
-        // اندازهٔ ریز روی صفحه؛ رشد نرم با زوم برای خوانایی
-        'icon-size': ['interpolate', ['linear'], ['zoom'], 5, 0.6, 8, 0.95, 12, 1.15],
-      },
-      paint: {
-        'icon-opacity': ['get', 'fillOpacity'],
-      },
-    })
-    registerArrowLayer(map, layerId)
-  }
-  if (!removeHooked.has(map)) {
-    removeHooked.add(map)
-    map.once('remove', stopArrowAnimation)
-  }
-}
-
-/** میدان باد زیر خط مسیر بنشیند (خط مسیر و چک‌پوینت‌ها رو باشد). */
-export function moveWindLayersBelowRoute(map: MapLibreMap): void {
-  const routeLayer = 'route-line-layer' // همان ROUTE_LAYER_ID در MapView
-  for (const layerId of arrowLayerIds(map)) {
-    if (map.getLayer(layerId) && map.getLayer(routeLayer)) {
-      map.moveLayer(layerId, routeLayer)
-    }
-  }
-  if (map.getLayer(FIELD_LAYER) && arrowLayerIds(map).length > 0 && map.getLayer(arrowLayerIds(map)[0])) {
-    map.moveLayer(FIELD_LAYER, arrowLayerIds(map)[0])
-  }
-}
-
 /**
  * نمایش/پنهان‌سازی گروهی باد (نقشهٔ رنگی + همهٔ لایه‌های پیکان) — برای
  * کلیدهای تنظیمات «نمای نقشه».
@@ -316,7 +248,8 @@ export function setWindOverlaysVisible(
   if (map.getLayer(FIELD_LAYER)) {
     map.setLayoutProperty(FIELD_LAYER, 'visibility', visible.heatmap ? 'visible' : 'none')
   }
-  for (const layerId of arrowLayerIds(map)) {
+  for (const altitude of WIND_ALTITUDES) {
+    const layerId = `${ARROW_LAYER_PREFIX}${altitude}`
     if (map.getLayer(layerId)) {
       map.setLayoutProperty(layerId, 'visibility', visible.arrows ? 'visible' : 'none')
     }
@@ -340,19 +273,17 @@ interface ArrowAnimState {
 
 let arrowAnim: ArrowAnimState | null = null
 
-function visibleArrowLayer(map: MapLibreMap, altitude: number): boolean {
-  const layerId = `${ARROW_LAYER_PREFIX}${altitude}`
-  return map.getLayer(layerId) !== undefined
-}
-
 function drawArrows() {
   if (!arrowAnim) return
   const { map, fields, multiLayer, phase } = arrowAnim
   try {
     let drewAny = false
     fields.forEach((field, index) => {
-      if (!visibleArrowLayer(map, field.altitude_m)) return
-      const src = map.getSource(`${ARROW_SOURCE_PREFIX}${field.altitude_m}`) as GeoJSONSource | undefined
+      const layerId = `${ARROW_LAYER_PREFIX}${field.altitude_m}`
+      if (!map.getLayer(layerId)) return
+      const src = map.getSource(`${ARROW_SOURCE_PREFIX}${field.altitude_m}`) as
+        | GeoJSONSource
+        | undefined
       if (!src) return
       src.setData(
         arrowChevronsGeoJson(field, {
@@ -405,7 +336,7 @@ export function stopArrowAnimation() {
   }
 }
 
-/** به‌روزرسانی تصویر نرم میدان فعال (اولین لایهٔ نمایان). */
+/** به‌روزرسانی تصویر نرم میدان فعال (اولین لایهٔ نمایان) — منبع در استایل است. */
 function updateFieldImage(map: MapLibreMap, field: WindField): void {
   const meta = gridMeta(field)
   const latMax = meta.lats[meta.lats.length - 1]
@@ -421,70 +352,72 @@ function updateFieldImage(map: MapLibreMap, field: WindField): void {
       [lonMin, latMin],
     ] as [[number, number], [number, number], [number, number], [number, number]],
   }
-  if (!map.getSource(FIELD_SOURCE)) {
-    map.addSource(FIELD_SOURCE, { type: 'image', ...payload })
-  }
-  ;(map.getSource(FIELD_SOURCE) as ImageSource).updateImage(payload)
-  if (!map.getLayer(FIELD_LAYER)) {
-    map.addLayer({
-      id: FIELD_LAYER,
-      type: 'raster',
-      source: FIELD_SOURCE,
-      paint: { 'raster-opacity': 0.85, 'raster-fade-duration': 0 },
-    })
-  }
+  const imageSource = map.getSource(FIELD_SOURCE) as ImageSource | undefined
+  if (!imageSource) return
+  // مهم: `updateImage` فقط url را عوض می‌کند و مختصات جای‌نگهدار استایل
+  // باقی می‌ماند (تصویر در جای اشتباه نقش می‌بست) — مختصات را صریح ست می‌کنیم.
+  imageSource.setCoordinates(payload.coordinates)
+  imageSource.updateImage({ url: payload.url })
 }
 
 /**
  * اعمال میدان‌های نمایان — تک‌لایه در ۲بعدی (رنگ سطل سرعت) و همهٔ لایه‌ها
- * با رنگ لایه در ۳بعدی (مثل صحنهٔ مسیریابی). به‌جای گیتِ `isStyleLoaded`
- * (که با منبع DEM مدت‌ها false می‌ماند و همه‌چیز را قفل می‌کند) مستقیم
- * تلاش می‌کنیم و روی خطا با تایمر برمی‌گردیم؛ همهٔ قطعات بازگشت‌پذیرند.
+ * با رنگ لایه در ۳بعدی (مثل صحنهٔ مسیریابی). هیچ لایه‌ای add نمی‌شود —
+ * لایه‌ها از ابتدا در استایل‌اند و این‌جا فقط داده و دید هرکدام تنظیم
+ * می‌شود؛ روی خطا با تایمر دوباره تلاش می‌شود.
  */
 export function applyWindFields(
   map: MapLibreMap,
   fields: WindField[],
-  opts: { multiLayer: boolean; showHeatmap: boolean; showArrows: boolean; attempt?: number } = {
-    multiLayer: false,
-    showHeatmap: true,
-    showArrows: true,
-  },
+  opts: {
+    multiLayer: boolean
+    showHeatmap: boolean
+    showArrows: boolean
+    attempt?: number
+  } = { multiLayer: false, showHeatmap: true, showArrows: true },
 ): void {
   const attempt = opts.attempt ?? 0
   try {
+    ensureArrowSprites(map)
     const ordered = [...fields].sort((a, b) => a.altitude_m - b.altitude_m)
-    // لایه‌های پیکان هر سطح از قبل ساخته می‌شوند تا سوییچ ۲/۳بعدی بی‌درنگ
-    // باشد؛ دیده‌شدن هرکدام به حالت و تنظیمات بستگی دارد.
-    for (const field of ordered) {
-      ensureArrowLayer(map, field.altitude_m)
-    }
     if (ordered.length > 0 && opts.showHeatmap) {
       updateFieldImage(map, ordered[0])
     }
-    moveWindLayersBelowRoute(map)
     // نقشهٔ رنگی: فقط لایهٔ فعال (اولین نمایان) — در هر دو حالت
     if (map.getLayer(FIELD_LAYER)) {
       const heatmapVisible = ordered.length > 0 && opts.showHeatmap
       map.setLayoutProperty(FIELD_LAYER, 'visibility', heatmapVisible ? 'visible' : 'none')
     }
     // پیکان‌ها: ۲بعدی = فقط لایهٔ فعال؛ ۳بعدی = همهٔ لایه‌های نمایان.
-    // لایه‌هایی که دیگر در فهرست نمایان‌ها نیستند پنهان می‌شوند.
-    for (const layerId of arrowLayerIds(map)) {
+    for (const altitude of WIND_ALTITUDES) {
+      const layerId = `${ARROW_LAYER_PREFIX}${altitude}`
       if (!map.getLayer(layerId)) continue
-      const altitude = Number(layerId.slice(ARROW_LAYER_PREFIX.length))
-      const isActive = ordered[0]?.altitude_m === altitude
-      const visible =
-        opts.showArrows && ordered.some((f) => f.altitude_m === altitude) && (opts.multiLayer || isActive)
+      const field = ordered.find((f) => f.altitude_m === altitude)
+      const visible = Boolean(
+        field && opts.showArrows && (opts.multiLayer || field.altitude_m === ordered[0]?.altitude_m),
+      )
       map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none')
+      if (field) {
+        // رنگ لایه‌ای بر اساس جایگاه در فهرست نمایان‌ها — هماهنگ با drawArrows
+        const layerIdx = ordered.findIndex((f) => f.altitude_m === altitude)
+        const src = map.getSource(`${ARROW_SOURCE_PREFIX}${altitude}`) as GeoJSONSource
+        src.setData(
+          arrowChevronsGeoJson(field, {
+            phase: arrowAnim?.phase ?? 0,
+            stride: opts.multiLayer ? ARROW_STRIDE_MULTILAYER : ARROW_STRIDE,
+            iconFor: opts.multiLayer
+              ? () => `${LAYER_IMAGE_PREFIX}${layerIdx % LAYER_COLORS.length}`
+              : (speed) => `${ARROW_IMAGE_PREFIX}${relativeBucket(speed, fieldSpeedRange(field))}`,
+          }),
+        )
+      }
     }
     if (ordered.length > 0 && opts.showArrows) {
       startArrowAnimation(map, ordered, opts.multiLayer)
     } else {
       stopArrowAnimation()
     }
-    // وقتی استایل در وضعیت نیمه‌لود (صف DEM) است، addLayer گاهی تا رندر
-    // بعدی بی‌اثر می‌ماند — یک رندر صریح تضمین می‌کند لایه‌ها همان لحظه
-    // دیده شوند.
+    // یک رندر صریح — تضمین دیده‌شدن فوری داده‌های تازه
     map.triggerRepaint()
   } catch {
     if (attempt < 100) {

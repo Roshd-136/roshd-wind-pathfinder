@@ -24,6 +24,18 @@ const ROUTE_SOURCE_ID = 'route-line'
 const ROUTE_LAYER_ID = 'route-line-layer'
 const ROUTE_DOTS_SOURCE_ID = 'route-dots'
 const ROUTE_DOTS_LAYER_ID = 'route-dots-layer'
+/** میدانِ خالی برای منبع‌های image/geojson استایل پایه. */
+const EMPTY_FC = { type: 'FeatureCollection' as const, features: [] }
+const EMPTY_LINE = {
+  type: 'Feature' as const,
+  properties: {},
+  geometry: { type: 'LineString' as const, coordinates: [] },
+}
+/** تصویر شفاف ۱×۱ — جای‌نگهدار منبع image تا اولین به‌روزرسانی میدان. */
+const TRANSPARENT_PIXEL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII='
+/** لایه‌های ارتفاعی میدان باد — همان لایه‌های UI (فیکسچرها/API). */
+const WIND_ALTITUDES = [50, 200, 500] as const
 
 const Khorasan_CENTER: [number, number] = [58.65, 36.18]
 
@@ -31,6 +43,12 @@ const Khorasan_CENTER: [number, number] = [58.65, 36.18]
  * استایل نقشه — کاشی‌های آزاد OpenStreetMap و تصویر ماهواره‌ای Esri (هر دو
  * بدون توکن) با تم هماهنگ برنامه؛ در تم تاریک با فیلتر CSS روی بوم نقشه
  * تیره می‌شود (global.css).
+ *
+ * **همهٔ لایه‌های پویا (نقشهٔ رنگی باد، پیکان‌های هر ارتفاع، خط مسیر) از
+ * ابتدا در استایل تعریف می‌شوند** با دادهٔ خالی و `visibility: none` — هیچ
+ * لایه‌ای در زمان اجرا add نمی‌شود. افزودن لایه وقتی استایل در وضعیت
+ * نیمه‌لود (صف DEM) است گاهی بی‌اثر می‌ماند و لایه هرگز رسم نمی‌شد؛ با
+ * درخت لایهٔ ایستا فقط داده عوض می‌شود و این دسته باگ کلاً حذف می‌شود.
  */
 function baseStyle(): maplibregl.StyleSpecification {
   return {
@@ -61,6 +79,24 @@ function baseStyle(): maplibregl.StyleSpecification {
         tileSize: 256,
         maxzoom: 14,
       },
+      'wind-field-raster': {
+        type: 'image',
+        url: TRANSPARENT_PIXEL,
+        coordinates: [
+          [0, 1],
+          [1, 1],
+          [1, 0],
+          [0, 0],
+        ],
+      },
+      ...Object.fromEntries(
+        WIND_ALTITUDES.map((altitude) => [
+          `wind-arrows-${altitude}`,
+          { type: 'geojson' as const, data: EMPTY_FC },
+        ]),
+      ),
+      'route-line': { type: 'geojson', data: EMPTY_LINE },
+      'route-dots': { type: 'geojson', data: EMPTY_FC },
     },
     layers: [
       { id: 'bg', type: 'background', paint: { 'background-color': '#e8e6e1' } },
@@ -73,6 +109,57 @@ function baseStyle(): maplibregl.StyleSpecification {
         paint: {
           'hillshade-exaggeration': 0.35,
           'hillshade-shadow-color': '#473b2d',
+        },
+      },
+      {
+        id: 'wind-field-layer',
+        type: 'raster',
+        source: 'wind-field-raster',
+        layout: { visibility: 'none' },
+        paint: { 'raster-opacity': 0.85, 'raster-fade-duration': 0 },
+      },
+      ...WIND_ALTITUDES.map(
+        (altitude) =>
+          ({
+            id: `wind-arrows-layer-${altitude}`,
+            type: 'symbol',
+            source: `wind-arrows-${altitude}`,
+            layout: {
+              visibility: 'none',
+              'symbol-placement': 'point',
+              'icon-image': ['get', 'icon'],
+              'icon-rotate': ['get', 'heading'],
+              // چرخش با زمین (جهت واقعی جریان روی صفحه) ولی شکل پیکان همیشه
+              // رو‌به‌بیننده می‌ماند تا در ۳بعدی هم همان شکل ۲بعدی دیده شود
+              'icon-rotation-alignment': 'map',
+              'icon-pitch-alignment': 'viewport',
+              'icon-allow-overlap': true,
+              'icon-ignore-placement': true,
+              'icon-size': ['interpolate', ['linear'], ['zoom'], 5, 0.6, 8, 0.95, 12, 1.15],
+            },
+            paint: { 'icon-opacity': ['get', 'fillOpacity'] },
+          }) as maplibregl.LayerSpecification,
+      ),
+      {
+        id: ROUTE_LAYER_ID,
+        type: 'line',
+        source: ROUTE_SOURCE_ID,
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': '#f8fafc',
+          'line-width': 4,
+          'line-blur': 0.2,
+        },
+      },
+      {
+        id: ROUTE_DOTS_LAYER_ID,
+        type: 'circle',
+        source: ROUTE_DOTS_SOURCE_ID,
+        paint: {
+          'circle-radius': 3.2,
+          'circle-color': '#f8fafc',
+          'circle-stroke-color': 'rgba(10, 14, 26, 0.4)',
+          'circle-stroke-width': 1,
         },
       },
     ],
@@ -164,54 +251,6 @@ export function MapView({
       mapRef.current = null
     }
   }, [])
-
-  // منبع/لایه‌های مسیر — بازگشت‌پذیر؛ رویداد load در محیط‌های کند (صف DEM)
-  // دیر می‌رسد، پس ساخت منبع‌ها به اولین تلاشِ رسم منتقل شده است.
-  const ensureRouteSources = (map: maplibregl.Map): void => {
-    if (!map.getSource(ROUTE_SOURCE_ID)) {
-      map.addSource(ROUTE_SOURCE_ID, {
-        type: 'geojson',
-        data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } },
-      })
-    }
-    // خط مسیر سفید + نقاط سفید — مطابق mockup
-    if (!map.getLayer(ROUTE_LAYER_ID)) {
-      map.addLayer({
-        id: ROUTE_LAYER_ID,
-        type: 'line',
-        source: ROUTE_SOURCE_ID,
-        layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: {
-          'line-color': '#f8fafc',
-          'line-width': 4,
-          'line-blur': 0.2,
-        },
-      })
-    }
-    if (!map.getSource(ROUTE_DOTS_SOURCE_ID)) {
-      map.addSource(ROUTE_DOTS_SOURCE_ID, {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      })
-    }
-    if (!map.getLayer(ROUTE_DOTS_LAYER_ID)) {
-      map.addLayer({
-        id: ROUTE_DOTS_LAYER_ID,
-        type: 'circle',
-        source: ROUTE_DOTS_SOURCE_ID,
-        paint: {
-          'circle-radius': 3.2,
-          'circle-color': '#f8fafc',
-          'circle-stroke-color': 'rgba(10, 14, 26, 0.4)',
-          'circle-stroke-width': 1,
-        },
-      })
-    }
-    // وقتی استایل در وضعیت نیمه‌لود (صف DEM) است، addLayer گاهی تا رندر
-    // بعدی بی‌اثر می‌ماند — یک رندر صریح تضمین می‌کند خط مسیر همان لحظه
-    // دیده شود.
-    map.triggerRepaint()
-  }
 
   // حالت ۲بعدی/۳بعدی + نقشهٔ پایه — سوییچ درجا (بدون تغییر URL): در ۳بعدی
   // ترنِ واقعی با pitch و بزرگ‌نمایی ارتفاع فعال می‌شود (مثل صحنهٔ
@@ -325,9 +364,7 @@ export function MapView({
   }, [checkpoints])
 
   // رسم خط مسیر + نقاط سفید روی آن (مطابق mockup) + تنظیم کادر روی مسیر.
-  // منبع‌ها با اولین تلاشِ رسم ساخته می‌شوند (بازگشت‌پذیر) و روی خطا با تایمر
-  // دوباره تلاش می‌شود — بدون گیتِ isStyleLoaded (باگ قبلی: مسیر محاسبه‌شده
-  // گاهی رسم نمی‌شد).
+  // لایه‌ها از ابتدا در استایل پایه‌اند — این‌جا فقط داده عوض می‌شود.
   useEffect(() => {
     let cancelled = false
     let attempts = 0
@@ -336,7 +373,6 @@ export function MapView({
       const map = mapRef.current
       if (!map) return
       try {
-        ensureRouteSources(map)
         const source = map.getSource(ROUTE_SOURCE_ID) as maplibregl.GeoJSONSource
         source.setData({
           type: 'Feature',
