@@ -10,6 +10,8 @@ interface RouteState {
   constraints: RouteConstraints
   layerVisibility: LayerVisibility
   result: RouteResult | null
+  /** مسیرهای جایگزین (معیارهای دیگر) — مثل صحنهٔ مسیریابی */
+  alternatives: RouteResult[]
   /** گامِ فعال ویزارد — تعیین می‌کند کلیک بعدی روی نقشه چه چیزی را عوض می‌کند. */
   wizardStep: 1 | 2 | 3
   setOrigin: (c: Coordinate | null) => void
@@ -21,6 +23,7 @@ interface RouteState {
   setConstraints: (c: RouteConstraints) => void
   setLayerVisibility: (v: LayerVisibility) => void
   setResult: (r: RouteResult | null) => void
+  setAlternatives: (r: RouteResult[]) => void
   setWizardStep: (n: 1 | 2 | 3) => void
   reset: () => void
 }
@@ -41,6 +44,7 @@ export const useRouteStore = create<RouteState>((set) => ({
   constraints: { criterion: 'time', max_wind_speed_mps: 20 },
   layerVisibility: { surface: true, mid: true, high: true },
   result: null,
+  alternatives: [],
   wizardStep: 1,
   setOrigin: (origin) => set({ origin }),
   setDestination: (destination) => set({ destination }),
@@ -64,6 +68,7 @@ export const useRouteStore = create<RouteState>((set) => ({
   setConstraints: (constraints) => set({ constraints }),
   setLayerVisibility: (layerVisibility) => set({ layerVisibility }),
   setResult: (result) => set({ result }),
+  setAlternatives: (alternatives) => set({ alternatives }),
   setWizardStep: (wizardStep) => set({ wizardStep }),
-  reset: () => set({ origin: null, destination: null, checkpoints: [], result: null, wizardStep: 1 }),
+  reset: () => set({ origin: null, destination: null, checkpoints: [], result: null, alternatives: [], wizardStep: 1 }),
 }))
