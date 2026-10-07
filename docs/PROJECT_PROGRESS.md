@@ -1390,3 +1390,11 @@ src/pathfinding/routing.py     86    3   30    6   92%
 - **نتیجه:** دُم اکنون واقعاً نصف (baseY ۰٫۲۴)؛ سر و ضخامت از کانفیگ.
 - **شواهد:** ۳۸/۳۸ تست + lint/typecheck/build موفق.
 - **PR:** [#24](https://github.com/Roshd-136/roshd-wind-pathfinder/pull/24)
+
+## Task: «نازک‌کردن پیکان + دُم کمی بلندتر» — گام ۲۶
+
+- **تسک:** همان 86bc860cq.
+- **ضخامت ۰٫۷×** (shaftWidth ۹٫۴۵ → ۶٫۶۱۵px) و **دُم کمی بلندتر**
+  (baseY ۰٫۲۴ → ۰٫۲۹) — هر دو در `config/mapDisplay.ts`.
+- **شواهد:** ۳۸/۳۸ تست + lint/typecheck/build موفق؛ تأیید بصری زنده.
+- **PR:** [#24](https://github.com/Roshd-136/roshd-wind-pathfinder/pull/24)
