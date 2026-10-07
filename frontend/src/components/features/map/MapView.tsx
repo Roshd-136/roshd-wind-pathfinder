@@ -34,9 +34,6 @@ const EMPTY_LINE = {
 /** تصویر شفاف ۱×۱ — جای‌نگهدار منبع image تا اولین به‌روزرسانی میدان. */
 const TRANSPARENT_PIXEL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII='
-/** لایه‌های ارتفاعی میدان باد — همان لایه‌های UI (فیکسچرها/API). */
-const WIND_ALTITUDES = [50, 200, 500] as const
-
 const Khorasan_CENTER: [number, number] = [58.65, 36.18]
 
 /**
@@ -89,12 +86,7 @@ function baseStyle(): maplibregl.StyleSpecification {
           [0, 0],
         ],
       },
-      ...Object.fromEntries(
-        WIND_ALTITUDES.map((altitude) => [
-          `wind-arrows-${altitude}`,
-          { type: 'geojson' as const, data: EMPTY_FC },
-        ]),
-      ),
+      'wind-particles': { type: 'geojson' as const, data: EMPTY_FC },
       'route-line': { type: 'geojson', data: EMPTY_LINE },
       'route-dots': { type: 'geojson', data: EMPTY_FC },
     },
@@ -118,28 +110,13 @@ function baseStyle(): maplibregl.StyleSpecification {
         layout: { visibility: 'none' },
         paint: { 'raster-opacity': 0.85, 'raster-fade-duration': 0 },
       },
-      ...WIND_ALTITUDES.map(
-        (altitude) =>
-          ({
-            id: `wind-arrows-layer-${altitude}`,
-            type: 'symbol',
-            source: `wind-arrows-${altitude}`,
-            layout: {
-              visibility: 'none',
-              'symbol-placement': 'point',
-              'icon-image': ['get', 'icon'],
-              'icon-rotate': ['get', 'heading'],
-              // چرخش با زمین (جهت واقعی جریان روی صفحه) ولی شکل پیکان همیشه
-              // رو‌به‌بیننده می‌ماند تا در ۳بعدی هم همان شکل ۲بعدی دیده شود
-              'icon-rotation-alignment': 'map',
-              'icon-pitch-alignment': 'viewport',
-              'icon-allow-overlap': true,
-              'icon-ignore-placement': true,
-              'icon-size': ['interpolate', ['linear'], ['zoom'], 5, 0.6, 8, 0.95, 12, 1.15],
-            },
-            paint: { 'icon-opacity': ['get', 'fillOpacity'] },
-          }) as maplibregl.LayerSpecification,
-      ),
+      {
+        id: 'wind-particles-layer',
+        type: 'line',
+        source: 'wind-particles',
+        layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#38bdf8', 'line-width': 2.4, 'line-opacity': 0.85 },
+      },
       {
         id: ROUTE_LAYER_ID,
         type: 'line',

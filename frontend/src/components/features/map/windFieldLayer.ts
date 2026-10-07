@@ -1,44 +1,32 @@
 import type { GeoJSONSource, ImageSource, Map as MapLibreMap } from 'maplibre-gl'
 import type { WindField } from '../../../types/routing'
-import { WIND_ARROW_CONFIG } from '../../../config/mapDisplay'
+import { WIND_PARTICLE_CONFIG } from '../../../config/mapDisplay'
 import {
-  arrowFeatures,
   colorForFieldSpeed,
   fieldSpeedRange,
   gridMeta,
-  WIND_SPEED_STOPS,
+  sampleWindAtPoint,
 } from '../../../utils/windField'
 
 /**
  * رندر میدان باد روی MapLibre GL — **همهٔ لایه‌ها از ابتدا در استایل پایه
- * تعریف شده‌اند** (نقشهٔ رنگی، پیکان‌های سه ارتفاع) و این‌جا فقط دادهٔ
- * آن‌ها به‌روز می‌شود؛ افزودن لایه در زمان اجرا وقتی استایل در وضعیت
- * نیمه‌لود (صف DEM) است گاهی بی‌اثر می‌ماند و لایه هرگز رسم نمی‌شد — با
- * درخت لایهٔ ایستا این دسته باگ کلاً حذف شده است.
+ * تعریف شده‌اند** (نقشهٔ رنگی، ذرات جریان باد) و این‌جا فقط دادهٔ آن‌ها
+ * به‌روز می‌شود؛ افزودن لایه در زمان اجرا وقتی استایل در وضعیت نیمه‌لود
+ * (صف DEM) است گاهی بی‌اثر می‌ماند و لایه هرگز رسم نمی‌شد — با درخت لایهٔ
+ * ایستا این دسته باگ کلاً حذف شده است.
  *
  *  ۱) نقشهٔ حرارتی «نرم» — تصویر canvas با درون‌یابی دوخطی روی شبکه، رنگ
  *     نسبت به بازهٔ خود میدان (مثل صحنهٔ بصری‌سازی)،
- *  ۲) پیکان‌های باد — لایهٔ symbol با اسپرایت باریک ثابت‌اندازه که «کمی
- *     جلو می‌روند، محو می‌شوند و از نو شروع می‌کنند». در ۳بعدی همهٔ لایه‌های
- *     نمایان هم‌زمان رسم می‌شوند و رنگ هر لایه از پالت صحنهٔ مسیریابی
- *     می‌آید (در ۲بعدی تک‌لایه با رنگ سطل سرعت). قرارداد هواشناسی:
- *     `direction_deg` از کجا می‌وزد؛ پیکان به سمت جریان (جهت + ۱۸۰).
+ *  ۲) **ذرات جریان باد** (سبک windy) — ذرات ریز که پیوسته در امتداد بردار
+ *     محلی باد حرکت می‌کنند و ردّ کوتاه می‌گذارند؛ رنگ نسبت به بازهٔ میدان.
+ *     قرارداد هواشناسی: `direction_deg` از کجا می‌وزد؛ حرکت به سمت جریان
+ *     (جهت + ۱۸۰).
  */
 
 const FIELD_SOURCE = 'wind-field-raster'
 const FIELD_LAYER = 'wind-field-layer'
-const ARROW_SOURCE_PREFIX = 'wind-arrows-'
-const ARROW_LAYER_PREFIX = 'wind-arrows-layer-'
-/** لایه‌های ارتفاعی باد — باید با لایه‌های تعریف‌شده در baseStyle یکی باشد. */
-const WIND_ALTITUDES = [50, 200, 500] as const
-
-/** پالت رنگ لایه‌های ارتفاعی — همان `_LAYER_PALETTE` صحنهٔ مسیریابی. */
-const LAYER_COLORS: ReadonlyArray<[number, number, number]> = [
-  [0x74, 0xb9, 0xff],
-  [0x00, 0xce, 0xc9],
-  [0xfd, 0xcb, 0x6e],
-  [0xe8, 0x43, 0x93],
-]
+const PARTICLE_SOURCE = 'wind-particles'
+const PARTICLE_LAYER = 'wind-particles-layer'
 
 /** تصویر نرم میدان از شبکه (canvas → dataURL) — درون‌یابی دوخطی + رنگ نسبی. */
 export function buildFieldImage(field: WindField, width = 420): string {
@@ -53,32 +41,22 @@ export function buildFieldImage(field: WindField, width = 420): string {
   const ctx = canvas.getContext('2d')
   if (!ctx) return ''
   const image = ctx.createImageData(width, height)
-  const nLats = meta.lats.length
-  const nLons = meta.lons.length
-
-  // نمونه‌گیری دوخطی سرعت — نوارهای تیز سلولی به گرادیان پیوسته تبدیل می‌شود
-  const sampleSpeed = (gx: number, gy: number): number => {
-    const x = Math.min(Math.max(gx, 0), nLons - 1)
-    const y = Math.min(Math.max(gy, 0), nLats - 1)
-    const x0 = Math.min(Math.floor(x), nLons - 2)
-    const y0 = Math.min(Math.floor(y), nLats - 2)
-    const tx = x - x0
-    const ty = y - y0
-    const s00 = field.vectors[y0 * nLons + x0].speed_mps
-    const s01 = field.vectors[y0 * nLons + x0 + 1].speed_mps
-    const s10 = field.vectors[(y0 + 1) * nLons + x0].speed_mps
-    const s11 = field.vectors[(y0 + 1) * nLons + x0 + 1].speed_mps
-    return (s00 * (1 - tx) + s01 * tx) * (1 - ty) + (s10 * (1 - tx) + s11 * tx) * ty
-  }
 
   for (let py = 0; py < height; py += 1) {
     // ردیف ۰ تصویر = شمال (بیشینهٔ عرض جغرافیایی)
-    const gy = (1 - py / (height - 1)) * (nLats - 1)
+    const rowFloat = (1 - py / (height - 1)) * (meta.lats.length - 1)
+    const row = Math.min(Math.max(Math.round(rowFloat), 0), meta.lats.length - 1)
     for (let px = 0; px < width; px += 1) {
-      const gx = (px / (width - 1)) * (nLons - 1)
-      const speed = sampleSpeed(gx, gy)
-      const [r, g, b] = colorForFieldSpeed(speed, range)
-      const alpha = 80 + Math.round(70 * Math.min((speed - range[0]) / Math.max(range[1] - range[0], 1e-6), 1))
+      const col = Math.min(
+        Math.max(Math.round((px / (width - 1)) * (meta.lons.length - 1)), 0),
+        meta.lons.length - 1,
+      )
+      const v = field.vectors[row * meta.lons.length + col]
+      if (!v) continue
+      const [r, g, b] = colorForFieldSpeed(v.speed_mps, range)
+      const alpha =
+        80 +
+        Math.round(70 * Math.min((v.speed_mps - range[0]) / Math.max(range[1] - range[0], 1e-6), 1))
       const offset = (py * width + px) * 4
       image.data[offset] = r
       image.data[offset + 1] = g
@@ -90,157 +68,202 @@ export function buildFieldImage(field: WindField, width = 420): string {
   return canvas.toDataURL('image/png')
 }
 
-// --- پیکان‌های sprite — اندازهٔ ثابت روی صفحه، چرخش با جهت باد ---
-
-const ARROW_IMAGE_PREFIX = 'wind-arrow-'
-const LAYER_IMAGE_PREFIX = 'wind-layer-arrow-'
-/** ثابت‌های ظاهری/انیمیشن پیکان‌ها — از فایل تنظیمات `config/mapDisplay`. */
-const ARROW_CFG = WIND_ARROW_CONFIG
-
-function kmToDegLat(km: number): number {
-  return km / 111.32
+/** به‌روزرسانی تصویر نرم میدان فعال — منبع در استایل است. */
+function updateFieldImage(map: MapLibreMap, field: WindField): void {
+  const meta = gridMeta(field)
+  const latMax = meta.lats[meta.lats.length - 1]
+  const latMin = meta.lats[0]
+  const lonMin = meta.lons[0]
+  const lonMax = meta.lons[meta.lons.length - 1]
+  const imageSource = map.getSource(FIELD_SOURCE) as ImageSource | undefined
+  if (!imageSource) return
+  // مهم: `updateImage` فقط url را عوض می‌کند و مختصات جای‌نگهدار استایل
+  // باقی می‌ماند (تصویر در جای اشتباه نقش می‌بست) — مختصات را صریح ست می‌کنیم.
+  imageSource.setCoordinates([
+    [lonMin, latMax],
+    [lonMax, latMax],
+    [lonMax, latMin],
+    [lonMin, latMin],
+  ])
+  imageSource.updateImage({ url: buildFieldImage(field) })
 }
 
-function kmToDegLon(km: number, lat: number): number {
-  return km / (111.32 * Math.max(Math.cos((lat * Math.PI) / 180), 0.2))
+// ---------------------------------------------------------------------------
+// ذرات جریان باد — ذرات ریز که پیوسته در امتداد بردار محلی باد حرکت می‌کنند
+// و ردّ کوتاه می‌گذارند. جایگزین پیکان‌های چشمک‌زن (بازخورد: انیمیشن
+// همزمان/تصادفی هر دو بد بودند). حرکت پیوسته و روان است؛ ذره در پایان عمر
+// یا خروج از میدان، بی‌سروصدا جای خود را با ذرهٔ تازه عوض می‌کند.
+// ---------------------------------------------------------------------------
+
+interface Particle {
+  lon: number
+  lat: number
+  /** ردّ ذره — آخرین نقاط مسیر برای رسم خط کوتاه. */
+  trail: [number, number][]
+  ageMs: number
+  lifetimeMs: number
+  /** سرعت محلی آخرین نمونه — برای رنگ ردّ. */
+  speedMps: number
 }
 
-/**
- * رسم پیکان رو به شمال روی ctx — کاملاً بر پایهٔ هندسهٔ کانفیگ
- * (`ARROW_CFG.geometry` + `shaftWidth`)؛ عموداً وسط بوم قرار می‌گیرد تا
- * لنگرِ center نماد درست باشد.
- */
-function drawArrow(ctx: CanvasRenderingContext2D, size: number, color: [number, number, number]): void {
-  const [r, g, b] = color
-  const cx = size / 2
-  const geo = ARROW_CFG.geometry
-  const span = (geo.baseY - geo.tipY) * size
-  const top = (size - span) / 2
-  const tipY = top
-  const headBaseY = top + (geo.headBaseY - geo.tipY) * size
-  const shaftTopY = top + (geo.shaftTopY - geo.tipY) * size
-  const baseY = top + (geo.baseY - geo.tipY) * size
-  const headHalf = geo.headHalfWidth * size
-  const shaftHalf = ARROW_CFG.shaftWidth / 2
-  // ساقهٔ ضخیم: مستطیل دقیق (بدون خطای lineCap در طول)
-  ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.98)`
-  ctx.fillRect(cx - shaftHalf, shaftTopY, shaftHalf * 2, baseY - shaftTopY)
-  // سرِ پیکان: مثلث توپر
-  ctx.beginPath()
-  ctx.moveTo(cx, tipY)
-  ctx.lineTo(cx - headHalf, headBaseY)
-  ctx.lineTo(cx + headHalf, headBaseY)
-  ctx.closePath()
-  ctx.fill()
+interface FlowState {
+  map: MapLibreMap
+  field: WindField
+  particles: Particle[]
+  timer: ReturnType<typeof setInterval>
+  lastTick: number
+  prng: () => number
 }
 
-let speedSpritesCache: Record<string, ImageData> | null = null
-let layerSpritesCache: Record<string, ImageData> | null = null
+let flow: FlowState | null = null
 
-/** اسپرایت‌های پیکان به رنگ سطل‌های رمپ سرعت — یک‌بار ساخته و کش می‌شود. */
-function buildSpeedArrowSprites(): Record<string, ImageData> {
-  if (speedSpritesCache) return speedSpritesCache
-  const size = ARROW_CFG.spriteSize
-  const sprites: Record<string, ImageData> = {}
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return sprites
-  for (const [index, stop] of WIND_SPEED_STOPS.entries()) {
-    ctx.clearRect(0, 0, size, size)
-    drawArrow(ctx, size, stop.color)
-    sprites[`${ARROW_IMAGE_PREFIX}${index}`] = ctx.getImageData(0, 0, size, size)
-  }
-  speedSpritesCache = sprites
-  return sprites
-}
-
-/** اسپرایت‌های پیکان به رنگ لایه‌های ارتفاعی (پالت صحنهٔ مسیریابی). */
-function buildLayerArrowSprites(): Record<string, ImageData> {
-  if (layerSpritesCache) return layerSpritesCache
-  const size = ARROW_CFG.spriteSize
-  const sprites: Record<string, ImageData> = {}
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return sprites
-  for (const [index, color] of LAYER_COLORS.entries()) {
-    ctx.clearRect(0, 0, size, size)
-    drawArrow(ctx, size, color)
-    sprites[`${LAYER_IMAGE_PREFIX}${index}`] = ctx.getImageData(0, 0, size, size)
-  }
-  layerSpritesCache = sprites
-  return sprites
-}
-
-/** ثبت اسپرایت‌ها روی نقشه — بازگشت‌پذیر؛ هر کدام فقط اگر نبود اضافه می‌شود. */
-function ensureArrowSprites(map: MapLibreMap): void {
-  for (const [name, image] of Object.entries(buildSpeedArrowSprites())) {
-    if (!map.hasImage(name)) {
-      map.addImage(name, image, { pixelRatio: 2 })
-    }
-  }
-  for (const [name, image] of Object.entries(buildLayerArrowSprites())) {
-    if (!map.hasImage(name)) {
-      map.addImage(name, image, { pixelRatio: 2 })
-    }
+/** PRNG قطعی (mulberry32) — همان seed همیشه همان جریان را می‌سازد. */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0
+  return () => {
+    a |= 0
+    a = (a + 0x6d2b79f5) | 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
 }
 
-/** سطل رنگ نسبی یک سرعت روی بازهٔ خود میدان (اندیس رمپ ۰ تا ۴). */
-function relativeBucket(speed: number, range: [number, number]): number {
-  const [min, max] = range
-  const t = Math.min(Math.max((speed - min) / Math.max(max - min, 1e-6), 0), 1)
-  return Math.min(Math.floor(t * WIND_SPEED_STOPS.length), WIND_SPEED_STOPS.length - 1)
+function fieldBbox(
+  field: WindField,
+): { lonMin: number; latMin: number; lonMax: number; latMax: number } {
+  const meta = gridMeta(field)
+  return {
+    lonMin: meta.lons[0],
+    latMin: meta.lats[0],
+    lonMax: meta.lons[meta.lons.length - 1],
+    latMax: meta.lats[meta.lats.length - 1],
+  }
 }
 
-interface ArrowGeoJsonOptions {
-  phase: number
-  stride: number
-  /** آیکون هر پیکان بر اساس سرعت — سطل سرعت یا رنگ لایه. */
-  iconFor: (speed: number) => string
+function respawnParticle(p: Particle, prng: () => number, field: WindField): void {
+  const bbox = fieldBbox(field)
+  p.lon = bbox.lonMin + prng() * (bbox.lonMax - bbox.lonMin)
+  p.lat = bbox.latMin + prng() * (bbox.latMax - bbox.latMin)
+  p.ageMs = 0
+  p.lifetimeMs = WIND_PARTICLE_CONFIG.lifetimeMs * (0.5 + prng() * 0.5)
+  p.trail = [[p.lon, p.lat]]
 }
 
-/**
- * GeoJSON پیکان‌ها (نقطه + جهت + شفافیت) در فاز `phase` از چرخهٔ انیمیشن:
- * همهٔ پیکان‌ها **همزمان** حرکت می‌کنند، محو می‌شوند و از نو شروع می‌کنند
- * (بدون اختلاف فاز — بازخورد: انیمیشن نباید تصادفی باشد).
- */
-export function arrowChevronsGeoJson(field: WindField, opts: ArrowGeoJsonOptions) {
-  const arrows = arrowFeatures(field, opts.stride)
-  const features = arrows.map((a) => {
-    const t = opts.phase
-    // حرکت کوتاه در راستای جریان (جهت هواشناسی + ۱۸۰)
-    const heading = (a.direction_deg + 180) * (Math.PI / 180)
-    const dx = Math.sin(heading)
-    const dy = Math.cos(heading)
-    const travelLat = kmToDegLat(ARROW_CFG.travelKm) * t
-    const travelLon = kmToDegLon(ARROW_CFG.travelKm, a.lat) * t
-    // محو: ورود سریع، خروج نرم — «بروز» ناگهانی ندارد
-    const opacity = Math.min(1, t * 5) * (1 - t)
-    return {
+/** رنگ نسبی به‌صورت expression رنگی maplibre (بازهٔ خود میدان). */
+function particleColorExpression(field: WindField): unknown[] {
+  const [min, max] = fieldSpeedRange(field)
+  const stops: unknown[] = ['interpolate', ['linear'], ['get', 'speed']]
+  for (const stop of WIND_PARTICLE_RAMP) {
+    const value = min + (max - min) * stop.t
+    stops.push(Number(value.toFixed(2)), stop.color)
+  }
+  return stops
+}
+
+const WIND_PARTICLE_RAMP: ReadonlyArray<{ t: number; color: string }> = [
+  { t: 0, color: 'rgb(37, 99, 235)' },
+  { t: 0.25, color: 'rgb(34, 197, 94)' },
+  { t: 0.5, color: 'rgb(234, 179, 8)' },
+  { t: 0.75, color: 'rgb(249, 115, 22)' },
+  { t: 1, color: 'rgb(239, 68, 68)' },
+]
+
+function particleGeoJson(particles: Particle[]) {
+  return {
+    type: 'FeatureCollection' as const,
+    features: particles.map((p) => ({
       type: 'Feature' as const,
-      properties: {
-        speed: a.speed_mps,
-        heading: Number((a.direction_deg + 180).toFixed(1)),
-        icon: opts.iconFor(a.speed_mps),
-        fillOpacity: Number(opacity.toFixed(3)),
-      },
-      geometry: {
-        type: 'Point' as const,
-        coordinates: [a.lon + dx * travelLon, a.lat + dy * travelLat],
-      },
-    }
-  })
-  return { type: 'FeatureCollection' as const, features }
+      properties: { speed: p.speedMps },
+      geometry: { type: 'LineString' as const, coordinates: p.trail },
+    })),
+  }
 }
 
-/**
- * نمایش/پنهان‌سازی گروهی باد (نقشهٔ رنگی + همهٔ لایه‌های پیکان) — برای
- * کلیدهای تنظیمات «نمای نقشه».
- */
+function tickFlow(): void {
+  if (!flow) return
+  const { map, field, particles } = flow
+  try {
+    const src = map.getSource(PARTICLE_SOURCE) as GeoJSONSource | undefined
+    if (!src || !map.getSource(FIELD_SOURCE)) {
+      stopParticleFlow()
+      return
+    }
+    const now = performance.now()
+    const dtMs = Math.min(now - flow.lastTick, 120)
+    flow.lastTick = now
+    const dtSec = dtMs / 1000
+    const bbox = fieldBbox(field)
+
+    for (const p of particles) {
+      const sample = sampleWindAtPoint(field, p.lat, p.lon)
+      const heading = (sample.direction_deg + 180) * (Math.PI / 180)
+      // حرکت نمایشی: هر m/s باد → چند صدم درجه در ثانیه (از کانفیگ)
+      const dist = sample.speed_mps * WIND_PARTICLE_CONFIG.degPerSecPerMps * dtSec
+      p.lon += Math.sin(heading) * dist
+      p.lat += Math.cos(heading) * dist
+      p.ageMs += dtMs
+      p.speedMps = sample.speed_mps
+      const outOfField =
+        p.lon < bbox.lonMin ||
+        p.lon > bbox.lonMax ||
+        p.lat < bbox.latMin ||
+        p.lat > bbox.latMax
+      if (outOfField || p.ageMs > p.lifetimeMs) {
+        respawnParticle(p, flow.prng, field)
+      } else {
+        p.trail.push([p.lon, p.lat])
+        while (p.trail.length > WIND_PARTICLE_CONFIG.trailPoints) p.trail.shift()
+      }
+    }
+    src.setData(particleGeoJson(particles))
+  } catch {
+    // نقشه حذف شده یا استایل عوض شده — جریان چیزی برای رسم ندارد
+    stopParticleFlow()
+  }
+}
+
+function startParticleFlow(map: MapLibreMap, field: WindField): void {
+  if (flow && flow.map === map) {
+    flow.field = field
+    return
+  }
+  stopParticleFlow()
+  const prng = mulberry32(WIND_PARTICLE_CONFIG.seed)
+  const particles: Particle[] = []
+  for (let i = 0; i < WIND_PARTICLE_CONFIG.count; i += 1) {
+    const p: Particle = {
+      lon: 0,
+      lat: 0,
+      trail: [],
+      ageMs: 0,
+      lifetimeMs: WIND_PARTICLE_CONFIG.lifetimeMs,
+      speedMps: 0,
+    }
+    respawnParticle(p, prng, field)
+    // عمر اولیهٔ تصادفی تا ذرات همزمان نپرند
+    p.ageMs = prng() * p.lifetimeMs
+    particles.push(p)
+  }
+  flow = {
+    map,
+    field,
+    particles,
+    timer: setInterval(tickFlow, WIND_PARTICLE_CONFIG.tickMs),
+    lastTick: performance.now(),
+    prng,
+  }
+  tickFlow()
+}
+
+export function stopParticleFlow(): void {
+  if (flow) {
+    clearInterval(flow.timer)
+    flow = null
+  }
+}
+
+/** نمایش/پنهان‌سازی گروهی باد (نقشهٔ رنگی + ذرات جریان) — کلیدهای تنظیمات. */
 export function setWindOverlaysVisible(
   map: MapLibreMap,
   visible: { heatmap: boolean; arrows: boolean },
@@ -248,123 +271,17 @@ export function setWindOverlaysVisible(
   if (map.getLayer(FIELD_LAYER)) {
     map.setLayoutProperty(FIELD_LAYER, 'visibility', visible.heatmap ? 'visible' : 'none')
   }
-  for (const altitude of WIND_ALTITUDES) {
-    const layerId = `${ARROW_LAYER_PREFIX}${altitude}`
-    if (map.getLayer(layerId)) {
-      map.setLayoutProperty(layerId, 'visibility', visible.arrows ? 'visible' : 'none')
-    }
+  if (map.getLayer(PARTICLE_LAYER)) {
+    map.setLayoutProperty(PARTICLE_LAYER, 'visibility', visible.arrows ? 'visible' : 'none')
   }
-  if (!visible.heatmap && !visible.arrows) stopArrowAnimation()
-}
-
-// --- انیمیشن پیکان‌ها (حرکت کوتاه + محو + شروع دوباره) ---
-// با requestAnimationFrame و سقف ~۳۰ فریم بر ثانیه — به‌روزرسانی چند صد فیچر
-// GeoJSON در هر تیک سبک است، ولی لازم نیست ۶۰ بار در ثانیه انجام شود.
-interface ArrowAnimState {
-  map: MapLibreMap
-  fields: WindField[]
-  /** رنگ لایه‌ای فقط در حالت چندلایه (۳بعدی) استفاده می‌شود. */
-  multiLayer: boolean
-  raf: number
-  phase: number
-  lastTick: number
-  lastDraw: number
-}
-
-let arrowAnim: ArrowAnimState | null = null
-
-function drawArrows() {
-  if (!arrowAnim) return
-  const { map, fields, multiLayer, phase } = arrowAnim
-  try {
-    let drewAny = false
-    fields.forEach((field, index) => {
-      const layerId = `${ARROW_LAYER_PREFIX}${field.altitude_m}`
-      if (!map.getLayer(layerId)) return
-      const src = map.getSource(`${ARROW_SOURCE_PREFIX}${field.altitude_m}`) as
-        | GeoJSONSource
-        | undefined
-      if (!src) return
-      src.setData(
-        arrowChevronsGeoJson(field, {
-          phase,
-          stride: multiLayer ? ARROW_CFG.strideMultiLayer : ARROW_CFG.stride,
-          iconFor: multiLayer
-            ? () => `${LAYER_IMAGE_PREFIX}${index % LAYER_COLORS.length}`
-            : (speed) => `${ARROW_IMAGE_PREFIX}${relativeBucket(speed, fieldSpeedRange(field))}`,
-        }),
-      )
-      drewAny = true
-    })
-    if (!drewAny) stopArrowAnimation()
-  } catch {
-    // نقشه حذف شده یا استایل عوض شده — انیمیشن چیزی برای کشیدن ندارد
-    stopArrowAnimation()
-  }
-}
-
-function tickArrows(now: number) {
-  if (!arrowAnim) return
-  const dt = arrowAnim.lastTick === 0 ? 0 : now - arrowAnim.lastTick
-  arrowAnim.lastTick = now
-  arrowAnim.phase = (arrowAnim.phase + dt / ARROW_CFG.cycleMs) % 1
-  // سقف ~۳۰ به‌روزرسانی در ثانیه — روان است و منابع را هدر نمی‌دهد
-  if (now - arrowAnim.lastDraw >= 33) {
-    arrowAnim.lastDraw = now
-    drawArrows()
-  }
-  arrowAnim.raf = requestAnimationFrame(tickArrows)
-}
-
-function startArrowAnimation(map: MapLibreMap, fields: WindField[], multiLayer: boolean) {
-  if (arrowAnim) {
-    if (arrowAnim.map === map) {
-      arrowAnim.fields = fields
-      arrowAnim.multiLayer = multiLayer
-      return
-    }
-    stopArrowAnimation()
-  }
-  arrowAnim = { map, fields, multiLayer, raf: 0, phase: 0, lastTick: 0, lastDraw: 0 }
-  arrowAnim.raf = requestAnimationFrame(tickArrows)
-}
-
-export function stopArrowAnimation() {
-  if (arrowAnim) {
-    cancelAnimationFrame(arrowAnim.raf)
-    arrowAnim = null
-  }
-}
-
-/** به‌روزرسانی تصویر نرم میدان فعال (اولین لایهٔ نمایان) — منبع در استایل است. */
-function updateFieldImage(map: MapLibreMap, field: WindField): void {
-  const meta = gridMeta(field)
-  const latMax = meta.lats[meta.lats.length - 1]
-  const latMin = meta.lats[0]
-  const lonMin = meta.lons[0]
-  const lonMax = meta.lons[meta.lons.length - 1]
-  const payload = {
-    url: buildFieldImage(field),
-    coordinates: [
-      [lonMin, latMax],
-      [lonMax, latMax],
-      [lonMax, latMin],
-      [lonMin, latMin],
-    ] as [[number, number], [number, number], [number, number], [number, number]],
-  }
-  const imageSource = map.getSource(FIELD_SOURCE) as ImageSource | undefined
-  if (!imageSource) return
-  // مهم: `updateImage` فقط url را عوض می‌کند و مختصات جای‌نگهدار استایل
-  // باقی می‌ماند (تصویر در جای اشتباه نقش می‌بست) — مختصات را صریح ست می‌کنیم.
-  imageSource.setCoordinates(payload.coordinates)
-  imageSource.updateImage({ url: payload.url })
+  if (!visible.heatmap && !visible.arrows) stopParticleFlow()
 }
 
 /**
- * اعمال میدان‌های نمایان — تک‌لایه در ۲بعدی (رنگ سطل سرعت) و همهٔ لایه‌ها
- * با رنگ لایه در ۳بعدی (مثل صحنهٔ مسیریابی). هیچ لایه‌ای add نمی‌شود —
- * لایه‌ها از ابتدا در استایل‌اند و این‌جا فقط داده و دید هرکدام تنظیم
- * می‌شود؛ روی خطا با تایمر دوباره تلاش می‌شود.
+ * اعمال میدان‌های نمایان — نقشهٔ رنگی روی لایهٔ فعال و جریان ذرات روی
+ * همان میدان؛ رنگ ذرات نسبت به بازهٔ میدان تنظیم می‌شود. هیچ لایه‌ای
+ * add نمی‌شود — لایه‌ها از ابتدا در استایل‌اند و این‌جا فقط داده و دید
+ * هرکدام تنظیم می‌شود؛ روی خطا با تایمر دوباره تلاش می‌شود.
  */
 export function applyWindFields(
   map: MapLibreMap,
@@ -378,53 +295,33 @@ export function applyWindFields(
 ): void {
   const attempt = opts.attempt ?? 0
   try {
-    ensureArrowSprites(map)
     const ordered = [...fields].sort((a, b) => a.altitude_m - b.altitude_m)
-    if (ordered.length > 0 && opts.showHeatmap) {
-      updateFieldImage(map, ordered[0])
+    const active = ordered[0]
+    if (active && opts.showHeatmap) {
+      updateFieldImage(map, active)
     }
-    // نقشهٔ رنگی: فقط لایهٔ فعال (اولین نمایان) — در هر دو حالت
     if (map.getLayer(FIELD_LAYER)) {
-      const heatmapVisible = ordered.length > 0 && opts.showHeatmap
+      const heatmapVisible = Boolean(active) && opts.showHeatmap
       map.setLayoutProperty(FIELD_LAYER, 'visibility', heatmapVisible ? 'visible' : 'none')
     }
-    // پیکان‌ها: ۲بعدی = فقط لایهٔ فعال؛ ۳بعدی = همهٔ لایه‌های نمایان.
-    for (const altitude of WIND_ALTITUDES) {
-      const layerId = `${ARROW_LAYER_PREFIX}${altitude}`
-      if (!map.getLayer(layerId)) continue
-      const field = ordered.find((f) => f.altitude_m === altitude)
-      const visible = Boolean(
-        field && opts.showArrows && (opts.multiLayer || field.altitude_m === ordered[0]?.altitude_m),
-      )
-      map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none')
-      if (field) {
-        // رنگ لایه‌ای بر اساس جایگاه در فهرست نمایان‌ها — هماهنگ با drawArrows
-        const layerIdx = ordered.findIndex((f) => f.altitude_m === altitude)
-        const src = map.getSource(`${ARROW_SOURCE_PREFIX}${altitude}`) as GeoJSONSource
-        src.setData(
-          arrowChevronsGeoJson(field, {
-            phase: arrowAnim?.phase ?? 0,
-            stride: opts.multiLayer ? ARROW_CFG.strideMultiLayer : ARROW_CFG.stride,
-            iconFor: opts.multiLayer
-              ? () => `${LAYER_IMAGE_PREFIX}${layerIdx % LAYER_COLORS.length}`
-              : (speed) => `${ARROW_IMAGE_PREFIX}${relativeBucket(speed, fieldSpeedRange(field))}`,
-          }),
-        )
+    // ذرات جریان: روی میدان فعال، رنگ نسبت به بازهٔ خود میدان
+    if (map.getLayer(PARTICLE_LAYER)) {
+      const particlesVisible = Boolean(active) && opts.showArrows
+      map.setLayoutProperty(PARTICLE_LAYER, 'visibility', particlesVisible ? 'visible' : 'none')
+      if (active) {
+        map.setPaintProperty(PARTICLE_LAYER, 'line-color', particleColorExpression(active) as never)
       }
     }
-    if (ordered.length > 0 && opts.showArrows) {
-      startArrowAnimation(map, ordered, opts.multiLayer)
+    if (active && opts.showArrows) {
+      startParticleFlow(map, active)
     } else {
-      stopArrowAnimation()
+      stopParticleFlow()
     }
     // یک رندر صریح — تضمین دیده‌شدن فوری داده‌های تازه
     map.triggerRepaint()
   } catch {
     if (attempt < 100) {
-      setTimeout(
-        () => applyWindFields(map, fields, { ...opts, attempt: attempt + 1 }),
-        150,
-      )
+      setTimeout(() => applyWindFields(map, fields, { ...opts, attempt: attempt + 1 }), 150)
     }
   }
 }
