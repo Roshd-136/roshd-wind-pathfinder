@@ -205,13 +205,13 @@ interface ArrowGeoJsonOptions {
 
 /**
  * GeoJSON پیکان‌ها (نقطه + جهت + شفافیت) در فاز `phase` از چرخهٔ انیمیشن:
- * هر پیکان با اختلاف فاز خودش کمی جلو می‌رود، محو می‌شود و از نو شروع
- * می‌کند — «حرکت کوچک + سایه + تکرار» تا جهت جریان دقیقاً دیده شود.
+ * همهٔ پیکان‌ها **همزمان** حرکت می‌کنند، محو می‌شوند و از نو شروع می‌کنند
+ * (بدون اختلاف فاز — بازخورد: انیمیشن نباید تصادفی باشد).
  */
 export function arrowChevronsGeoJson(field: WindField, opts: ArrowGeoJsonOptions) {
   const arrows = arrowFeatures(field, opts.stride)
-  const features = arrows.map((a, i) => {
-    const t = (opts.phase + ((i % 7) * 0.13 + Math.floor(i / 7) * 0.29)) % 1
+  const features = arrows.map((a) => {
+    const t = opts.phase
     // حرکت کوتاه در راستای جریان (جهت هواشناسی + ۱۸۰)
     const heading = (a.direction_deg + 180) * (Math.PI / 180)
     const dx = Math.sin(heading)

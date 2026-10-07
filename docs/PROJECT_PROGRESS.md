@@ -1398,3 +1398,12 @@ src/pathfinding/routing.py     86    3   30    6   92%
   (baseY ۰٫۲۴ → ۰٫۲۹) — هر دو در `config/mapDisplay.ts`.
 - **شواهد:** ۳۸/۳۸ تست + lint/typecheck/build موفق؛ تأیید بصری زنده.
 - **PR:** [#24](https://github.com/Roshd-136/roshd-wind-pathfinder/pull/24)
+
+## Task: «همزمان‌سازی انیمیشن فلش‌ها» — گام ۲۷
+
+- **تسک:** همان 86bc860cq.
+- **علت تصادفی‌بودن:** هر فلش آفست فاز تصادفی‌نما داشت
+  (`(i%7)*0.13 + floor(i/7)*0.29`). حذف شد — همهٔ فلش‌ها با `phase` مشترک
+  همزمان حرکت و محو می‌شوند (دو فریم تأیید).
+- **شواهد:** ۳۸/۳۸ تست + lint/typecheck/build موفق.
+- **PR:** [#24](https://github.com/Roshd-136/roshd-wind-pathfinder/pull/24)
