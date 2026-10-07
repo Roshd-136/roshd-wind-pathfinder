@@ -1368,3 +1368,11 @@ src/pathfinding/routing.py     86    3   30    6   92%
   شد: بسته شد و هیچ نقطه‌ای ثبت نشد.
 - **شواهد:** ۳۸/۳۸ تست + lint/typecheck/build موفق.
 - **PR:** [#24](https://github.com/Roshd-136/roshd-wind-pathfinder/pull/24)
+
+## Task: «دُم نصف‌شدهٔ فلش» — گام ۲۴
+
+- **تسک:** همان 86bc860cq.
+- **دُم فلش نصف شد:** baseY ۰٫۳۳۲۵ → ۰٫۲۴ (سر و ضخامت دست‌نخورده) در
+  `config/mapDisplay.ts`.
+- **شواهد:** ۳۸/۳۸ تست + lint/typecheck/build موفق؛ تأیید بصری زنده.
+- **PR:** [#24](https://github.com/Roshd-136/roshd-wind-pathfinder/pull/24)
