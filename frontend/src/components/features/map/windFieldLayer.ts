@@ -105,24 +105,31 @@ function kmToDegLon(km: number, lat: number): number {
   return km / (111.32 * Math.max(Math.cos((lat * Math.PI) / 180), 0.2))
 }
 
-/** رسم یک پیکان باریک رو به شمال روی ctx — ساقهٔ نازک + سرِ کوچک. */
+/**
+ * رسم پیکان رو به شمال روی ctx — کاملاً بر پایهٔ هندسهٔ کانفیگ
+ * (`ARROW_CFG.geometry` + `shaftWidth`)؛ عموداً وسط بوم قرار می‌گیرد تا
+ * لنگرِ center نماد درست باشد.
+ */
 function drawArrow(ctx: CanvasRenderingContext2D, size: number, color: [number, number, number]): void {
   const [r, g, b] = color
   const cx = size / 2
-  // ساقه: از پایین بوم تا نزدیک نوک — باریک ولی پررنگ
-  ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.95)`
-  ctx.lineWidth = 3.5
-  ctx.lineCap = 'round'
+  const geo = ARROW_CFG.geometry
+  const span = (geo.baseY - geo.tipY) * size
+  const top = (size - span) / 2
+  const tipY = top
+  const headBaseY = top + (geo.headBaseY - geo.tipY) * size
+  const shaftTopY = top + (geo.shaftTopY - geo.tipY) * size
+  const baseY = top + (geo.baseY - geo.tipY) * size
+  const headHalf = geo.headHalfWidth * size
+  const shaftHalf = ARROW_CFG.shaftWidth / 2
+  // ساقهٔ ضخیم: مستطیل دقیق (بدون خطای lineCap در طول)
+  ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.98)`
+  ctx.fillRect(cx - shaftHalf, shaftTopY, shaftHalf * 2, baseY - shaftTopY)
+  // سرِ پیکان: مثلث توپر
   ctx.beginPath()
-  ctx.moveTo(cx, size - 6)
-  ctx.lineTo(cx, 11)
-  ctx.stroke()
-  // سرِ پیکان: مثلث توپر روی نوک
-  ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.95)`
-  ctx.beginPath()
-  ctx.moveTo(cx, 2)
-  ctx.lineTo(cx - 7, 14)
-  ctx.lineTo(cx + 7, 14)
+  ctx.moveTo(cx, tipY)
+  ctx.lineTo(cx - headHalf, headBaseY)
+  ctx.lineTo(cx + headHalf, headBaseY)
   ctx.closePath()
   ctx.fill()
 }

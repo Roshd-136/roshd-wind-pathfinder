@@ -1376,3 +1376,17 @@ src/pathfinding/routing.py     86    3   30    6   92%
   `config/mapDisplay.ts`.
 - **شواهد:** ۳۸/۳۸ تست + lint/typecheck/build موفق؛ تأیید بصری زنده.
 - **PR:** [#24](https://github.com/Roshd-136/roshd-wind-pathfinder/pull/24)
+
+## Task: «اعمال واقعی هندسهٔ کانفیگ روی اسپرایت پیکان» — گام ۲۵
+
+- **تسک:** همان 86bc860cq.
+- **ریشهٔ «دُم هنوز نصف نشده»:**
+
+  `drawArrow` مختصات پیکسلی ثابت داشت (۳٫۵px ساقه، `size−۶` دُم) و
+  `ARROW_CFG.geometry` را کلاً نادیده می‌گرفت — تغییر baseY بی‌اثر بود.
+- **رفع:** بازنویسی `drawArrow` بر پایهٔ نسبت‌های کانفیگ (tipY/headBaseY/
+  shaftTopY/baseY/headHalfWidth) + ضخامت از `shaftWidth` + وسط‌چین عمودی
+  اسپرایت برای لنگر center.
+- **نتیجه:** دُم اکنون واقعاً نصف (baseY ۰٫۲۴)؛ سر و ضخامت از کانفیگ.
+- **شواهد:** ۳۸/۳۸ تست + lint/typecheck/build موفق.
+- **PR:** [#24](https://github.com/Roshd-136/roshd-wind-pathfinder/pull/24)
