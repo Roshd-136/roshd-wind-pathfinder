@@ -3,7 +3,8 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEffect, useRef } from 'react'
 import type { Coordinate, WindField } from '../../../types/routing'
 import type { ViewportSettings } from '../../../store/useUiStore'
-import { applyWindFields, setWindOverlaysVisible } from './windFieldLayer'
+import { WIND_PARTICLE_CONFIG } from '../../../config/mapDisplay'
+import { applyWindFields, setWindOverlaysVisible, stopParticleFlow } from './windFieldLayer'
 
 interface MapViewProps {
   mode: '2d' | '3d'
@@ -87,6 +88,7 @@ function baseStyle(): maplibregl.StyleSpecification {
         ],
       },
       'wind-particles': { type: 'geojson' as const, data: EMPTY_FC },
+      'wind-particle-tips': { type: 'geojson' as const, data: EMPTY_FC },
       'route-line': { type: 'geojson', data: EMPTY_LINE },
       'route-dots': { type: 'geojson', data: EMPTY_FC },
     },
@@ -115,7 +117,24 @@ function baseStyle(): maplibregl.StyleSpecification {
         type: 'line',
         source: 'wind-particles',
         layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#38bdf8', 'line-width': 2.4, 'line-opacity': 0.85 },
+        paint: {
+          'line-color': '#38bdf8',
+          'line-width': WIND_PARTICLE_CONFIG.trailWidth,
+          'line-opacity': 0.85,
+        },
+      },
+      {
+        id: 'wind-particle-tips-layer',
+        type: 'symbol',
+        source: 'wind-particle-tips',
+        layout: {
+          visibility: 'none',
+          'icon-image': ['concat', 'wind-particle-tip-', ['to-string', ['get', 'bucket']]],
+          'icon-rotate': ['get', 'heading'],
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+        },
+        paint: { 'icon-opacity': 0.95 },
       },
       {
         id: ROUTE_LAYER_ID,
@@ -224,6 +243,7 @@ export function MapView({
 
     mapRef.current = map
     return () => {
+      stopParticleFlow()
       map.remove()
       mapRef.current = null
     }

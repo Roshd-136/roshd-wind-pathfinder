@@ -18,7 +18,8 @@ import {
  *  ۱) نقشهٔ حرارتی «نرم» — تصویر canvas با درون‌یابی دوخطی روی شبکه، رنگ
  *     نسبت به بازهٔ خود میدان (مثل صحنهٔ بصری‌سازی)،
  *  ۲) **ذرات جریان باد** (سبک windy) — ذرات ریز که پیوسته در امتداد بردار
- *     محلی باد حرکت می‌کنند و ردّ کوتاه می‌گذارند؛ رنگ نسبت به بازهٔ میدان.
+ *     محلی باد حرکت می‌کنند و ردّ کوتاه می‌گذارند؛ رنگ نسبت به بازهٔ میدان
+ *     و نوکِ تیرکِ جهت‌دار روی سرِ هر ردّ.
  *     قرارداد هواشناسی: `direction_deg` از کجا می‌وزد؛ حرکت به سمت جریان
  *     (جهت + ۱۸۰).
  */
@@ -27,6 +28,9 @@ const FIELD_SOURCE = 'wind-field-raster'
 const FIELD_LAYER = 'wind-field-layer'
 const PARTICLE_SOURCE = 'wind-particles'
 const PARTICLE_LAYER = 'wind-particles-layer'
+const PARTICLE_TIP_SOURCE = 'wind-particle-tips'
+const PARTICLE_TIP_LAYER = 'wind-particle-tips-layer'
+const PARTICLE_TIP_PREFIX = 'wind-particle-tip-'
 
 /** تصویر نرم میدان از شبکه (canvas → dataURL) — درون‌یابی دوخطی + رنگ نسبی. */
 export function buildFieldImage(field: WindField, width = 420): string {
@@ -180,12 +184,40 @@ function particleGeoJson(particles: Particle[]) {
   }
 }
 
+/** نوک فلش هر ذره — نقطهٔ سر ردّ با جهت و سطل رنگ نسبی؛ ردِّ تازه‌متولد (تک‌نقطه) نوک ندارد. */
+function particleTipsGeoJson(particles: Particle[], field: WindField) {
+  const [min, max] = fieldSpeedRange(field)
+  return {
+    type: 'FeatureCollection' as const,
+    features: particles.flatMap((p) => {
+      if (p.trail.length < 2) return []
+      const head = p.trail[p.trail.length - 1]
+      const prev = p.trail[p.trail.length - 2]
+      const heading =
+        (Math.atan2(head[0] - prev[0], head[1] - prev[1]) * 180) / Math.PI
+      const t = Math.min(Math.max((p.speedMps - min) / Math.max(max - min, 1e-6), 0), 1)
+      return [
+        {
+          type: 'Feature' as const,
+          properties: {
+            speed: p.speedMps,
+            heading: Number(heading.toFixed(1)),
+            bucket: Math.min(Math.floor(t * 5), 4),
+          },
+          geometry: { type: 'Point' as const, coordinates: head },
+        },
+      ]
+    }),
+  }
+}
+
 function tickFlow(): void {
   if (!flow) return
   const { map, field, particles } = flow
   try {
     const src = map.getSource(PARTICLE_SOURCE) as GeoJSONSource | undefined
-    if (!src || !map.getSource(FIELD_SOURCE)) {
+    const tipSrc = map.getSource(PARTICLE_TIP_SOURCE) as GeoJSONSource | undefined
+    if (!src || !tipSrc || !map.getSource(FIELD_SOURCE)) {
       stopParticleFlow()
       return
     }
@@ -217,21 +249,60 @@ function tickFlow(): void {
       }
     }
     src.setData(particleGeoJson(particles))
+    tipSrc.setData(particleTipsGeoJson(particles, field))
   } catch {
     // نقشه حذف شده یا استایل عوض شده — جریان چیزی برای رسم ندارد
     stopParticleFlow()
   }
 }
 
-function startParticleFlow(map: MapLibreMap, field: WindField): void {
+/**
+ * اسپرایت نوک فلش ذره — تیرک کوچک رو به شمال، رنگ سطل‌های رمپ نسبی.
+ * نوکِ تیز دقیقاً وسط بوم گذاشته می‌شود تا `icon-rotate` حول همان نقطهٔ
+ * سرِ ردّ بچرخد و نوک همیشه چسبیده به سرِ ذره بماند.
+ */
+function ensureParticleTipSprites(map: MapLibreMap): void {
+  const { spriteSize, halfWidth, length, notch } = WIND_PARTICLE_CONFIG.tip
+  for (let b = 0; b < 5; b += 1) {
+    const name = `${PARTICLE_TIP_PREFIX}${b}`
+    if (map.hasImage(name)) continue
+    const stop = WIND_PARTICLE_RAMP[b]
+    const match = stop.color.match(/\((\d+),\s*(\d+),\s*(\d+)\)/)
+    const r = match ? Number(match[1]) : 255
+    const g = match ? Number(match[2]) : 255
+    const bl = match ? Number(match[3]) : 255
+    const canvas = document.createElement('canvas')
+    canvas.width = spriteSize
+    canvas.height = spriteSize
+    const ctx = canvas.getContext('2d')
+    if (!ctx) continue
+    const cx = spriteSize / 2
+    const wingHalf = halfWidth * spriteSize
+    const tipLen = length * spriteSize
+    ctx.fillStyle = `rgb(${r}, ${g}, ${bl})`
+    ctx.beginPath()
+    ctx.moveTo(cx, cx)
+    ctx.lineTo(cx - wingHalf, cx + tipLen)
+    ctx.lineTo(cx, cx + tipLen * notch)
+    ctx.lineTo(cx + wingHalf, cx + tipLen)
+    ctx.closePath()
+    ctx.fill()
+    const data = ctx.getImageData(0, 0, spriteSize, spriteSize)
+    if (!map.hasImage(name)) map.addImage(name, data, { pixelRatio: 2 })
+  }
+}
+
+function startParticleFlow(map: MapLibreMap, field: WindField, count?: number): void {
   if (flow && flow.map === map) {
     flow.field = field
     return
   }
   stopParticleFlow()
+  ensureParticleTipSprites(map)
   const prng = mulberry32(WIND_PARTICLE_CONFIG.seed)
   const particles: Particle[] = []
-  for (let i = 0; i < WIND_PARTICLE_CONFIG.count; i += 1) {
+  const total = count ?? WIND_PARTICLE_CONFIG.count
+  for (let i = 0; i < total; i += 1) {
     const p: Particle = {
       lon: 0,
       lat: 0,
@@ -263,7 +334,7 @@ export function stopParticleFlow(): void {
   }
 }
 
-/** نمایش/پنهان‌سازی گروهی باد (نقشهٔ رنگی + ذرات جریان) — کلیدهای تنظیمات. */
+/** نمایش/پنهان‌سازی گروهی باد (نقشهٔ رنگی + ذرات جریان و نوک‌ها) — کلیدهای تنظیمات. */
 export function setWindOverlaysVisible(
   map: MapLibreMap,
   visible: { heatmap: boolean; arrows: boolean },
@@ -273,6 +344,9 @@ export function setWindOverlaysVisible(
   }
   if (map.getLayer(PARTICLE_LAYER)) {
     map.setLayoutProperty(PARTICLE_LAYER, 'visibility', visible.arrows ? 'visible' : 'none')
+  }
+  if (map.getLayer(PARTICLE_TIP_LAYER)) {
+    map.setLayoutProperty(PARTICLE_TIP_LAYER, 'visibility', visible.arrows ? 'visible' : 'none')
   }
   if (!visible.heatmap && !visible.arrows) stopParticleFlow()
 }
@@ -290,11 +364,13 @@ export function applyWindFields(
     multiLayer: boolean
     showHeatmap: boolean
     showArrows: boolean
+    particleCount?: number
     attempt?: number
   } = { multiLayer: false, showHeatmap: true, showArrows: true },
 ): void {
   const attempt = opts.attempt ?? 0
   try {
+    ensureParticleTipSprites(map)
     const ordered = [...fields].sort((a, b) => a.altitude_m - b.altitude_m)
     const active = ordered[0]
     if (active && opts.showHeatmap) {
@@ -304,16 +380,20 @@ export function applyWindFields(
       const heatmapVisible = Boolean(active) && opts.showHeatmap
       map.setLayoutProperty(FIELD_LAYER, 'visibility', heatmapVisible ? 'visible' : 'none')
     }
-    // ذرات جریان: روی میدان فعال، رنگ نسبت به بازهٔ خود میدان
+    // ذرات جریان: روی میدان فعال، رنگ نسبت به بازهٔ خود میدان؛ نوک‌ها هم
+    // همان کلید نمایش را دنبال می‌کنند و رنگشان از اسپرایتِ سطل‌بندی‌شده می‌آید.
     if (map.getLayer(PARTICLE_LAYER)) {
       const particlesVisible = Boolean(active) && opts.showArrows
       map.setLayoutProperty(PARTICLE_LAYER, 'visibility', particlesVisible ? 'visible' : 'none')
+      if (map.getLayer(PARTICLE_TIP_LAYER)) {
+        map.setLayoutProperty(PARTICLE_TIP_LAYER, 'visibility', particlesVisible ? 'visible' : 'none')
+      }
       if (active) {
         map.setPaintProperty(PARTICLE_LAYER, 'line-color', particleColorExpression(active) as never)
       }
     }
     if (active && opts.showArrows) {
-      startParticleFlow(map, active)
+      startParticleFlow(map, active, opts.particleCount)
     } else {
       stopParticleFlow()
     }
