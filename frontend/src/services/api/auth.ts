@@ -17,12 +17,12 @@ export interface User {
 
 /** POST /auth/register */
 export function register(input: { email: string; password: string; name: string }): Promise<User> {
-  return apiFetch<User>('/auth/register', { method: 'POST', body: input })
+  return apiFetch<User>('/v1/auth/register', { method: 'POST', body: input })
 }
 
 /** POST /auth/login */
 export async function login(input: { email: string; password: string }): Promise<AuthTokens> {
-  const tokens = await apiFetch<AuthTokens>('/auth/login', { method: 'POST', body: input })
+  const tokens = await apiFetch<AuthTokens>('/v1/auth/login', { method: 'POST', body: input })
   setAccessToken(tokens.access_token)
   setRefreshToken(tokens.refresh_token)
   return tokens
@@ -49,7 +49,7 @@ export function verifyEmail(token: string): Promise<void> {
 /** POST /auth/logout — ابطال refresh token ذخیره‌شده (اگر باشد). */
 export async function logout(): Promise<void> {
   const refresh_token = localStorage.getItem('windpath-refresh-token')
-  await apiFetch<void>('/auth/logout', {
+  await apiFetch<void>('/v1/auth/logout', {
     method: 'POST',
     body: refresh_token ? { refresh_token } : undefined,
   })

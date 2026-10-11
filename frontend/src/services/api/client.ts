@@ -51,7 +51,7 @@ async function tryRefresh(): Promise<boolean> {
   if (!stored) return false
   refreshing ??= (async () => {
     try {
-      const res = await fetch(`${BASE_URL}/auth/refresh`, {
+      const res = await fetch(`${BASE_URL}/v1/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: stored }),

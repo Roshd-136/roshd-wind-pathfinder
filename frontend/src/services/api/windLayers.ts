@@ -17,7 +17,7 @@ async function devFallback<T>(path: string, mockFile: string): Promise<T> {
 /** GET /wind-layers */
 export async function listWindLayers(): Promise<WindLayerMeta[]> {
   try {
-    return await apiFetch<WindLayerMeta[]>('/wind-layers')
+    return await apiFetch<WindLayerMeta[]>('/v1/wind-layers')
   } catch {
     return devFallback('/wind-layers', '/mock/wind-layers.json')
   }
@@ -28,13 +28,13 @@ export async function getWindAtPointAllLayers(
   lat: number,
   lon: number,
 ): Promise<WindPointSample[]> {
-  return apiFetch<WindPointSample[]>(`/wind-layers/point-all?lat=${lat}&lon=${lon}`)
+  return apiFetch<WindPointSample[]>(`/v1/wind-layers/point-all?lat=${lat}&lon=${lon}`)
 }
 
 /** GET /wind-layers/{altitudeM}/field — میدان برداری باد یک لایه. */
 export async function getWindField(altitudeM: number): Promise<WindField> {
   try {
-    return await apiFetch<WindField>(`/wind-layers/${altitudeM}/field`)
+    return await apiFetch<WindField>(`/v1/wind-layers/${altitudeM}/field`)
   } catch {
     return devFallback(`/wind-layers/${altitudeM}/field`, `/mock/wind-field-${altitudeM}.json`)
   }

@@ -15,22 +15,28 @@ export interface RouteHistoryPage {
   next_cursor: string | null
 }
 
-/** GET /me */
+/**
+ * همهٔ مسیرها با پیشوند `/v1` — روتر بک‌اند `account` با
+ * `prefix="/account"` تعریف و در `api/main.py` با `prefix="/v1"` مانت می‌شود
+ * (`/v1/account`)؛ مسیرهای `/me...` در سرور وجود ندارند.
+ */
+
+/** GET /v1/account — پروفایل کاربر جاری. */
 export function getMe(): Promise<User> {
-  return apiFetch<User>('/me')
+  return apiFetch<User>('/v1/account')
 }
 
-/** GET /me/preferences */
+/** GET /v1/account/preferences */
 export function getPreferences(): Promise<Preferences> {
-  return apiFetch<Preferences>('/me/preferences')
+  return apiFetch<Preferences>('/v1/account/preferences')
 }
 
-/** PUT /me/preferences */
+/** PUT /v1/account/preferences */
 export function updatePreferences(preferences: Preferences): Promise<Preferences> {
-  return apiFetch<Preferences>('/me/preferences', { method: 'PUT', body: preferences })
+  return apiFetch<Preferences>('/v1/account/preferences', { method: 'PUT', body: preferences })
 }
 
-/** GET /me/routes */
+/** GET /v1/account/history */
 export function getRouteHistory(): Promise<RouteHistoryPage> {
-  return apiFetch<RouteHistoryPage>('/me/routes')
+  return apiFetch<RouteHistoryPage>('/v1/account/history')
 }
