@@ -1445,4 +1445,4 @@ src/pathfinding/routing.py     86    3   30    6   92%
 - **شواهد:** ۱۹۹/۱۹۹ تست + `ruff check .`؛ `|p0-origin| = 0`، انتها دقیقاً
   مقصد، باند `[1500,2200]` → `altitudes_used = [2200]`.
 - **مستند:** [`docs/task_api_terrain_band_routing.md`](task_api_terrain_band_routing.md)
-- **PR:** در حال ساخت (لینک تسک کلیک‌آپ در پیام کاربر نبود)
+- **PR:** [#25](https://github.com/Roshd-136/roshd-wind-pathfinder/pull/25)

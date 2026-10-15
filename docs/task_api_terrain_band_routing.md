@@ -98,3 +98,7 @@
 - باند سطح `[0, 1500]` از مبدأ کوهستانی ۱۹۷۲ متری واقعاً غیرقابل‌پرواز است؛
   خطای صریح فارسی برگردانده می‌شود.
 - `pytest` → **۱۹۹ passed**؛ `ruff check .` → **All checks passed**.
+
+## PR
+
+[#25](https://github.com/Roshd-136/roshd-wind-pathfinder/pull/25)
