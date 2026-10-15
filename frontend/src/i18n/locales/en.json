@@ -1,0 +1,155 @@
+{
+  "app": {
+    "name": "WindPath"
+  },
+  "nav": {
+    "menu": "Menu",
+    "map": "Map",
+    "settings": "Settings",
+    "about": "About",
+    "profile": "Profile"
+  },
+  "map": {
+    "title": "Path Finding",
+    "subtitle": "Wind-aware route planning",
+    "toggle2d": "2D",
+    "toggle3d": "3D",
+    "selectHint": "Select start and end points",
+    "selectOrigin": "Step 1 of 2 — pick the start point on the map",
+    "selectDestination": "Step 2 of 2 — pick the destination on the map",
+    "clear": "Clear",
+    "tokenMissing": "Error: {{code}} is not set — the map cannot load."
+  },
+  "routing": {
+    "algorithm": "Algorithm",
+    "algorithmDefault": "default",
+    "algorithmFallback": "fallback",
+    "windLayerFilter": "Wind Layer Filter",
+    "layerSurface": "Surface (0-50m)",
+    "layerMid": "Mid (50-200m)",
+    "layerHigh": "High (200-500m)",
+    "constraints": "Constraints",
+    "maxWindSpeed": "Max wind speed (m/s)",
+    "calculatePath": "Calculate Path",
+    "advancedFilters": "Advanced Filters",
+    "minAltitude": "Min altitude",
+    "maxAltitude": "Max altitude",
+    "criterion": "Optimization criterion",
+    "criterionTime": "Time",
+    "criterionEnergy": "Energy",
+    "criterionBalanced": "Balanced",
+    "avoidZones": "Avoid marked zones",
+    "checkpoints": "Mandatory checkpoints",
+    "checkpointHint": "After picking origin and destination, press “Add checkpoint” and then click on the map.",
+    "addCheckpoint": "Add checkpoint",
+    "addingCheckpoint": "Click on the map…",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove",
+    "stepsTitle": "Route steps",
+    "stepOrigin": "Select start",
+    "stepDestination": "Select end",
+    "stepOriginDone": "Start",
+    "stepDestinationDone": "End",
+    "stepCompute": "Compute route",
+    "stepComputeDone": "Route computed",
+    "back": "Previous step",
+    "next": "Next step",
+    "collapsePanel": "Hide panel",
+    "openPanel": "Show control panel",
+    "catAltitude": "Flight altitude",
+    "catOptimization": "Optimization",
+    "catAvoid": "Avoid zones",
+    "demoRoute": "Demo route — computed on real station data (no backend)"
+  },
+  "legend": {
+    "title": "Wind Speed (m/s)"
+  },
+  "trip": {
+    "title": "Trip Settings"
+  },
+  "wizard": {
+    "searchPlaceholder": "Search a place…"
+  },
+  "settings": {
+    "theme": "Theme",
+    "themeDark": "Dark",
+    "themeLight": "Light",
+    "themeSystem": "System",
+    "language": "Language",
+    "units": "Units",
+    "unitsMetric": "Metric (m/s, km)",
+    "unitsImperial": "Imperial (mph, mi)"
+  },
+  "results": {
+    "title": "Route Result",
+    "layerAltitude": "Layer altitude",
+    "algorithm": "Algorithm",
+    "criterion": "Criterion",
+    "distance": "Distance",
+    "eta": "Estimated time",
+    "pathPoints": "Path points"
+  },
+  "profile": {
+    "title": "Profile",
+    "name": "Name",
+    "email": "Email",
+    "routeHistory": "Route history",
+    "emptyHistory": "No saved routes yet."
+  },
+  "onboarding": {
+    "welcome": "Welcome",
+    "welcomeBody": "WindPath finds the shortest / most energy-efficient route while accounting for wind.",
+    "pickPoints": "Pick origin and destination",
+    "pickPointsBody": "Click on the map to set your start and end points.",
+    "layerAlgorithm": "Layer & algorithm",
+    "layerAlgorithmBody": "Choose the altitude layer and routing algorithm from the panel next to the map.",
+    "start": "Get Started"
+  },
+  "about": {
+    "text": "Roshd Wind Pathfinder — a wind pathfinder built on real Khorasan station data."
+  },
+  "windLayers": {
+    "title": "Wind Layers",
+    "pointInfo": "Point Info",
+    "viewAtPoint": "View Wind Layers at Point",
+    "viewAtPointHint": "Click on the map to pick a point."
+  },
+  "common": {
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "retry": "Retry",
+    "close": "Close"
+  },
+  "auth": {
+    "login": "Log in",
+    "register": "Register",
+    "name": "Full name",
+    "email": "Email",
+    "password": "Password",
+    "forgotPassword": "Forgot password?",
+    "sendResetLink": "Send reset link",
+    "resetEmailSent": "If this email exists, a reset link has been sent.",
+    "resetPassword": "Set a new password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "resetToken": "Reset code",
+    "resetSuccess": "Your password has been changed.",
+    "passwordMismatch": "Passwords do not match.",
+    "haveToken": "I have a reset code",
+    "backToLogin": "Back to login",
+    "verifyEmail": "Verify email",
+    "verifyEmailHint": "A verification link has been sent to your email.",
+    "verifySuccess": "Your email has been verified.",
+    "registerSuccess": "Registration complete — a verification email was sent."
+  },
+  "viewport": {
+    "title": "Map display",
+    "mapStyle": "Base map",
+    "styleSimple": "Simple",
+    "styleSatellite": "Satellite",
+    "showArrows": "Wind arrows",
+    "showHeatmap": "Wind color map",
+    "showHillshade": "Hillshade"
+  }
+}

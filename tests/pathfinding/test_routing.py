@@ -152,9 +152,13 @@ def test_multilayer_route_climbs_when_the_upper_layer_pays() -> None:
 
     The route runs west, so a wind *from* 90° is a tailwind and a wind *from*
     270° a headwind: the low layer is the headwind, the high layer the tailwind,
-    and the climb is cheap. The optimum must therefore climb. Without this test
-    a regression that flattened the routed graph back to one layer per route
-    would go unnoticed.
+    and the climb is cheap. The optimum must therefore reach the upper layer.
+
+    It need not *switch mid-route*: the ground node now reaches every layer
+    directly (see ``to_stacked_graph``), so when one layer is uniformly better
+    the optimum climbs out at the origin instead of flying the bad layer first.
+    A mid-route switch is exercised by
+    ``test_route_switches_layer_midway_when_winds_flip``.
     """
     ml = _make_shear_multi(low_direction=270.0, high_direction=90.0)
     router = WindRouter(
@@ -166,9 +170,81 @@ def test_multilayer_route_climbs_when_the_upper_layer_pays() -> None:
     )
     result = router.find_optimal_path(MASHHAD, SABZEVAR)
 
-    assert result.is_multilayer, result.altitudes_used
     assert 2000.0 in result.altitudes_used
     assert result.total_climb_m > 0.0 and result.total_descent_m > 0.0
+    # Using the tailwind layer must beat being locked to the headwind layer.
+    locked_low = router.find_optimal_path(MASHHAD, SABZEVAR, layers=(500.0,))
+    assert result.estimated_time_hours < locked_low.estimated_time_hours
+
+
+def test_route_switches_layer_midway_when_winds_flip() -> None:
+    """A route must climb *mid-route* when only the far half pays for it.
+
+    Here the wind is deliberately non-uniform: each layer is a tailwind on
+    exactly one half of the corridor and a headwind on the other. Flying one
+    layer the whole way is therefore always wrong — the optimum has to take the
+    low layer for the first leg, climb, and take the high layer for the second.
+    Without this test, a regression that could only climb at the origin (or
+    only ever used a single layer) would still satisfy the layer-selection
+    tests and go unnoticed.
+    """
+    # A chain of waypoints along the real Mashhad -> Sabzevar corridor. Short
+    # edges (``max_edge_distance_km``) forbid a single long hop, so the route is
+    # *forced* to traverse both halves and cannot sidestep the flip.
+    points = [
+        (
+            MASHHAD[0] + (SABZEVAR[0] - MASHHAD[0]) * i / 5,
+            MASHHAD[1] + (SABZEVAR[1] - MASHHAD[1]) * i / 5,
+        )
+        for i in range(6)
+    ]
+    # Westbound route: "from 90°" = tailwind, "from 270°" = headwind.
+    # Low layer is the tailwind on the eastern half, high layer on the western
+    # half, so no single layer is good for the whole corridor.
+    def _direction(altitude: float, index: int) -> float:
+        east_half = index < len(points) // 2
+        if altitude < 1000.0:
+            return 90.0 if east_half else 270.0
+        return 270.0 if east_half else 90.0
+
+    ml = MultiLayerWindGraph()
+    for altitude in (500.0, 2000.0):
+        frame = pd.DataFrame(
+            [
+                {
+                    "lat": lat,
+                    "lon": lon,
+                    "altitude": altitude,
+                    "wind_speed": 15.0,
+                    "wind_direction": _direction(altitude, index),
+                }
+                for index, (lat, lon) in enumerate(points)
+            ]
+        )
+        ml.add_layer(
+            WindGraph.build_from_dataframe(
+                frame,
+                altitude=altitude,
+                criterion="time",
+                max_edge_distance_km=50.0,
+            )
+        )
+    router = WindRouter(
+        ml,
+        criterion="time",
+        algorithm="dijkstra",
+        allow_layer_changes=True,
+        vertical_cost=VerticalCostConfig(climb_rate_mps=20.0, descent_rate_mps=20.0),
+    )
+    result = router.find_optimal_path(MASHHAD, SABZEVAR)
+
+    assert result.is_multilayer, result.altitudes_used
+    assert set(result.altitudes_used) == {500.0, 2000.0}
+    assert result.total_climb_m > 0.0 and result.total_descent_m > 0.0
+    # The genuine mid-route switch must beat being locked to either layer.
+    for locked_altitude in (500.0, 2000.0):
+        locked = router.find_optimal_path(MASHHAD, SABZEVAR, layers=(locked_altitude,))
+        assert result.estimated_time_hours < locked.estimated_time_hours
 
 
 def test_layer_restriction_keeps_the_route_on_one_layer() -> None:

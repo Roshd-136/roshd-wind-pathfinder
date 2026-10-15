@@ -9,6 +9,7 @@
 
 from .algorithms import a_star, dijkstra
 from .cost import (
+    CRITERIA,
     CostModelConfig,
     EdgeCostResult,
     InfeasibleEdgeError,
@@ -22,6 +23,7 @@ from .routing import LayerComparison, RouteResult, WindRouter
 
 __all__ = [
     # cost.py
+    "CRITERIA",
     "CostModelConfig",
     "EdgeCostResult",
     "InfeasibleEdgeError",

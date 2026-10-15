@@ -35,14 +35,19 @@ from dataclasses import dataclass
 
 from preprocessing.consistency import haversine_km
 
+# Valid criterion values for cost computation
+CRITERIA = ("time", "energy", "balanced", "distance")
+
 __all__ = [
     "CostModelConfig",
     "EdgeCostResult",
     "InfeasibleEdgeError",
+    "CRITERIA",
     "initial_bearing_deg",
     "decompose_wind",
     "ground_speed_mps",
     "compute_edge_cost",
+    "air_heading_deg",
 ]
 
 
@@ -75,12 +80,15 @@ class CostModelConfig:
     airspeed_mps: float = 50.0
     induced_drag_coeff: float = 0.3
     time_weight: float = 0.5
+    headwind_penalty_coeff: float = 0.0
 
     def __post_init__(self) -> None:
         if self.airspeed_mps <= 0:
             raise ValueError("airspeed_mps must be positive.")
         if self.induced_drag_coeff < 0:
             raise ValueError("induced_drag_coeff cannot be negative.")
+        if self.headwind_penalty_coeff < 0:
+            raise ValueError("headwind_penalty_coeff cannot be negative.")
         if not (0.0 <= self.time_weight <= 1.0):
             raise ValueError("time_weight must be within [0, 1].")
 
@@ -214,8 +222,8 @@ def compute_edge_cost(
         time_weight = config.time_weight
     if not (0.0 <= time_weight <= 1.0):
         raise ValueError("time_weight must be within [0, 1].")
-    if criterion not in ("time", "energy", "balanced"):
-        raise ValueError(f"Unknown criterion {criterion!r}; expected 'time', 'energy' or 'balanced'.")
+    if criterion not in CRITERIA:
+        raise ValueError(f"Unknown criterion {criterion!r}; expected one of {CRITERIA}.")
 
     bearing_deg = initial_bearing_deg(lat1, lon1, lat2, lon2)
     along_track_mps, cross_track_mps = decompose_wind(
@@ -232,7 +240,8 @@ def compute_edge_cost(
     time_hours = distance_km / ground_speed_kmh
 
     induced_penalty = 1.0 + config.induced_drag_coeff * (cross_track_mps / config.airspeed_mps) ** 2
-    energy_hours = time_hours * induced_penalty
+    headwind_penalty = 1.0 + config.headwind_penalty_coeff * max(0.0, -along_track_mps) / config.airspeed_mps
+    energy_hours = time_hours * induced_penalty * headwind_penalty
 
     balanced_hours = time_weight * time_hours + (1.0 - time_weight) * energy_hours
 
@@ -240,6 +249,7 @@ def compute_edge_cost(
         "time": time_hours,
         "energy": energy_hours,
         "balanced": balanced_hours,
+        "distance": distance_km,
     }
 
     return EdgeCostResult(
@@ -254,3 +264,61 @@ def compute_edge_cost(
         criterion=criterion,
         cost=cost_by_criterion[criterion],
     )
+
+
+def air_heading_deg(
+    track_bearing_deg: float,
+    wind_speed_mps: float,
+    wind_direction_from_deg: float,
+    airspeed_mps: float,
+) -> tuple[float, float]:
+    """سمت هوایی و سرعت زمینی لازم برای حفظ یک مسیر با باد معلوم.
+
+    این تابع سمت *فرمانی* را میدهد: همان سمتی که خلبان/کنترلر باید نگه دارد تا
+    مسیر روی زمین حفظ شود. تفاوت سمت هوایی دو قطعهٔ متوالی، همان چیزی است که
+    «یک بار تصحیح مسیر با موتور» شمرده میشود — نه اختلاف سمت مسیر روی زمین.
+
+    مختصات محلی: بردار یکهٔ مسیر ``T`` و بردار یکهٔ «سمت راست مسیر`` ``R``.
+    باد بهسوی ``wind_direction_from_deg + 180`` میوزد. شرط حفظ مسیر این است
+    که سرعت زمینی روی ``T`` بیفتد، پس بردار سرعت هوایی ``A = G·T − W`` است و
+    از ``|A| = airspeed`` سرعت زمینی و سمت حل میشوند.
+
+    برمیگرداند
+    ----------
+    (heading_deg, ground_speed_mps)
+        سمت هوایی (درجه، از شمال، ساعتگرد) و سرعت زمینی (m/s).
+
+    استثناها
+    --------
+    InfeasibleEdgeError
+        اگر اندازهٔ مؤلفهٔ عمود باد از سرعت هوایی بیشتر باشد (نگهداشتن مسیر
+        ممکن نیست) یا سرعت زمینی نامثبت شود.
+    """
+    if wind_speed_mps < 0.0:
+        raise ValueError("wind_speed_mps cannot be negative.")
+    if airspeed_mps <= 0.0:
+        raise ValueError("airspeed_mps must be positive.")
+
+    bearing_rad = math.radians(track_bearing_deg)
+    wind_to_rad = math.radians((wind_direction_from_deg + 180.0) % 360.0)
+
+    # مؤلفههای باد در چارچوب مسیر (همراستا و عمود با علامت).
+    along = wind_speed_mps * math.cos(bearing_rad - wind_to_rad)
+    cross_signed = wind_speed_mps * math.sin(bearing_rad - wind_to_rad)
+
+    if abs(cross_signed) > airspeed_mps:
+        raise InfeasibleEdgeError(
+            f"Crosswind ({abs(cross_signed):.2f} m/s) exceeds airspeed "
+            f"({airspeed_mps:.2f} m/s); heading cannot be held."
+        )
+    ground_speed = ground_speed_mps(airspeed_mps, along, abs(cross_signed))
+    if ground_speed <= 0.0:
+        raise InfeasibleEdgeError(
+            f"Headwind leaves zero or negative ground speed ({ground_speed:.2f} m/s)."
+        )
+
+    # بردار سرعت هوایی = سرعت زمینی روی مسیر منهای بردار باد.
+    east = ground_speed * math.sin(bearing_rad) - wind_speed_mps * math.sin(wind_to_rad)
+    north = ground_speed * math.cos(bearing_rad) - wind_speed_mps * math.cos(wind_to_rad)
+    heading = (math.degrees(math.atan2(east, north)) + 360.0) % 360.0
+    return heading, ground_speed

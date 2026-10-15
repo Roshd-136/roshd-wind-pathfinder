@@ -1,46 +1,46 @@
-"""مسیریابی «بادسواری» — با یک فرمان سمت، باد مسیر را می‌برد.
+"""Wind-riding routing — one fixed heading, and the wind carries the route.
 
-ایدهٔ مسیر
+Route idea
 ----------
-مسیریابی روی گراف (A*/Dijkstra) مسیر را روی یک شبکهٔ گره‌ای می‌سازد، پس مسیر ناچار
-«پله‌ای» می‌شود و هر پله یک تصحیح سمت با موتور لازم دارد. در این میدان باد (باد
-غالباً از شرق به غرب، یعنی هم‌راستا با کریدور مشهد→سبزوار) راه دیگری هم هست که
-گراف نمی‌تواند بیانش کند:
+Graph routing (A*/Dijkstra) builds the route over a node lattice, so the path is
+inevitably "staircased" and every step needs a motor heading correction. In this
+wind field (wind mostly east-to-west, i.e. aligned with the Mashhad->Sabzevar
+corridor) there is another option the graph cannot express:
 
-۱) صعود به یک لایه،
-۲) نگه‌داشتن **یک** سمت هوایی ثابت،
-۳) اینکه باد هواپیما را جلو ببرد — مسیر روی زمین هرچه باد می‌خواهد می‌شود،
-۴) و در پایان فرود تدریجی روی مقصد.
+1) climb to a layer,
+2) hold **one** fixed air heading,
+3) let the wind push the aircraft forward — the ground track becomes whatever
+   the wind wants,
 
-«بادسواری» همین است. سمت فرمان با جست‌وجوی یک‌پارامتری انتخاب می‌شود: برای هر
-سمت، مسیر روی زمین *انتگرال‌گیری* می‌شود و سمتی برگزیده می‌شود که با کمترین زمان
-کل به مقصد برسد. لایه هم با همان معیار (صعود + بادسواری + فرود + قطعهٔ پایانی)
-انتخاب می‌شود.
+"Wind riding" is exactly this. The heading is chosen with a one-parameter
+search: for each candidate heading the ground track is *integrated*, and the
+heading reaching the destination in the least total time wins. The layer is
+selected with the same criterion (climb + wind riding + descent + final leg).
 
-هشدار صداقت
+Honesty notes
 -----------
-- این برنامه‌ریز روی *میدان باد* انتگرال می‌گیرد، نه روی گراف. مسافت/زمانش از
-  همان میدان بادِ مسیرهای گرافی می‌آید (``LayerField``)، ولی مسیر در فضای پیوسته
-  ساخته می‌شود و می‌تواند از گره‌های گراف نگذرد. پس «کوتاه‌ترین مسیر گراف» و
-  «بادسواری» دو فضای جواب متفاوت‌اند؛ مقایسه‌شان در جدول صحنه همین را می‌گوید.
-- زیر پایین‌ترین لایه (AGL < ۵۰۰ متر) میدان باد تعریف نشده است؛ در فاز فرود، باد
-  همان **پایین‌ترین لایهٔ موجود** استفاده می‌شود. این محدودیت داده است، نه فرض
-  فیزیکی.
-- صعود در همین یک نقطه انجام می‌شود (همان قراردادی که یال‌های عمودی گراف دارند).
-  صعود در حال حرکت مدل نشده است.
-- **فرود یک *شیب* است، نه یک شیرجه.** فرود وقتی شروع می‌شود که فاصلهٔ باقی‌مانده
-  با ``h · descent_glideslope_ratio`` برابر شود و بعد روی همان شیب ثابت تا ارتفاع
-  زمین مقصد ادامه می‌یابد. شیب پیش‌فرض (۱ به ۴۰) از شیب گلاید بیشینهٔ هواپیما
-  (۱ به L/D = ۱ به ۱۲) *ملایم‌تر* است، یعنی موتور خاموش نمی‌تواند آن را نگه دارد؛
-  پس موتور با توان *جزئی* کار می‌کند و همان توان هم واقعاً حساب می‌شود. از توازن
-  رانش در فرود (`T = D − m·g·sinγ` و `D = m·g/(L/D)`) کسر توان
-  `۱ − (L/D)·sinγ` می‌آید؛ اگر شیبِ لازم از گلاید بیشینه تندتر شود، دور آرام
-  (`descent_idle_power_fraction`) کف کار می‌شود.
-- **شکل پروفیل، سوخت را رایگان نمی‌کند.** ملایم‌کردن فرود یعنی مسافتِ بیشتری
-  زیر شیب سپری شود و همان مسافت از کروز کم شود؛ اتحاد انرژی می‌گوید در مسیری که
-  از زمین شروع و روی زمین تمام می‌شود تنها هزینهٔ واقعی *کار پسار در طول مسیر*
-  است، نه شکل پروفیل ارتفاع. پس فرود ملایم تقریباً هم‌قیمتِ فرود تند است و انتخاب
-  بین آن دو یک انتخاب *نمایشی/عملیاتی* است، نه یک بهینه‌سازی پنهان.
+- This planner integrates over the *wind field*, not the graph. Its
+  distance/time come from the same wind field used for graph routes
+  (``LayerField``), but the path is built in continuous space and may bypass
+  graph nodes. So "shortest graph route" and "wind riding" are two different
+- Below the lowest layer (AGL < 500 m) the wind field is undefined; during the
+  descent phase the **lowest available layer** wind is used. That is a data
+  limitation, not a physical assumption.
+- The climb happens at a single point (same convention as the graph's vertical
+  edges). Climbing while moving is not modeled.
+- **Descent is a *glide slope*, not a dive.** Descent begins when the remaining
+  distance equals ``h · descent_glideslope_ratio`` and then follows that fixed
+  slope down to the destination's ground elevation. The default slope (1 in 40)
+   (1 in L/D = 1 in 12) *gentler* — i.e. a dead engine cannot sustain it;
+   so the engine runs at *partial* power, and that power is genuinely
+   accounted for. From the thrust balance at landing (``T = D − m·g·sinγ`` and
+   ``D = m·g/(L/D)``) the power fraction ``1 − (L/D)·sinγ`` follows; if the
+   required slope steepens beyond max glide, ``descent_idle_power_fraction``
+- **The profile shape does not make fuel free.** Softening the descent means
+   more distance spent under the slope and that distance is taken from cruise;
+   energy conservation says for a route that starts and ends on the ground the
+   only real cost is *work against drag along the path*, not the altitude
+   profile shape. So a soft descent costs roughly the same as a steep one and
 """
 
 from __future__ import annotations
@@ -66,58 +66,58 @@ __all__ = [
     "wind_riding_route_result",
 ]
 
-# نمونه‌بردار باد یک لایه: ``(lat, lon) -> (speed_mps, direction_from_deg)``.
+# Wind sampler for one layer: ``(lat, lon) -> (speed_mps, direction_from_deg)``.
 WindSampler = Callable[[float, float], tuple[float, float]]
 
 _KM_PER_DEG_LAT = 111.32
 
 @dataclass(frozen=True)
 class WindRidingConfig:
-    """پارامترهای عددی برنامه‌ریزی بادسواری (همه «سیاست محاسباتی»، نه فیزیک).
+    """Numerical parameters for wind-riding planning (all are "computational
 
-    پارامترها
+    Parameters
     ----------
     step_s : float
-        گام انتگرال‌گیری زمانی (ثانیه). کوچک‌تر = دقیق‌تر و کندتر.
+        Time integration step (seconds). Smaller = more accurate, slower.
     max_hours : float
-        سقف زمان شبیه‌سازی هر سمت فرمان (ساعت).
+        Simulation time cap per candidate heading (hours).
     max_arrival_miss_km : float
-        بیشترین فاصلهٔ نهایی قابل‌قبول از مقصد (کیلومتر). برنامه‌ای که بدتر از
-        این باشد رد می‌شود؛ باقی‌مانده با یک قطعهٔ پایانی بسته می‌شود.
+        Maximum acceptable final distance from the destination (km). Plans
+        worse than this are rejected; the remainder is closed with a final leg.
     arrival_radius_km : float
-        اگر فاصله به این مقدار برسد، «رسیدن» پذیرفته می‌شود.
+        Distance at which "arrival" is accepted.
     heading_coarse_step_deg : float
-        گام پویش درشت روی ۳۶۰ درجه.
+        Coarse sweep step over the 360 degrees.
     heading_refine_steps_deg : tuple[float, ...]
-        گام‌های ریزکردن پشت‌سرهم: هر مرحله حول بهترین سمت مرحلهٔ قبل، در بازهٔ
-        ±گام مرحلهٔ قبل، با گام این مرحله پویش می‌کند. چند مرحله لازم است چون
-        «خطای رسیدن» به سمت فرمان حساس است: با یک مرحله ۰.۲۵ درجه‌ای، مسیر
-        چند صد متر بیرون مقصد فرود می‌آمد و همان باقی‌مانده یک قطعهٔ پایانی
-        (و یک تصحیح سمت) به مسیر تحمیل می‌کرد — چیزی که کل ایدهٔ بادسواری را
-        بی‌اثر می‌کرد.
+        Successive refinement steps: each stage sweeps around the previous
+        stage's best heading, within +/- the previous stage's step, using this
+        stage's step. Several stages are needed because "arrival error" is
+        sensitive to heading: with a single 0.25 deg stage the route landed
+        several hundred meters past the destination, and that residual forced
+        a final leg (and one more heading correction) — defeating the whole
     path_sample_s : float
-        گام زمانی نگه‌داشتن نقطه/قطعه در مسیر گزارش‌شده (ثانیه). انتگرال‌گیری با
-        ``step_s`` انجام می‌شود؛ برای مسیر، هر ``path_sample_s`` یک نقطه نگه
-        داشته می‌شود وگرنه مسیر چند صد قطعه می‌شود و مقادیر بازسازی‌شده از وترها
-        نویز می‌گیرند.
+        Time step for holding a point/segment in the reported route (seconds).
+        Integration uses ``step_s``; for the route, one point is kept per
+        ``path_sample_s``, otherwise the route becomes hundreds of segments
+        and values reconstructed from chords turn noisy.
     abandon_margin_km : float
-        قاعدهٔ هرس جست‌وجو: اگر فاصله به مقصد از بهترین فاصلهٔ دیدهٔ‌شده در همان
-        شبیه‌سازی بیشتر از این مقدار شود، آن سمت رها می‌شود. سمت‌هایی که مقصد را
-        نمی‌گیرند ناچار تا ``max_hours`` می‌رفتند و کل جست‌وجو را کند می‌کردند.
-        این فقط یک قاعدهٔ *محاسباتی* است: سمت رهاشده هرگز نمی‌تواند بهترین
-        برنامه باشد (در حال دور شدن از مقصد است).
+        Search pruning rule: if the distance to the destination exceeds the
+        best distance seen so far in the same simulation by more than this
+        value, that heading is abandoned. Headings that never reach the
+        destination would otherwise run to ``max_hours`` and slow the whole
+        search. This is purely a *computational* rule: an abandoned heading can
     descent_glideslope_ratio : float
-        شیب فرود به‌صورت «۱ به N» — به‌ازای هر متر کم‌کردن ارتفاع، N متر جلو
-        رفتن. بُرد گلاید *بیشینه* هواپیما ``L/D`` است؛ مقدار بزرگ‌تر یعنی فرود
-        ملایم‌تر و طولانی‌تر که فقط با توان جزئی موتور ممکن است (و همان توان در
-        ``power_fraction`` قطعه‌های فرود حساب می‌شود). مقدار کوچک‌تر از ``L/D``
-        یعنی فرود تندتر از گلاید: دور آرام کف کار می‌شود و باقی انرژی از
-        تندترکم‌کردن ارتفاع می‌آید.
+        Descent slope as "1 in N" — for every meter of altitude lost, N meters
+        flown forward. The aircraft's *maximum* glide range is ``L/D``; a
+        larger value means a gentler, longer descent possible only with slight
+        engine power (accounted in ``power_fraction`` of descent segments). A
+        value below ``L/D`` means descending steeper than glide: part of the
+        energy comes from descending faster.
     approach_km : float
-        طول تقرب پایانی (کیلومتر). کف فاصلهٔ ایمنی از زمین در فرود تنها وقتی
-        بر فراز *کوه* معنا دارد؛ در این چند کیلومتر آخر، کف خطی از `زمین + آستانه`
-        به ارتفاع زمین مقصد می‌رسد تا نشستن روی مقصد ممکن باشد. بدون این
-        گذار، فرود مجبور می‌شد ۳۰۰ متر بالای مقصد تمام شود.
+        Final approach length (km). The terrain clearance floor only matters
+        over *mountains*; in these last kilometers the floor ramps linearly
+        from `terrain + threshold` down to the destination's ground elevation so
+        landing on the destination becomes possible. Without this transition,
     """
 
     step_s: float = 20.0
@@ -133,33 +133,43 @@ class WindRidingConfig:
     track_wind: bool = True
     wind_corridor_fraction: float = 0.5
     wind_corridor_min_km: float = 0.2
-    # **جست‌وجوی سیاست، نه یک سیاست ثابت.** دالان ``wind_corridor_fraction``
-    # تعیین می‌کند هواپیما تا چه اندازه اجازه دارد از خط مبدأ–مقصد دور شود تا
-    # «موازی باد» بماند. این یک *مبادله* است، نه یک انتخاب درست/غلط: دالان
-    # بازتر یعنی سهم بیشترِ مسیرِ موازی باد، به بهای مسافت/زمان/سوخت بیشتر و
-    # یک تصحیح پایانی بزرگ‌تر. اندازه‌گیری روی همین کریدور (جدول «مبادلهٔ
-    # بادسواری» در صحنه) نشان می‌دهد سهم موازی از ۹٪ (دالان ۰.۲) تا ۶۲٪
-    # (دالان ۰.۹۵) می‌رود و زمان از ۲.۱۲ به ۲.۳۱ ساعت. پس بهترین دالان یک عدد
-    # ثابت نیست و باید با *هدف* انتخاب شود؛ همان کاری که این جست‌وجو می‌کند.
+    # **Policy search, not one fixed policy.** The ``wind_corridor_fraction``
+    # corridor decides how far the aircraft may stray from the origin-destination
+    # line while staying "parallel to the wind". This is a *trade-off*, not a
+    # right/wrong choice: a wider corridor means a larger share of wind-parallel
+    # flight at the cost of more distance/time/fuel and a bigger final
+    # correction. Measurement on this corridor (the "wind-riding trade-off"
+    # table in the scene) shows the parallel share goes from 9% (corridor 0.2)
+    # to 62% (corridor 0.95) and time from 2.12 to 2.31 h. So the best corridor
     search_fractions: tuple[float, ...] = (0.5, 0.75, 0.95)
-    # هدف: بیشترین مسافت موازی باد، مشروط به اینکه زمان از این ضریب روی
-    # کم‌زمان‌ترین برنامهٔ همان لایه بیشتر نشود. بدون این سقف، «بیشترین موازی»
-    # یک مسیر بی‌معنا می‌شود (کل کریدور را دور می‌زند تا هم‌راستا بماند).
+    # Objective: maximize wind-parallel distance, subject to time not exceeding
+    # this factor over the fastest plan of the same layer. Without this cap,
+    # "maximum parallel" degenerates into a meaningless route (it would wander
     alignment_first: bool = True
     alignment_slack_ratio: float = 1.15
-    # **یک دالان مشخص، به‌جای جست‌وجو.** اگر این مقدار داده شود، برنامه‌ریز فقط
-    # همان یک دالان را می‌سنجد و انتخاب خودکار را کنار می‌گذارد. کاربردش ساختن
-    # «گونه‌های هم‌خانواده» یک مسیر بادسواری است: چند نقطهٔ متفاوت روی همان
-    # مبادله (دالان تنگ = سریع‌ترین و کم‌موازی‌ترین، دالان باز = موازی‌ترین)،
-    # تا در صحنه و جدول کنار هم دیده شوند و تفاوت استراتژی قابل مقایسه باشد.
-    # ``None`` یعنی همان جست‌وجوی خودکار (رفتار پیش‌فرض).
+    # **One explicit corridor, instead of a search.** When this value is given,
+    # measures that one corridor and skips the automatic choice. Use case:
+    # building "sibling variants" of one wind-riding route: several points on
+    # the same trade-off (narrow corridor = fastest, least-parallel; wide
+    # corridor = most parallel), so the scene and table can show them side by
+    # side and the strategy difference becomes comparable. ``None`` means the
     corridor_override: float | None = None
+    # **Band ceiling (MSL).** When given, a plan that would have to climb above
+    # this ceiling to clear terrain is *rejected* (``terrain_climb_feasible``
+    # becomes false) instead of being flown through or over. This is how the
+    # "selected altitude band" promise is kept: within the band the aircraft may
+    # climb to clear a mountain, but it never leaves the band. ``None`` keeps the
+    # free behaviour — climb over any terrain, which is what the "all layers"
+    # mode wants.
+    max_altitude_msl_m: float | None = None
 
     def __post_init__(self) -> None:
         if self.descent_glideslope_ratio <= 0.0:
             raise ValueError("descent_glideslope_ratio must be positive.")
         if self.approach_km <= 0.0:
             raise ValueError("approach_km must be positive.")
+        if self.max_altitude_msl_m is not None and self.max_altitude_msl_m <= 0.0:
+            raise ValueError("max_altitude_msl_m must be positive when given.")
         if not 0.0 < self.wind_corridor_fraction < 1.0:
             raise ValueError("wind_corridor_fraction must be in (0, 1).")
         if self.wind_corridor_min_km <= 0.0:
@@ -174,69 +184,69 @@ class WindRidingConfig:
         if self.corridor_override is not None and not 0.0 < self.corridor_override < 1.0:
             raise ValueError("corridor_override must be in (0, 1) when given.")
 
-    # سیاست بادسواری، دو حالت دارد و هر دو در همین ماژول پیاده شده‌اند:
+    # The wind-riding policy has two modes, both implemented in this module:
     #
-    # ``track_wind=True`` (پیش‌فرض) — **دنبال‌کردن باد.** فرمان طوری حل می‌شود که
-    #   *سمت مسیر روی زمین* روی جهت خودِ باد بیفتد (مثلث باد). پس مسیر در فاز
-    #   بادسواری موازی پیکان‌های باد است و پسار القایی و باد رو-به-رو صفر می‌شود
-    #   (هواپیما باد را دنبال می‌کند، با آن نمی‌جنگد). تصحیح مسیر فقط تا آنجا
-    #   رخ می‌دهد که لازم باشد *دالان فرود* (`wind_corridor_fraction`) برقرار
-    #   بماند؛ پس می‌شود چند تصحیح کوتاه، نه یک نبرد مداوم.
+    # ``track_wind=True`` (default) — **follow the wind.** The command is solved
+    #   so the *ground track* falls on the wind's own direction (wind triangle).
+    #   The wind-riding phase is then parallel to the wind arrows and induced
+    #   drag and crosswind terms vanish (the aircraft follows the wind instead
+    #   of fighting it). Course correction happens only as needed to keep the
+    #   landing corridor (``wind_corridor_fraction``) satisfied — a few short
     #
-    # ``track_wind=False`` — **سمت فرمان ثابت.** همان مدل قبلی: یک سمت هوایی
-    #   برای همهٔ مسیر، باد هواپیما را می‌برد و مسیر روی زمین کج می‌شود. با آن،
-    #   مسیر بادسواری یک خط راست بود، نه یک مسیر «هم‌سو با باد».
+    # ``track_wind=False`` — **fixed heading.** The previous model: one air
+    #   heading for the whole leg; the wind carries the aircraft and the ground
+    #   track skews off. With it, the wind-riding route was a straight line,
     #
-    # دلیل تغییر: اندازه‌گیری روی صحنه نشان داد مسیر قبلی میانگین چرخش ۰.۰۴
-    # درجه داشت، یعنی یک خط راست؛ و زاویهٔ *مسیر* با بادِ محلی حدود ۲۰ درجه بود
-    # (زاویهٔ دریفت)، پس در هیچ نقطه‌ای موازی باد نبود.
+    # Reason for the change: measurement on the scene showed the old route had
+    # 0.04 deg mean turning — a straight line — and its *track* angle sat about
+    # 20 deg off the local wind (the drift angle), so nowhere was it parallel
 
 
 @dataclass(frozen=True)
 class WindRidingPlan:
-    """نتیجهٔ برنامه‌ریزی بادسواری.
+    """Wind-riding plan result.
 
-    پارامترها
+    Attributes
     ----------
     altitude_m : float
-        ارتفاع بادسواری (بالای زمین).
+        Wind-riding altitude (above ground).
     heading_deg : float
-        سمت هوایی مسیر. در حالت ``track_wind=False`` همان سمت ثابتی است که در
-        تمام فاز بادسواری و فرود نگه داشته می‌شود؛ در حالت ``track_wind=True``
-        سمت‌ها هر گام از مثلث باد می‌آیند و این عدد میانگین مسافت‌وزن آن‌ها است
-        (سمت غالب پرواز).
+        Air heading of the route. In ``track_wind=False`` mode this is the fixed
+        heading held through the wind-riding and descent phases; in
+        ``track_wind=True`` mode the headings come from the wind triangle each
+        step and this number is the distance-weighted mean (the dominant
     path : list[tuple[float, float]]
-        مسیر روی زمین از مبدأ تا مقصد. طول آن یکی بیشتر از ``legs`` است.
+        Ground track from origin to destination. One element longer than
     node_altitudes : list[float]
-        ارتفاع AGL هر نقطه (متر): صفر در مبدأ، ``altitude_m`` در فاز بادسواری،
-        کم‌شدن در فاز فرود و صفر روی مقصد.
+        AGL altitude of each point (m): zero at the origin, ``altitude_m`` in
+        the wind-riding phase, decreasing in the descent, zero at the
     climb_time_hours, ride_time_hours, descent_time_hours, final_leg_hours : float
-        تفکیک زمان پرواز به فازها.
+        Flight time broken down by phase.
     ride_distance_km, descent_distance_km : float
-        مسافت روی زمین در فاز بادسواری و در فاز فرود.
+        Ground distance in the wind-riding phase and in the descent phase.
     total_distance_km : float
-        مسافت افقی کل (بادسواری + فرود + قطعهٔ پایانی).
+        Total horizontal distance (wind riding + descent + final leg).
     arrival_miss_km : float
-        فاصلهٔ باقی‌مانده به مقصد *پس از* فرود (پیش از قطعهٔ پایانی).
+        Remaining distance to the destination *after* the descent (before the
     final_leg_km, final_bearing_deg : float
-        طول و سمت قطعهٔ پایانی (صفر اگر فرود روی مقصد بیفتد).
+        Length and bearing of the final leg (zero if the descent lands on the
     descent_slope_ratio : float
-        شیب *واقعی* فرود «۱ به N» در همین برنامه (``مسافت فرود ÷ ارتفاع فرود``).
-        این عدد با ``descent_glideslope_ratio`` یکی می‌شود مگر آنکه مسیر از
-        همان ابتدا کوتاه‌تر از شیب خواسته‌شده باشد؛ در آن حالت از خود مسیر می‌آید.
+        The *actual* descent slope "1 in N" of this plan (``descent distance /
+        descent height``). Equal to ``descent_glideslope_ratio`` unless the
+        route was shorter than the requested slope from the start; then it
     descent_power_fraction : float
-        کسر توان کروز در فاز فرود، از توازن رانش همان شیب واقعی. برای شیب
-        ملایم‌تر از گلاید بیشینه عددی بین دور آرام و ۱ است.
+        Cruise power fraction during the descent, from the thrust balance of
+        the actual slope. For a slope gentler than max glide it is a number
     """
 
     altitude_m: float
     heading_deg: float
     path: list[tuple[float, float]]
     node_altitudes: list[float]
-    # کمترین فاصلهٔ عمودی از زمین در تمام مسیر (متر). ``None`` یعنی ارتفاع‌ها
-    # نسبت به زمین‌اند و مسئلهٔ برخورد با زمین اصلاً مطرح نیست.
+    # Minimum vertical clearance above terrain along the whole route (m).
+    # ``None`` means altitudes are AGL and terrain collision is not modeled.
     min_terrain_clearance_m: float | None
-    # ارتفاعی که واقعاً باید صعود شود: از زمین مبدأ تا سطح پرواز.
+    # Altitude that actually had to be climbed: origin ground to cruise level.
     climb_m: float
     climb_time_hours: float
     ride_time_hours: float
@@ -251,12 +261,12 @@ class WindRidingPlan:
     final_leg_km: float
     final_bearing_deg: float
     legs: list[LegSample] = field(default_factory=list)
-    # کارنامهٔ هم‌راستایی همین برنامه (از ``pathfinding.alignment``).
-    # ``aligned_share`` سهم مسافت با انحراف ≤۳ درجه از جهت باد است؛
-    # ``parallel_mean_deg`` میانگین انحراف *در همان بخش*؛ و
-    # ``final_correction_km`` مسافت از آخرین قطعهٔ موازی تا مقصد (یعنی «چند
-    # کیلومتر آخر تصحیح شد»). این سه عدد همان چیزی است که در جدول گزارش می‌شود
-    # و ادعای «بادسواری» را قابل حسابرسی می‌کند.
+    # Alignment report of this plan (from ``pathfinding.alignment``).
+    # ``aligned_share``: share of distance within 3 deg of the wind direction;
+    # ``parallel_mean_deg``: mean deviation *within that portion*; and
+    # ``final_correction_km``: distance from the last wind-parallel segment to
+    # the destination (i.e. "how many final kilometers were corrected"). These
+    # three numbers are exactly what the report table shows and make the
     aligned_share: float = 0.0
     parallel_mean_deg: float = math.nan
     final_correction_km: float = 0.0
@@ -264,10 +274,10 @@ class WindRidingPlan:
 
     @property
     def wind_aligned_fraction(self) -> float:
-        """سهم مسافت افقی که سمت مسیرش موازی جهت باد بود (۰ تا ۱).
+        """Share of horizontal distance flown with the heading parallel to the
 
-        از خود قطعه‌های گزارش‌شده حساب می‌شود، پس «بادسواری» یک ادعا نیست:
-        اگر مسیر با باد بجنگد، همین عدد نزدیک صفر می‌ماند.
+        Computed from the reported segments themselves, so "wind riding" is not
+        a claim: if the route fights the wind, this number stays near zero.
         """
         total = sum(leg.distance_km for leg in self.legs)
         if total <= 0.0:
@@ -285,7 +295,7 @@ class WindRidingPlan:
 
     @property
     def total_time_hours(self) -> float:
-        """زمان کل پرواز (ساعت): صعود + بادسواری + فرود + قطعهٔ پایانی."""
+        """Total flight time (hours): climb + wind riding + descent + final leg."""
         return (
             self.climb_time_hours
             + self.ride_time_hours
@@ -296,7 +306,7 @@ class WindRidingPlan:
 
 @dataclass(frozen=True)
 class _Simulation:
-    """مسیر روی زمین برای یک سمت فرمان (خروجی خام انتگرال‌گیری)."""
+    """Ground track for one candidate heading (raw integration output)."""
 
     heading_deg: float
     points: list[tuple[float, float]]
@@ -311,41 +321,41 @@ class _Simulation:
     final_bearing_deg: float
     miss_km: float
     min_terrain_clearance_m: float | None = None
-    # شیب واقعی فرود (۱ به N) و کسر توان موتور در همان فاز. هر دو *خروجی* محاسبه
-    # هستند نه ورودی: از نقطه‌ای که فرود شروع می‌شود و ارتفاعی که باید خرج شود
-    # ساخته می‌شوند، پس نمایش و حسابداری از یک منبع می‌آیند.
+    # Real descent slope (1 in N) and engine power fraction in that phase.
+    # Both are *outputs*, not inputs: derived from where the descent starts and
+    # the altitude to spend, so display and accounting share one source.
     descent_slope_ratio: float = 0.0
     descent_power_fraction: float = 1.0
-    # آيا کف زمین در فاز بادسواری با سقف صعود هواپیما قابل‌پرواز بود. ``False``
-    # یعنی مسیر برای رد شدن از کوه به صعودی تندتر از توان هواپیما نیاز دارد، پس
-    # این سطح «مسیر دارد» فقط روی کاغذ.
+    # Whether the terrain floor in the wind-riding phase was flyable within the
+    # aircraft climb ceiling. ``False`` means clearing the mountain needs a
+    # climb steeper than the aircraft can sustain — "flyable" on paper only.
     terrain_climb_feasible: bool = True
-    # مسافت *وزن‌داری* که سمت مسیر، موازی (در حد ``_ALIGNED_TOLERANCE_DEG``)
-    # جهت خود باد بود. مبنای سنجهٔ ``wind_aligned_fraction`` است: «چند درصد از
-    # مسیر واقعاً بادسواری بود؟» — یک عدد اندازه‌گیری‌شده، نه یک صفت.
+    # Distance-weighted distance whose track stayed parallel (within
+    # ``_ALIGNED_TOLERANCE_DEG``) to the wind's own direction. Basis of the
+    # ``wind_aligned_fraction`` metric: "what share of the route truly rode
     aligned_km: float = 0.0
 
     def flight_hours(self) -> float:
-        """زمان پرواز بدون صعود اولیه (کروز + فرود + قطعهٔ پایانی).
+        """Flight time without the initial climb (cruise + descent + final leg).
 
-        هنگام مقایسهٔ *سیاست‌ها* همین عدد ملاک است: صعود در مبدأ برای همهٔ
-        سیاست‌ها یکی است، پس واردکردنش فقط نویز به مقایسه می‌آورد.
+        When comparing *policies* this is the criterion: the origin climb is
+        identical for every policy, so including it only adds noise.
         """
         return self.ride_hours + self.descent_hours + self.final_leg_hours
 
 
 def _bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """آزیموت مسیر روی زمین بین دو نقطه (درجه، از شمال)."""
+    """Ground-track azimuth between two points (degrees, from north)."""
     return initial_bearing_deg(lat1, lon1, lat2, lon2)
 
 
 def _approx_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """فاصلهٔ محلی با تصویر تخت (کیلومتر) — فقط برای *کنترل حلقهٔ انتگرال*.
+    """Local flat-projection distance (km) — for *integration loop control* only.
 
-    این تابع در حلقهٔ جست‌وجو صدها هزار بار صدا زده می‌شود؛ ``haversine_km``
-    روی کره برای همین کار گران است. تمام اعدادی که *گزارش* می‌شوند (مسافت
-    قطعات، مسافت کل، خطای رسیدن) در ``wind_riding_route_result`` با فاصلهٔ
-    بزرگ‌دایره بازمحاسبه می‌شوند، پس این تقریب به خروجی راه پیدا نمی‌کند.
+    Called hundreds of thousands of times in the search loop, where spherical
+    ``haversine_km`` is too expensive. Every *reported* number (segment
+    distances, total difference) is recomputed with great-circle
+    distance in ``wind_riding_route_result``, so this approximation never
     """
     d_lat = (lat2 - lat1) * _KM_PER_DEG_LAT
     d_lon = (lon2 - lon1) * _KM_PER_DEG_LAT * math.cos(math.radians(lat1))
@@ -353,18 +363,18 @@ def _approx_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 
 def _wind_vector(speed_mps: float, direction_from_deg: float) -> tuple[float, float]:
-    """بردار باد در محورهای (شرق، شمال) — جهتی که باد *به* آن می‌وزد."""
+    """Wind vector in (east, north) axes — the direction the wind blows *toward*."""
     to_rad = math.radians((direction_from_deg + 180.0) % 360.0)
     return speed_mps * math.sin(to_rad), speed_mps * math.cos(to_rad)
 
 
-# آستانهٔ «موازی باد». ۱۵ درجه یعنی زاویهٔ بین سمت مسیر و جهت باد کمتر از ۱۵
-# درجه باشد؛ با این آستانه «بادسواری» از «جنگیدن با باد» جدا می‌شود.
+# "Parallel to wind" threshold. 15 deg means the angle between the ground track
+# and the wind direction stays under 15 deg; it separates "riding the wind"
 _ALIGNED_TOLERANCE_DEG = 15.0
 
 
 def _angle_between(bearing_a_deg: float, bearing_b_deg: float) -> float:
-    """کمترین زاویهٔ بین دو آزیموت (۰ تا ۱۸۰ درجه)."""
+    """Smallest angle between two azimuths (0 to 180 degrees)."""
     difference = (bearing_a_deg - bearing_b_deg) % 360.0
     return difference if difference <= 180.0 else 360.0 - difference
 
@@ -375,24 +385,24 @@ def _solve_wind_triangle(
     wind_north: float,
     airspeed_mps: float,
 ) -> tuple[float, float, float] | None:
-    """مثلث باد را برای «سمت مسیر خواسته‌شده» حل می‌کند.
+    """Solves the wind triangle for a *requested ground track*.
 
-    می‌خواهیم **سمت مسیر روی زمین** دقیقاً ``track_bearing_deg`` باشد، نه سمت
-    فرمان. بردار سرعت زمینی ``G·û`` است (``û`` بردار یکهٔ آن سمت) و باد ``W``
-    معلوم است، پس بردار سرعت هوایی ``A = G·û − W`` باید طولش ``V`` باشد:
+    We want the **ground track** to be exactly ``track_bearing_deg``, not the
+    heading. The ground velocity is ``G·û`` (``û`` its unit vector) and the
+    wind ``W`` is known, so the air velocity ``A = G·û − W`` must have length
 
         G² − 2G(W·û) + (|W|² − V²) = 0
         ⇒ G = (W·û) + √(V² − |W⊥|²)
 
-    ریشهٔ مثبت انتخاب می‌شود (سرعت زمینی بیشتر). شرط وجود جواب ``V ≥ |W⊥|``
-    است؛ یعنی باد جانبی نتواند بیشتر از سرعت هوایی باشد. این همان چیزی است که
-    «جنگیدن با باد» را در مدل به یک عدد تبدیل می‌کند.
+    The positive root wins (higher ground speed). A solution exists only if
+    ``V >= |W_perp|`` — the crosswind cannot exceed airspeed. This is what
+    turns "fighting the wind" into a number in the model.
 
-    برمی‌گرداند
+    Returns
     ----------
     (air_east, air_north, ground_speed) | None
-        بردار سرعت هوایی و سرعت زمینی، یا ``None`` اگر این سمت مسیر با این باد
-        و این سرعت هوایی قابل‌نگه‌داشتن نباشد.
+        Air-velocity vector and ground speed, or ``None`` if this ground track
+        cannot be held with this wind and airspeed.
     """
     to_rad = math.radians(track_bearing_deg)
     ux_east, ux_north = math.sin(to_rad), math.cos(to_rad)
@@ -415,7 +425,7 @@ def _cross_track_km(
     lat: float,
     lon: float,
 ) -> float:
-    """فاصلهٔ جانبی امضاشده از خط مستقیم مبدأ–مقصد (کیلومتر، مثبت = چپ مسیر)."""
+    """Signed lateral distance from the straight origin-destination line (km, positive = left of track)."""
     lat0 = math.radians(origin[0])
     scale = _KM_PER_DEG_LAT * math.cos(lat0)
     dir_east = (destination[1] - origin[1]) * scale
@@ -426,12 +436,12 @@ def _cross_track_km(
     dir_east, dir_north = dir_east / norm, dir_north / norm
     off_east = (lon - origin[1]) * math.cos(math.radians(lat)) * _KM_PER_DEG_LAT
     off_north = (lat - origin[0]) * _KM_PER_DEG_LAT
-    # نرمال چپگرد بردار مسیر.
+    # Left-pointing normal of the track vector.
     return off_east * (-dir_north) + off_north * dir_east
 
 
 def _heading_scan(step_deg: float) -> list[float]:
-    """پویش درشت سمت فرمان روی ۳۶۰ درجه."""
+    """Coarse sweep of the heading over 360 degrees."""
     if step_deg <= 0.0:
         raise ValueError("heading_coarse_step_deg must be positive.")
     count = max(int(round(360.0 / step_deg)), 1)
@@ -439,10 +449,10 @@ def _heading_scan(step_deg: float) -> list[float]:
 
 
 def _refine_scan(center_deg: float, span_deg: float, step_deg: float) -> list[float]:
-    """سمت‌های اطراف ``center_deg`` در بازهٔ ±``span_deg`` با گام ``step_deg``.
+    """Headings around ``center_deg`` within +/- ``span_deg`` at ``step_deg``.
 
-    نقطهٔ مرکزی هم در فهرست می‌آید تا بهترین سمت مرحلهٔ قبل در مقایسهٔ همین
-    مرحله هم بماند.
+    The center point is included so the previous stage best heading stays in
+    this stage comparison too.
     """
     if step_deg <= 0.0:
         raise ValueError("heading refine steps must be positive.")
@@ -471,46 +481,46 @@ def _simulate_heading(
     sampler_for_altitude: Callable[[float], WindSampler] | None = None,
     max_climb_gradient: float | None = None,
 ) -> _Simulation:
-    """یک سمت فرمان را از مبدأ انتگرال می‌گیرد تا فرود و بستن باقی‌مانده.
+    """Integrates one air heading from the origin through landing and closure.
 
-    فازها و **نقش گرانش**
+    Phases and **the role of gravity**
     -------------------
-    ۱) صعود در مبدأ تا ارتفاع لایه (موتور).
-    ۲) بادسواری در ارتفاع ثابت: یک سمت فرمان، باد هواپیما را ارمغان می‌برد.
-    ۳) فرود **شیب‌دار ملایم**: وقتی فاصلهٔ باقی‌مانده برابر ``h · descent_ratio``
-       شود، فرود روی همان شیب ثابت شروع می‌شود و ارتفاع مو‌به‌مو با فاصلهٔ
-       باقی‌مانده کم می‌شود تا صفر روی مقصد.
+    1) Climb at the origin to the layer altitude (engine).
+    2) Wind riding at constant altitude: one heading, the wind carries the
+    3) Descent on a **gentle fixed slope**: when remaining distance equals
+    ``h · descent_ratio``, the descent starts on that fixed slope and altitude
+    decreases linearly with remaining distance down to zero at the destination.
 
-    پیش‌تر فاز سوم یک *گلاید بیشینه* بود: از ``h · L/D`` شروع می‌شد و در ۶ کیلومتر
-    آخر ارتفاع می‌گرفت. آن نسخه از نظر سوخت بی‌نقص بود ولی در صحنه مثل یک
-    شیرجه دیده می‌شد و به کاربر چیزی «تدریجی» نمی‌نمود. حالا شیب فرود یک سیاست
-    است: ملایم‌تر از گلاید بیشینه، با توان جزئی موتور، و همان توان هم از توازن
-    رانش حساب می‌شود — پس «تدریجی‌تر» به معنی «رایگان‌تر» نیست، فقط توزیع‌یافته‌تر
-    است.
+    The third phase used to be a *max glide*: it started at ``h · L/D`` and
+    regained altitude in the last 6 km. That version was fuel-perfect but
+    looked like a dive in the scene and showed the user nothing "gradual".
+    The descent slope is now a *policy*: gentler than max glide with partial
+    engine power, that power computed from the thrust balance — so "more
+    gradual" does not mean "free", only differently distributed.
     """
-    # بُرد گلاید (کیلومتر): از سطح پرواز *تا ارتفاع زمین مقصد*، نه تا سطح دریا،
-    # برای همان ارتفاعی که واقعاً باید کم شود. اگر سطح دریا مبنا بماند، بُرد بیش
-    # از حد طول می‌کشد و هواپیما پیش از مقصد ارتفاعش را تمام می‌کند.
+    # Glide range (km): from cruise level down to the *destination ground
+    # elevation*, not sea level, for the altitude that actually has to be
+    # spent. Keeping sea level as the basis stretches the range too far and
     height_to_lose_m = max(altitude_m - ground_end_m, 0.0)
-    # مسافت *افقی* فرود روی شیب سیاست‌گذاری‌شده (``h · ratio``). فرود از همان
-    # نقطه‌ای شروع می‌شود که این مسافت با فاصلهٔ باقی‌مانده برابر شود.
+    # Horizontal distance of the descent on the policy slope (``h · ratio``). The
+    # descent starts where this distance equals the remaining distance.
     descent_span_km = height_to_lose_m * descent_ratio / 1000.0
     heading_rad = math.radians(heading_deg)
     air_east = airspeed_mps * math.sin(heading_rad)
     air_north = airspeed_mps * math.cos(heading_rad)
-    # سمت فرمانی که *واقعاً* در گام جاری به کار می‌رود. در حالت دنبال‌کردن
-    # باد، هر گام سمت خودش را دارد (مثلث باد) و همین عدد در پروندهٔ سوخت
-    # «تعداد تصحیح مسیر با موتور» را می‌سازد؛ در حالت سمت ثابت، همان ورودی است.
+    # The heading *actually* used in the current step. In follow-the-wind mode
+    # each step has its own heading (wind triangle) and this number feeds the
+    # fuel-record "engine course corrections"; in fixed-heading mode it is the
     current_heading = heading_deg
-    # سمت مسیر خواسته‌شده نسبت به باد: ۰ = کاملاً موازی باد، ۹۰ = عمود بر باد.
-    # به‌صورت مسافت وزن‌دار جمع می‌شود تا «چه سهمی از مسیر موازی باد بود»
-    # اندازه‌گیری شود، نه ادعا.
+    # Requested track angle relative to the wind: 0 = fully wind-parallel,
+    # 90 = perpendicular. Accumulated distance-weighted so "what share of the
+    # route was wind-parallel" is measured, not claimed.
     aligned_km = 0.0
 
     lat, lon = origin
     points: list[tuple[float, float]] = [(lat, lon)]
-    # پروفیل ارتفاع نمایشی: با مدل زمین، ارتفاع‌ها **مطلق**‌اند و مبدأ/مقصد روی
-    # زمین خودشان می‌نشینند؛ بدون مدل زمین، همان ۰ تا ارتفاع لایه قبلی است.
+    # Display altitude profile: with a terrain model altitudes are **absolute**
+    # and origin/destination sit on their own ground; without one, the same
     altitudes: list[float] = [_terrain_height(origin, ground_elevation_at)]
     legs: list[LegSample] = []
     ride_km = 0.0
@@ -518,31 +528,31 @@ def _simulate_heading(
     ride_hours = 0.0
     descent_hours = 0.0
     descending = False
-    # مسافت باقی‌مانده در لحظهٔ شروع فرود (کیلومتر). تا وقتی فرود شروع نشده
-    # صفر می‌ماند؛ بعد از آن مبنای شيب فرود است.
+    # Remaining distance at the moment the descent started (km). Stays zero
+    # until descent begins; afterwards it is the descent-slope basis.
     descent_start_km = 0.0
-    # کسر توان موتور در فاز فرود، از توازن رانش *همان قطعه*. هر قطعه جداگانه
-    # حساب می‌شود و نه یک‌بار برای کل فرود: پروفیل فرود می‌تواند به‌خاطر کف
-    # فاصله از زمین تکه‌تکه شود و شیب هر تکه فرق کند.
+    # Engine power fraction in the descent phase, from the thrust balance of
+    # *that segment*. Computed per segment, not once for the whole descent:
+    # the descent profile can be fragmented by the terrain floor and each
     descent_power = glide_power_fraction
-    # ارتفاع مطلق هواپیما (متر). در فاز بادسواری برابر سطح پرواز، و در فاز فرود
-    # روی گلایدش سوار است. پیش از ورود به حلقه مقدار می‌گیرد چون انتخاب بادِ
-    # «همین ارتفاع» در گام اول به آن نیاز دارد.
+    # Absolute aircraft altitude (m). Equals the cruise level in the wind-riding
+    # phase and rides its glide in the descent. Initialized before the loop
+    # because picking the wind "at this altitude" in the first step needs it.
     agl_now = altitude_m
-    # پاسخ «آیا کل مسیر قابل‌پرواز است؟». در فاز بادسواری به‌روز می‌شود و در
-    # ``_Simulation`` گزارش می‌شود تا برنامه‌ریز سطح ناممکن را رد کند.
+    # The "is the whole route flyable?" answer. Updated in the wind-riding phase
+    # and reported in ``_Simulation`` so the planner rejects an impossible level.
     terrain_climb_ok = True
     time_s = 0.0
     window_s = 0.0
     last_point = (lat, lon)
-    # باد پنجرهٔ جاری از همان نقطهٔ فعلی خوانده می‌شود، نه صفر. بدون این
-    # مقدارگذاری، پنجرهٔ *اول* جهت باد صفر گزارش می‌کرد و سنجهٔ «چند درصد مسیر
-    # موازی باد بود» از همان‌جا غلط می‌شد.
+    # Wind of the current window is read from the actual current point, not
+    # zero. Without this initialization the *first* window reported a zero
+    # wind direction and the "what share of the route was wind-parallel" metric
     window_speed, window_direction = sampler(lat, lon)
     min_clearance: float | None = None if ground_elevation_at is None else math.inf
 
     def close_window(new_lat: float, new_lon: float, agl_now: float) -> None:
-        """پنجرهٔ نمونه‌برداری جاری را به یک قطعه/نقطه تبدیل می‌کند."""
+        """Converts the current sampling window into one segment/point."""
         nonlocal window_s, last_point, window_speed, window_direction
         nonlocal aligned_km
         segment_km = _approx_km(last_point[0], last_point[1], new_lat, new_lon)
@@ -559,13 +569,13 @@ def _simulate_heading(
                 wind_direction_from_deg=window_direction,
                 distance_km=segment_km,
                 time_hours=window_s / 3600.0,
-                # فرمانِ خودِ برنامه‌ریز در این قطعه. در حالت سمت ثابت، عددی است
-                # که همهٔ قطعه‌های بادسواری و فرود با آن پرواز می‌شوند؛ در حالت
-                # دنبال‌کردن باد، از مثلث باد همان گام می‌آید و همین است که
-                # تغییر سمت و بهای سوخت تصحیح‌ها را واقعی می‌کند.
+                # The planner's own heading in this segment. In fixed-heading mode
+                # it is the number every wind-riding and descent segment flies;
+                # in follow-the-wind mode it comes from that step's wind triangle,
+                # which is what makes heading changes and the fuel cost of
                 air_heading_deg=current_heading,
-                # در فاز فرود بخشی از رانش از گرانش می‌آید، پس سوخت این مسافت
-                # کمتر از کروز است؛ مدل سوخت همین کسر را می‌بیند.
+                # In the descent phase part of the thrust comes from gravity, so
+                # the fuel of this distance is less than cruise; the fuel model
                 power_fraction=(
                     min(
                         max(
@@ -593,14 +603,14 @@ def _simulate_heading(
         if remaining < closest_remaining:
             closest_remaining = remaining
         elif remaining > closest_remaining + config.abandon_margin_km:
-            # این سمت مقصد را دور می‌زند؛ ادامه‌دادن فقط جست‌وجو را کند می‌کند.
+        # This heading circles around the destination; continuing only slows the
             break
 
-        # **باد در ارتفاع *واقعی* هواپیما.** اگر پروفیل عمودی داده شده باشد، باد
-        # از لایه‌ای خوانده می‌شود که هواپیما همین حالا در آن است — نه از لایهٔ
-        # کروز. همین است که «صعود کن تا در بادی بیفتی که تو را می‌برد» را واقعی
-        # می‌کند: با بالا رفتن از رشته‌کوه، بادِ همان ارتفاع (که راست‌تر چرخیده)
-        # خودش وارد مسئله می‌شود. بدون پروفیل، همان نمونه‌بردار ثابت قبلی.
+        # **Wind at the aircraft's *actual* altitude.** When a vertical profile
+        # is given, wind is read from the layer the aircraft is currently in —
+        # not the cruise layer. This is what makes "climb until you fall into a
+        # wind that carries you" real: climbing over the mountain range brings
+        # the wind at that altitude (rotated further right) into the problem.
         if sampler_for_altitude is None:
             sampler_now = descent_sampler if descending else sampler
         else:
@@ -608,40 +618,40 @@ def _simulate_heading(
         speed, direction = sampler_now(lat, lon)
         wind_east, wind_north = _wind_vector(speed, direction)
         if track_wind:
-            # **دنبال‌کردن باد، با دالان همگرا.**
+            # **Wind following, with a converging corridor.**
             #
-            # سمت *پیش‌فرض* همان جهت خود باد است (موازی پیکان‌ها). ولی باد این
-            # کریدور به سمت مقصد نمی‌وزد؛ هرچه جلوتر می‌رویم باد به راست
-            # می‌چرخد، پس «موازی باد رفتن» به‌تنهایی هواپیما را از کنار مقصد
-            # می‌گذراند. پس زاویهٔ مسیر در *یک بازه* انتخاب می‌شود:
+            # The *default* track is the wind's own direction (parallel to the
+            # arrows). But this corridor's wind does not blow toward the
+            # destination; further along, the wind veers right, so "flying
+            # parallel to the wind" alone would carry the aircraft past the
             #
-            #     زاویهٔ مسیر نسبت به «مستقیم به مقصد» را ``δ`` بگیریم. با مسافت
-            #     باقی‌ماندهٔ ``R`` و انحراف جانبی کنونی ``x``، انحراف پایانی
-            #     می‌شود ``x − R·sin δ`` (علامت منفی از این می‌آید که افزایش
-            #     آزیموت در دستگاه شرق–شمال به سمت *راست* می‌چرخد). اگر بخواهیم
-            #     اندازهٔ همین عدد از دالان ``±b`` بیرون نزند:
+            #     destination. Let ``delta`` be the track angle relative to
+            #     "straight to the destination". With remaining distance ``R``
+            #     and current lateral offset ``x``, the final offset becomes
+            #     ``x − R·sin(delta)`` (the minus sign comes from azimuth
+            #     increasing turning *right* in the east–north frame). To keep
             #
-            #         δ ∈ [asin((x − b)/R)، asin((x + b)/R)]
+            #     |that value| inside the corridor ``±b``:
             #
-            # و ``δ`` انتخابی همان جهت *خود باد* است اگر داخل این بازه باشد،
-            # وگرنه نزدیک‌ترین سر بازه. یعنی «تا جایی که ممکن است موازی باد، و
-            # از آن به بعد کمترین تصحیح لازم» — نه یک نبرد مداوم با باد.
+            #         delta ∈ [asin((x − b)/R), asin((x + b)/R)]
+            # The chosen ``delta`` is the wind's own direction when it falls
+            # inside this interval, otherwise the nearest interval end. I.e.
             #
-            # دالان ``b`` نسبت به مسافت باقی‌مانده کوچک می‌شود
-            # (``wind_corridor_fraction``)، پس در چند کیلومتر آخر بازه به صفر
-            # می‌رسد و هواپیما روی مقصد می‌نشیند. همین چند درجه کج‌شدن هم پسار
-            # القایی و باد رو-به-رو را در مدل سوخت فعال می‌کند. با باد ثابت و
-            # ۸.۲ درجه اختلاف، این کنترل تا ۱۱۲ کیلومتر *کاملاً* موازی باد
-            # می‌رود و بقیه را تصحیح می‌کند؛ مسافت کل ۱۷۵ کیلومتر می‌شود، یعنی
-            # فقط ۲ کیلومتر بیشتر از خط مستقیم.
+            # "as parallel to the wind as possible, then the least correction
+            # The corridor ``b`` shrinks relative to remaining distance
+            # (``wind_corridor_fraction``), so in the last few kilometers the
+            # interval closes to zero and the aircraft lands on the destination.
+            # Those few degrees of crab also activate induced drag and headwind
+            # terms in the fuel model. With constant wind and an 8.2 deg offset,
+            # this control flies *fully* parallel to the wind for 112 km and
             direct_bearing = _bearing(lat, lon, destination[0], destination[1])
             cross_track = _cross_track_km(origin, destination, lat, lon)
             wind_magnitude = math.hypot(wind_east, wind_north)
             if wind_magnitude <= 1e-9:
-                # **هواي آرام ≠ «موازي باد نامعلوم».** با باد صفر جهت باد وجود
-                # ندارد و ``atan2(0, 0)`` یک عدد دلبخواه برمی‌گرداند (شمال).
-                # در این حالت تنها سمت مسیر قابل‌دفاع، همان ستمی است که انحراف
-                # جانبی را صفر می‌کند — یعنی مستقیم به مقصد.
+                # **Calm air != "unknown parallel wind".** With zero wind there
+                # is no wind direction and ``atan2(0, 0)`` returns an arbitrary
+                # number (north). In that case the only defensible track is the
+                # one that zeroes the lateral offset — i.e. straight to the
                 deviation = math.degrees(
                     math.asin(min(max(cross_track / remaining, -1.0), 1.0))
                 )
@@ -665,9 +675,9 @@ def _simulate_heading(
                 desired_track, wind_east, wind_north, airspeed_mps
             )
             if solution is None:
-                # باد جانبی از سرعت هوایی بیشتر است: این سمت مسیر قابل‌نگه‌داشتن
-                # نیست. به همان «رو به مقصد» می‌افتیم؛ اگر آن هم نشد، مسیری با
-                # این باد و این سرعت هوایی برای این مقصد وجود ندارد.
+                # Crosswind exceeds airspeed: this ground track cannot be held.
+                # Fall back to "straight at the destination"; if that fails too,
+                # no route exists for this wind and airspeed to this destination.
                 solution = _solve_wind_triangle(
                     direct_bearing, wind_east, wind_north, airspeed_mps
                 )
@@ -688,25 +698,25 @@ def _simulate_heading(
 
         dt = config.step_s
         if not descending and remaining <= descent_span_km:
-            # مرز بادسواری/فرود *همین‌جا* بسته می‌شود. وگرنه پنجرهٔ نمونه‌برداری
-            # جاری (تا ۲ دقیقه پرواز کروز) به فاز فرود نسبت داده می‌شد و
-            # مسافت/سرعت هر دو فاز غلط گزارش می‌شد.
+            # The wind-riding/descent boundary closes *here*. Otherwise the
+            # current sampling window (up to 2 minutes of cruise flight) would
+            # be attributed to the descent phase and the distance/speed of
             before = last_point
             close_window(lat, lon, altitude_m)
             if last_point != before:
                 ride_km += _approx_km(before[0], before[1], lat, lon)
-            # شروع فرود یک *رخداد زمانی* است، نه تصحیح سمت: با یک گام کوتاه
-            # دقیقاً به نقطهٔ شروع فرود می‌رسیم و سمت فرمان عوض نمی‌شود.
+            # Descent start is a *timing event*, not a heading change: one short
+            # step lands exactly on the descent-start point and the heading is
             descending = True
-            # شیب *واقعی* از همین نقطه ساخته می‌شود: ارتفاع تابع خطی فاصلهٔ
-            # باقی‌مانده است، پس هواپیما مو‌به‌مو روی مقصد می‌نشیند و خطای گامِ
-            # شروع فرود به مقصد منتقل نمی‌شود.
+            # The *actual* slope is built from this point: altitude is a linear
+            # function of remaining distance, so the aircraft lands exactly on
+            # the destination and the descent-start step error does not carry
             descent_start_km = max(remaining, 1e-6)
-            # کسر توان موتور در فرود از توازن رانش می‌آید، نه از یک عدد دلبخواه:
-            # ``T = D − m·g·sinγ`` و ``D = m·g/(L/D)`` ⇒ ``T/D = 1 − (L/D)·sinγ``.
-            # شیب ۱ به ۴۰ با L/D = ۱۲ یعنی ۰.۷ توان کروز — نه دور آرام. دور آرام
-            # *کف* کار است: هر وقت شیبِ لازم از گلاید بیشینه تندتر شود (مسیر کوتاه
-            # یا فرود دیرهنگام)، گرانش تنها منبع رانش می‌شود.
+            # Engine power fraction in descent comes from the thrust balance, not
+            # an arbitrary number: ``T = D − m·g·sinγ`` and ``D = m·g/(L/D)``
+            # give ``T/D = 1 − (L/D)·sinγ``. A 1-in-40 slope with L/D = 12 means
+            # 0.7 cruise power — not idle. Idle is the *floor*: whenever the
+            # required slope steepens beyond max glide (short route or late
             descent_power = min(
                 max(
                     1.0
@@ -724,44 +734,61 @@ def _simulate_heading(
 
         if descending:
             descent_hours += dt / 3600.0
-            # شيب گلاید: ارتفاع متناسب با مسافت باقی‌مانده کم می‌شود، پس هواپیما
-            # *همزمان* با رسیدن به مقصد به ارتفاع زمین مقصد می‌رسد. شيب همان
-            # ۱/(L/D) است — گلاید با موتور دور آرام، نه فرود توان‌دار.
+            # Glide slope: altitude decreases proportionally to remaining
+            # distance, so the aircraft reaches the destination ground elevation
+            # exactly when it arrives. The slope is 1/(L/D) — idle-engine glide,
             left_km = _approx_km(lat, lon, destination[0], destination[1])
             agl_now = ground_end_m + max(
                 height_to_lose_m * min(left_km / descent_start_km, 1.0), 0.0
             )
-            # **کف زمین.** یک فرود ملایم که از ۱۰۰ کیلومتر قبل شروع شود، در
-            # ارتفاع پایین‌تر به کوه می‌رسد. بادسواری نباید از داخل کوه رد شود،
-            # پس پروفیل سیاست‌گذاری‌شده در فراز *کوه* بالا نگه داشته می‌شود.
-            # در تقرب پایانی این کف به ارتفاع زمین مقصد می‌رسد (``approach_km``)،
-            # وگرنه هواپیما هرگز نمی‌توانست بنشیند.
+            # **Terrain floor.** A gentle descent starting 100 km out arrives at
+            # the mountain at a lower altitude. Wind riding must not pass through
+            # the mountain, so the policy profile is held up over the *summit*.
+            # In the final approach the floor ramps down to the destination
+            # ground elevation (``approach_km``), otherwise the aircraft could
             if ground_elevation_at is not None and clearance_floor_m > 0.0:
                 fade = min(left_km / approach_km, 1.0)
                 floor_msl = (
                     float(ground_elevation_at(lat, lon)) + clearance_floor_m * fade
                 )
+                # سقف باند: اگر کف زمین از سقف باند بالاتر باشد، این سطح
+                # نمی‌تواند هم‌زمان باند را نگه دارد و از کوه رد شود → غیرقابل‌پرواز.
+                if (
+                    config.max_altitude_msl_m is not None
+                    and floor_msl > config.max_altitude_msl_m + 1e-9
+                ):
+                    terrain_climb_ok = False
                 agl_now = max(agl_now, floor_msl)
         else:
             ride_hours += dt / 3600.0
             agl_now = altitude_m
-            # **کف زمین در فاز بادسواری.** این کریدور رشته‌کوهی تا ۳۱۷۵ متر دارد؛
-            # سطح پرواز ۱۵۰۰ یا ۲۲۰۰ متری از قله پایین‌تر است، پس کروز تراز
-            # یعنی پرواز از داخل کوه. هواپیما ناچار *بالا می‌رود* تا از زمین رد
-            # شود — و همان صعود، ارتفاعش را عوض می‌کند و از این‌جا به بعد بادِ
-            # همان ارتفاع تازه خوانده می‌شود (به ``sampler_for_altitude`` نگاه
-            # کنید). این تنها جای مسئله است که دو مدل به هم تکیه می‌کنند و هر دو
-            # جا عدد یکسان (``clearance_floor_m`` گراف) به کار می‌رود.
+            # **Terrain floor in the wind-riding phase.** This corridor crosses a
+            # mountain range up to 3175 m; the 1500 or 2200 m cruise level is below
+            # the summit, so level cruise would mean flying through the mountain.
+            # The aircraft necessarily *climbs* to clear the terrain, and that
+            # same climb changes its altitude, so from here on the wind is read at
+            # the new altitude (see ``sampler_for_altitude``). This is the only
+            # place where the two models lean on each other, and both use the same
             if ground_elevation_at is not None and clearance_floor_m > 0.0:
                 floor_msl = float(ground_elevation_at(lat, lon)) + clearance_floor_m
-                # **آیا این صعود را می‌تواند انجام دهد؟** کف زمین می‌تواند بالاتر از
-                # سطح کروز بیفتد (یال کوه). اگر همان کف را تحمیل کنیم، هواپیما در
-                # یک لحظه جهش می‌کند — یک صعود با شیب بینهایت که فقط روی کاغذ کار
-                # می‌کند. پس *صعود لازم برای رسیدن به کف* با سقف شیب هواپیما سنجیده
-                # می‌شود و اگر از آن بگذرد، این سطح قابل‌پرواز نیست: همان کاری که
-                # گراف با حذف گره‌های زیر آستانه می‌کند. نتیجه برای این کریدور این
-                # است که سطح ۱۵۰۰ تا ۲۹۰۰ متری برای بادسواری رد می‌شود (یال تا ۳۱۷۵
-                # متر بالا می‌رود) و بادسواری فقط در بالاترین سطح مسیر دارد.
+                # سقف باند (حالت «ارتفاع انتخابی»): صعود برای رد شدن از کوه
+                # فقط تا سقف باند مجاز است. اگر کف زمین از آن بالاتر باشد، این
+                # سطح نمی‌تواند باند را نگه دارد؛ برنامه در فیلتر «قابل‌پرواز»
+                # رد می‌شود و مسیریاب گراف — که با حذف گره‌های کم‌فاصله، مسیر
+                # را *دور* کوه می‌برد — جای آن را می‌گیرد.
+                if (
+                    config.max_altitude_msl_m is not None
+                    and floor_msl > config.max_altitude_msl_m + 1e-9
+                ):
+                    terrain_climb_ok = False
+                # **Can this climb be sustained?** The terrain floor can sit above
+                # the cruise level (a mountain edge). Imposing it as-is would make
+                # the aircraft jump instantly: an infinite-gradient climb that
+                # only works on paper. So the *climb needed to reach the floor* is
+                # checked against the aircraft climb-gradient ceiling; beyond it,
+                # this level is not flyable: exactly what the graph does by
+                # dropping nodes below the threshold. For this corridor levels
+                # 1500-2900 m are rejected (the edge climbs to 3175 m) and wind
                 if floor_msl > agl_now:
                     rise = floor_msl - agl_now
                     allowed = (
@@ -773,18 +800,18 @@ def _simulate_heading(
                         terrain_climb_ok = False
                     agl_now = floor_msl
 
-        # فاصله از زمین در **همین گام**. این‌جا و نه در نقطه‌های نمونه‌برداری
-        # سنجیده می‌شود: نمونه‌برداری هر ۲ دقیقه (≈۲.۵ کیلومتر) است و یک
-        # یال باریک کوه می‌تواند دقیقاً بین دو نمونه بیفتد.
-        # آستانهٔ سنجش فاصله از زمین فقط **بیرون از تقرب پایانی** اعمال می‌شود.
-        # در تقرب پایانی هواپیما *باید* به زمین برسد، پس اگر نقطهٔ نشستن هم در
-        # آمار بیاید کمترین فاصله از زمین همیشه صفر می‌شود و سنجهٔ ایمنی
-        # بی‌معنا. «تقرب پایانی» با **مسافت** تعریف می‌شود، نه با ارتفاع: تعریف
-        # ارتفاعی روی کوه اشتباه می‌کرد — اگر زمین زیر مسیر چند صد متر بالاتر از
-        # زمین مقصد باشد، هواپیما در تقرب پایانی هنوز بالای آستانهٔ ارتفاعی است
-        # و همان چند متر کاهش یافته به‌عنوان «نقض ایمنی» شمرده می‌شد، درحالی‌که
-        # هیچ کار دیگری نمی‌شد کرد. مسافت، همان تعریفی است که کف زمین هم با آن
-        # ساخته می‌شود (``approach_km``).
+        # Terrain clearance in **this step**. Measured here, not at the sampling
+        # points: sampling is every 2 minutes (about 2.5 km) and a narrow mountain
+        # edge can fall exactly between two samples.
+        # The clearance threshold applies only **outside the final approach**.
+        # In the final approach the aircraft *must* reach the ground, so if the
+        # touchdown point entered the statistics, minimum clearance would always
+        # be zero and the safety metric meaningless. "Final approach" is defined
+        # by **distance**, not altitude: an altitude-based definition was wrong:
+        # if the terrain under the route sits several hundred meters above the
+        # destination ground, the aircraft in the final approach is still above
+        # the altitude threshold and those few reduced meters would count as a
+        # "safety violation" although nothing else could be done. Distance is
         if (
             min_clearance is not None
             and ground_elevation_at is not None
@@ -794,8 +821,8 @@ def _simulate_heading(
             if clearance_now < min_clearance:
                 min_clearance = clearance_now
 
-        # نمونه‌برداری: هر ``path_sample_s`` (و در فاز فرود در هر گام، تا
-        # پروفیل ارتفاع دقیق بماند).
+        # Sampling: every ``path_sample_s`` (and in the descent phase every step,
+        # so the altitude profile stays exact).
         if window_s >= config.path_sample_s or descending:
             before = last_point
             close_window(lat, lon, agl_now)
@@ -808,7 +835,38 @@ def _simulate_heading(
                 window_speed, window_direction = speed, direction
 
 
-    # قطعهٔ پایانی: باقی‌ماندهٔ مستقیم به مقصد (اگر بیرون شعاع رسیدن باشیم).
+    # **بُرش در نزدیک‌ترین نقطه — جلوگیری از پاگرد تیز مقصد.** حلقهٔ بالا لحظهٔ
+    # «رسیدن» را *پیش از* هر گام می‌شکند، پس موقعیت نهایی می‌تواند از مقصد
+    # بگذرد (هر گام ≈ ۰٫۶ کیلومتر)؛ قاعدهٔ «پرت شدن» (``abandon_margin``) و
+    # سقف زمان هم می‌توانند مسیر را بعد از نزدیک‌ترین نقطه دور کرده باشند. درج
+    # مقصد پس از چنین نقطه‌ای یک «رد شد و برگشت» می‌سازد — همان پاگرد تیزی که
+    # در صحنه دیده می‌شد. پس هندسه تا نزدیک‌ترین نقطهٔ مقصد بریده می‌شود و
+    # قطعهٔ پایانی از همان‌جا می‌رود. قطعه‌های حساب‌شده (``legs``) هم هم‌پا
+    # بریده می‌شوند تا جفت «قطعه ↔ بازهٔ مسیر» در ``wind_riding_route_result``
+    # حفظ شود. قید ``tail`` جلوی بریدن مسیرهای بلند سالم را می‌گیرد: تنها
+    # جمع‌شدگی کوچک انتهایی (همان پاگرد) بسته می‌شود، نه یک مسیر پیچیده.
+    if points:
+        closest_index = min(
+            range(len(points)),
+            key=lambda index: haversine_km(
+                points[index][0], points[index][1], destination[0], destination[1]
+            ),
+        )
+        closest_km = haversine_km(
+            points[closest_index][0],
+            points[closest_index][1],
+            destination[0],
+            destination[1],
+        )
+        current_km = haversine_km(lat, lon, destination[0], destination[1])
+        tail = len(points) - 1 - closest_index
+        if current_km > closest_km + 1e-9 and tail <= max(2, len(points) // 4):
+            del points[closest_index + 1:]
+            del altitudes[closest_index + 1:]
+            del legs[closest_index:]
+            lat, lon = points[closest_index]
+
+    # Final leg: straight remainder to the destination (if outside the arrival
     miss_km = haversine_km(lat, lon, destination[0], destination[1])
     final_bearing = _bearing(lat, lon, destination[0], destination[1])
 
@@ -832,16 +890,16 @@ def _simulate_heading(
                 time_hours=final_leg_hours,
             )
         )
-    # اگر هواپیما همین حالا داخل شعاع رسیدن است، نقطهٔ آخر *با* مقصد جایگزین
-    # می‌شود؛ اضافه‌کردن مقصد یک قطعهٔ کوتاهِ رو‌به‌عقب می‌سازد.
+    # If the aircraft is already inside the arrival radius, the last point is
+    # replaced *with* the destination; appending it would create a short
     #
-    # چرا این مهم است: حلقه وقتی می‌شکند که فاصله به مقصد از شعاع رسیدن کمتر
-    # شود، و آن لحظه *قبل* از گام بعدی سنجیده می‌شود، پس نقطهٔ پایانی می‌تواند
-    # چند صد متر از مقصد گذشته باشد (یک گام ۲۰ ثانیه‌ای حدود ۰.۶ کیلومتر است).
-    # مقصدی که بعد از آن نقطه اضافه شود، انتهای مسیر را روی خودش برمی‌گرداند و
-    # همان پیچِ کوچک در پروفیل رسم‌شده به شکل یک «افتِ تیز» درست روی مقصد دیده
-    # می‌شود — چیزی که هیچ هواپیمایی انجام نمی‌دهد. جایگزینی، هندسه را با فیزیک
-    # یکی می‌کند: آخرین قطعه همان قطعهٔ مستقیم نهایی به مقصد می‌شود.
+    # Why this matters: the loop breaks when distance to destination drops below
+    # the arrival radius, and that moment is checked *before* the next step, so
+    # the final point can overshoot the destination by a few hundred meters (a
+    # 20-second step is about 0.6 km). Appending the destination after that
+    # point would fold the route end back on itself, and that small kink shows
+    # up in the plotted profile as a "sharp dip" right at the destination,
+    # something no aircraft does. Replacing unifies geometry with physics:
     if len(points) > 1 and miss_km <= config.arrival_radius_km:
         points[-1] = destination
         altitudes[-1] = ground_end_m
@@ -865,11 +923,11 @@ def _simulate_heading(
         final_leg_hours=final_leg_hours,
         final_bearing_deg=final_bearing,
         miss_km=miss_km,
-        # شیب *واقعی* فرود (۱ به N) از مسافت طی‌شده می‌آید، نه از سیاست: اگر کف
-        # زمین وسط راه بخشی از فرود را بالا نگه داشته باشد، میانگین شیب تند‌تر
-        # از ۱ به ``descent_ratio`` می‌شود و همین عدد باید گزارش شود. توان فرود
-        # هم از توازن رانش *همین* شیب میانگین می‌آید تا دو ستون جدول با هم یکی
-        # باشند — نه اینکه یک ستون سیاست را بگوید و دیگری هندسهٔ واقعی را.
+        # The *actual* descent slope (1 in N) comes from the distance flown, not
+        # from the policy: if the terrain floor held part of the descent up, the
+        # mean slope steepens beyond 1-in-``descent_ratio`` and that is the number
+        # to report. Descent power comes from the thrust balance of *that same*
+        # mean slope so the two table columns agree, rather than one column
         descent_slope_ratio=(
             descent_km * 1000.0 / height_to_lose_m if height_to_lose_m > 0.0 else 0.0
         ),

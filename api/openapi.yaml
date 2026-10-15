@@ -1,0 +1,878 @@
+openapi: 3.0.3
+info:
+  title: Roshd Wind Pathfinder API
+  description: |
+    قرارداد API بین رابط کاربری React و لایه بک‌اند FastAPI پروژه مسیریاب بادی.
+    این سند منبع واحد حقیقت (single source of truth) برای هر دو تیم فرانت‌اند و
+    بک‌اند است؛ تسک بک‌اند (`86bc860cr`) دقیقاً همین endpointها را پیاده می‌کند.
+  version: "1.0.0"
+  contact:
+    name: Roshd Wind Pathfinder
+    url: https://github.com/Roshd-136/roshd-wind-pathfinder
+
+servers:
+  - url: https://api.windpathfinder.roshd136.dev/v1
+    description: Production
+  - url: http://localhost:8000/v1
+    description: Local development (FastAPI dev server)
+
+tags:
+  - name: routing
+    description: محاسبه و بازیابی مسیر بهینه
+  - name: wind-layers
+    description: لایه‌های داده باد (چندارتفاعی)
+  - name: points
+    description: نقاط ذخیره‌شده / مورد علاقه کاربر
+  - name: algorithms
+    description: الگوریتم‌ها و معیارهای بهینگی موجود
+  - name: auth
+    description: احراز هویت
+  - name: account
+    description: حساب کاربری، ترجیحات، تاریخچه
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ---------------------------------------------------------------- routing
+  /routes:
+    post:
+      tags: [routing]
+      summary: محاسبه مسیر بهینه (sync یا async)
+      description: |
+        برای گراف‌های کوچک (وضعیت فعلی پروژه، ۳ ایستگاه) پاسخ معمولاً همزمان
+        (sync) و در چند صدم ثانیه برمی‌گردد. برای گراف‌های بزرگ‌تر آینده،
+        `async: true` یک job برمی‌گرداند که باید با `/routes/jobs/{jobId}`
+        یا وب‌سوکت پیگیری شود.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RouteRequest'
+      responses:
+        '200':
+          description: نتیجه فوری (حالت sync)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RouteResult'
+        '202':
+          description: درخواست پذیرفته شد؛ محاسبه در پس‌زمینه انجام می‌شود (حالت async)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RouteJobAccepted'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /routes/jobs/{jobId}:
+    get:
+      tags: [routing]
+      summary: وضعیت/پیشرفت یک job مسیریابی async
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: وضعیت فعلی job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RouteJobStatus'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /routes/jobs/{jobId}/compare-layers:
+    get:
+      tags: [routing]
+      summary: جدول مقایسه زمان سفر/هزینه روی همه لایه‌های ارتفاعی برای این مسیر
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: جدول مقایسه لایه‌ها
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LayerComparison'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /routes/{routeId}:
+    get:
+      tags: [routing]
+      summary: بازیابی یک مسیر قبلاً محاسبه/ذخیره‌شده
+      parameters:
+        - $ref: '#/components/parameters/RouteId'
+      responses:
+        '200':
+          description: نتیجه مسیر
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RouteResult'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [routing]
+      summary: حذف یک مسیر ذخیره‌شده از تاریخچه کاربر
+      responses:
+        '204':
+          description: حذف شد
+        '404':
+          $ref: '#/components/responses/NotFound'
+      parameters:
+        - $ref: '#/components/parameters/RouteId'
+
+  # ------------------------------------------------------------ wind-layers
+  /wind-layers:
+    get:
+      tags: [wind-layers]
+      summary: لیست تمام لایه‌های ارتفاعی باد موجود، با متادیتا
+      security: []
+      responses:
+        '200':
+          description: لیست لایه‌ها
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WindLayerMeta'
+
+  /wind-layers/{altitudeM}/field:
+    get:
+      tags: [wind-layers]
+      summary: داده برداری/کانتور سرعت و جهت باد یک لایه، برای یک محدوده جغرافیایی
+      security: []
+      parameters:
+        - name: altitudeM
+          in: path
+          required: true
+          schema: { type: number, format: float }
+          description: ارتفاع لایه به متر (مثلاً 500، 1000)
+        - name: bbox
+          in: query
+          required: false
+          schema: { type: string }
+          description: "min_lon,min_lat,max_lon,max_lat — پیش‌فرض کل محدوده داده"
+        - name: resolutionDeg
+          in: query
+          required: false
+          schema: { type: number, format: float, default: 0.05 }
+      responses:
+        '200':
+          description: میدان برداری باد
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WindField'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /wind-layers/{altitudeM}/point:
+    get:
+      tags: [wind-layers]
+      summary: سرعت/جهت باد درون‌یابی‌شده در یک نقطه مشخص (برای پاپ‌آپ Point Info)
+      security: []
+      parameters:
+        - name: altitudeM
+          in: path
+          required: true
+          schema: { type: number, format: float }
+        - name: lat
+          in: query
+          required: true
+          schema: { type: number, format: double }
+        - name: lon
+          in: query
+          required: true
+          schema: { type: number, format: double }
+      responses:
+        '200':
+          description: مقدار درون‌یابی‌شده
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WindPointSample'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /wind-layers/point-all:
+    get:
+      tags: [wind-layers]
+      summary: سرعت/جهت باد یک نقطه در همه لایه‌های ارتفاعی با هم (پاپ‌آپ "Wind Layers")
+      security: []
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema: { type: number, format: double }
+        - name: lon
+          in: query
+          required: true
+          schema: { type: number, format: double }
+      responses:
+        '200':
+          description: نمونه هر لایه
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WindPointSample'
+
+  # ----------------------------------------------------------------- points
+  /points/favorites:
+    get:
+      tags: [points]
+      summary: لیست نقاط مورد علاقه/ذخیره‌شده کاربر
+      responses:
+        '200':
+          description: لیست نقاط
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FavoritePoint'
+    post:
+      tags: [points]
+      summary: افزودن نقطه مورد علاقه
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FavoritePointCreate'
+      responses:
+        '201':
+          description: ایجاد شد
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FavoritePoint'
+
+  /points/favorites/{pointId}:
+    delete:
+      tags: [points]
+      summary: حذف نقطه مورد علاقه
+      parameters:
+        - name: pointId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: حذف شد
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ------------------------------------------------------------- algorithms
+  /algorithms:
+    get:
+      tags: [algorithms]
+      summary: لیست الگوریتم‌های مسیریابی و معیارهای بهینگی موجود
+      security: []
+      responses:
+        '200':
+          description: لیست الگوریتم‌ها
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlgorithmOptions'
+
+  # -------------------------------------------------------------------- auth
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: ثبت‌نام کاربر جدید
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: کاربر ایجاد شد؛ ایمیل تایید ارسال شد
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '409':
+          description: این ایمیل قبلاً ثبت شده
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: ورود با ایمیل/رمز عبور
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: توکن‌های احراز هویت
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      summary: تمدید access token با refresh token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        '200':
+          description: توکن‌های جدید
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: باطل کردن refresh token فعلی
+      responses:
+        '204':
+          description: خروج انجام شد
+
+  /auth/password-reset/request:
+    post:
+      tags: [auth]
+      summary: درخواست ایمیل بازیابی رمز عبور
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '202':
+          description: در صورت وجود ایمیل، لینک بازیابی ارسال می‌شود (بدون افشای وجود/عدم‌وجود ایمیل)
+
+  /auth/password-reset/confirm:
+    post:
+      tags: [auth]
+      summary: تعیین رمز عبور جدید با توکن بازیابی
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, new_password]
+              properties:
+                token: { type: string }
+                new_password: { type: string, format: password, minLength: 8 }
+      responses:
+        '204':
+          description: رمز عبور تغییر کرد
+        '400':
+          description: توکن نامعتبر یا منقضی
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/verify-email/confirm:
+    post:
+      tags: [auth]
+      summary: تایید ایمیل با توکن ارسال‌شده
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        '204':
+          description: ایمیل تایید شد
+        '400':
+          description: توکن نامعتبر یا منقضی
+
+  /auth/oauth/{provider}/authorize:
+    get:
+      tags: [auth]
+      summary: شروع جریان OAuth2 (اختیاری — Google/GitHub)
+      security: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema: { type: string, enum: [google, github] }
+      responses:
+        '302':
+          description: ریدایرکت به صفحه احراز هویت provider
+
+  /auth/oauth/{provider}/callback:
+    get:
+      tags: [auth]
+      summary: بازگشت از provider و صدور توکن‌های داخلی
+      security: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema: { type: string, enum: [google, github] }
+        - name: code
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: توکن‌های احراز هویت
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+
+  # ----------------------------------------------------------------- account
+  /me:
+    get:
+      tags: [account]
+      summary: اطلاعات کاربر جاری
+      responses:
+        '200':
+          description: کاربر
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    patch:
+      tags: [account]
+      summary: ویرایش اطلاعات پروفایل
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: کاربر به‌روزشده
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /me/preferences:
+    get:
+      tags: [account]
+      summary: دریافت ترجیحات کاربر (واحد، تم، زبان، الگوریتم/معیار پیش‌فرض)
+      responses:
+        '200':
+          description: ترجیحات
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Preferences'
+    put:
+      tags: [account]
+      summary: به‌روزرسانی کامل ترجیحات
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Preferences'
+      responses:
+        '200':
+          description: ترجیحات ذخیره شد
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Preferences'
+
+  /me/routes:
+    get:
+      tags: [account]
+      summary: تاریخچه مسیرهای محاسبه/ذخیره‌شده کاربر
+      parameters:
+        - name: saved_only
+          in: query
+          schema: { type: boolean, default: false }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, maximum: 100 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: صفحه‌ای از تاریخچه
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RouteHistoryPage'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    JobId:
+      name: jobId
+      in: path
+      required: true
+      schema: { type: string }
+    RouteId:
+      name: routeId
+      in: path
+      required: true
+      schema: { type: string }
+
+  responses:
+    BadRequest:
+      description: درخواست نامعتبر
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: احراز هویت نامعتبر یا منقضی
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: یافت نشد
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ValidationError:
+      description: خطای اعتبارسنجی ورودی
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ValidationErrorBody' }
+    RateLimited:
+      description: تعداد درخواست‌ها از حد مجاز گذشته
+      headers:
+        Retry-After:
+          schema: { type: integer }
+        X-RateLimit-Limit:
+          schema: { type: integer }
+        X-RateLimit-Remaining:
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Coordinate:
+      type: object
+      required: [lat, lon]
+      properties:
+        lat: { type: number, format: double, minimum: -90, maximum: 90 }
+        lon: { type: number, format: double, minimum: -180, maximum: 180 }
+
+    Checkpoint:
+      allOf:
+        - $ref: '#/components/schemas/Coordinate'
+        - type: object
+          properties:
+            order:
+              type: integer
+              description: ترتیب عبور اجباری از این چک‌پوینت (۰=اولین)
+
+    AvoidZone:
+      type: object
+      required: [type, center, radius_km]
+      properties:
+        type: { type: string, enum: [circle] }
+        center: { $ref: '#/components/schemas/Coordinate' }
+        radius_km: { type: number, format: float, minimum: 0 }
+
+    RouteConstraints:
+      type: object
+      properties:
+        max_wind_speed_mps: { type: number, format: float, nullable: true }
+        altitude_range_m:
+          type: array
+          items: { type: number, format: float }
+          minItems: 2
+          maxItems: 2
+          nullable: true
+        avoid_zones:
+          type: array
+          items: { $ref: '#/components/schemas/AvoidZone' }
+        criterion:
+          type: string
+          enum: [time, energy, balanced]
+          default: time
+        weights:
+          type: object
+          description: فقط وقتی criterion=balanced استفاده می‌شود؛ جمع باید ۱ باشد
+          properties:
+            time: { type: number, format: float, default: 0.5 }
+            energy: { type: number, format: float, default: 0.5 }
+
+    RouteRequest:
+      type: object
+      required: [origin, destination]
+      properties:
+        origin: { $ref: '#/components/schemas/Coordinate' }
+        destination: { $ref: '#/components/schemas/Coordinate' }
+        checkpoints:
+          type: array
+          items: { $ref: '#/components/schemas/Checkpoint' }
+        layer_mode:
+          type: string
+          enum: [auto, manual]
+          default: auto
+          description: auto = بهترین لایه به‌صورت خودکار انتخاب شود
+        altitude_m:
+          type: number
+          format: float
+          nullable: true
+          description: الزامی وقتی layer_mode=manual
+        algorithm:
+          type: string
+          enum: [a_star, dijkstra]
+          default: a_star
+        constraints:
+          $ref: '#/components/schemas/RouteConstraints'
+        async:
+          type: boolean
+          default: false
+
+    RouteResult:
+      type: object
+      properties:
+        route_id: { type: string }
+        path:
+          type: array
+          items: { $ref: '#/components/schemas/Coordinate' }
+        layer_altitude_m: { type: number, format: float }
+        algorithm: { type: string, enum: [a_star, dijkstra] }
+        criterion: { type: string, enum: [time, energy, balanced] }
+        total_distance_km: { type: number, format: float }
+        estimated_time_hours: { type: number, format: float }
+        total_cost: { type: number, format: float }
+        created_at: { type: string, format: date-time }
+        is_saved: { type: boolean, default: false }
+
+    RouteJobAccepted:
+      type: object
+      properties:
+        job_id: { type: string }
+        status: { type: string, enum: [queued] }
+        poll_url: { type: string }
+        websocket_url: { type: string }
+
+    RouteJobStatus:
+      type: object
+      properties:
+        job_id: { type: string }
+        status: { type: string, enum: [queued, running, succeeded, failed] }
+        progress_pct: { type: number, format: float, minimum: 0, maximum: 100 }
+        result:
+          $ref: '#/components/schemas/RouteResult'
+          nullable: true
+        error:
+          $ref: '#/components/schemas/Error'
+          nullable: true
+
+    LayerComparisonRow:
+      type: object
+      properties:
+        layer_altitude_m: { type: number, format: float }
+        estimated_time_hours: { type: number, format: float }
+        total_distance_km: { type: number, format: float }
+        total_cost: { type: number, format: float }
+        is_best: { type: boolean }
+
+    LayerComparison:
+      type: object
+      properties:
+        best_altitude_m: { type: number, format: float }
+        rows:
+          type: array
+          items: { $ref: '#/components/schemas/LayerComparisonRow' }
+
+    WindLayerMeta:
+      type: object
+      properties:
+        altitude_m: { type: number, format: float }
+        unit: { type: string, default: "m/s" }
+        bbox:
+          type: array
+          items: { type: number, format: double }
+          minItems: 4
+          maxItems: 4
+        last_updated: { type: string, format: date-time }
+
+    WindVector:
+      type: object
+      properties:
+        lat: { type: number, format: double }
+        lon: { type: number, format: double }
+        speed_mps: { type: number, format: float }
+        direction_deg: { type: number, format: float }
+
+    WindField:
+      type: object
+      properties:
+        altitude_m: { type: number, format: float }
+        vectors:
+          type: array
+          items: { $ref: '#/components/schemas/WindVector' }
+
+    WindPointSample:
+      type: object
+      properties:
+        altitude_m: { type: number, format: float }
+        speed_mps: { type: number, format: float }
+        direction_deg: { type: number, format: float }
+
+    FavoritePointCreate:
+      type: object
+      required: [label, coordinate]
+      properties:
+        label: { type: string }
+        coordinate: { $ref: '#/components/schemas/Coordinate' }
+
+    FavoritePoint:
+      allOf:
+        - $ref: '#/components/schemas/FavoritePointCreate'
+        - type: object
+          properties:
+            id: { type: string }
+            created_at: { type: string, format: date-time }
+
+    AlgorithmOptions:
+      type: object
+      properties:
+        algorithms:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, enum: [a_star, dijkstra] }
+              label: { type: string }
+              is_default: { type: boolean }
+        criteria:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, enum: [time, energy, balanced] }
+              label: { type: string }
+
+    RegisterRequest:
+      type: object
+      required: [email, password, name]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password, minLength: 8 }
+        name: { type: string }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+
+    AuthTokens:
+      type: object
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        token_type: { type: string, default: bearer }
+        expires_in: { type: integer, description: "ثانیه" }
+
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        name: { type: string }
+        email_verified: { type: boolean }
+        created_at: { type: string, format: date-time }
+
+    UserUpdate:
+      type: object
+      properties:
+        name: { type: string }
+
+    Preferences:
+      type: object
+      properties:
+        units: { type: string, enum: [metric, imperial], default: metric }
+        theme: { type: string, enum: [light, dark, system], default: system }
+        language: { type: string, enum: [fa, en], default: fa }
+        default_algorithm: { type: string, enum: [a_star, dijkstra], default: a_star }
+        default_criterion: { type: string, enum: [time, energy, balanced], default: time }
+
+    RouteHistoryPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/RouteResult' }
+        next_cursor: { type: string, nullable: true }
+
+    Error:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+        request_id: { type: string }
+
+    ValidationErrorBody:
+      type: object
+      properties:
+        code: { type: string, default: "validation_error" }
+        message: { type: string }
+        request_id: { type: string }
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              issue: { type: string }
