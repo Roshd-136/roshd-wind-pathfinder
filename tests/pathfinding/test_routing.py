@@ -543,3 +543,90 @@ def test_comparison_table_exposes_new_diagnostics() -> None:
         "estimated_time_hours",
     ):
         assert column in table.columns
+
+
+# ===========================================================================
+# لنگر هوایی — چک‌پوینت با ارتفاع قفل‌شده
+# ===========================================================================
+
+
+def _two_layer_router() -> WindRouter:
+    """روتری با گراف دونوع لایه که تغییر لایه در میانهٔ راه مجاز است."""
+    ml = _make_two_layer_multi()
+    return WindRouter(ml, criterion="time", allow_layer_changes=True)
+
+
+def test_locked_destination_endpoint_passes_in_air() -> None:
+    """سرِ قفل‌شدهٔ قطعه روی زمین نمی‌رسد؛ در همان ارتفاع در هوا تمام می‌شود.
+
+    قرارداد چک‌پوینتِ قفل‌شده: نقاط ابتدا و انتهای پروفیل گزارش‌شده باید
+    همان قرارداد لنگر را نگه دارند — شروع روی زمین و پایان در-هوا در سطح
+    قفل. (ساختار گره‌ها جداگانه هم کنترل می‌شود چون پروفیل نرم کمانی است.)
+    """
+    router = _two_layer_router()
+    cp = NEYSHABUR
+
+    # ساختار گراف انباشته: سرِ مقصد لنگر هوایی است، نه گره زمین.
+    stacked = router.multi_graph.to_stacked_graph(
+        SABZEVAR, cp, layers=(2000.0,), endpoint_altitudes=(None, 2000.0)
+    )
+    dest = stacked.graph.get_node(stacked.destination_id)
+    origin = stacked.graph.get_node(stacked.origin_id)
+    assert dest is not None and origin is not None
+    assert dest.altitude == pytest.approx(2000.0)
+    assert dest.is_ground is False
+    assert origin.is_ground is True
+
+    result = router.find_optimal_path(
+        SABZEVAR, cp, layers=(2000.0,), endpoint_altitudes=(None, 2000.0)
+    )
+    alts = result.node_altitudes
+    # شروع روی زمین (گره زمین → ارتفاع صفر) ...
+    assert alts[0] == pytest.approx(0.0)
+    # ... و پایان در-هوا در سطح قفل، نه فرود.
+    assert alts[-1] == pytest.approx(2000.0)
+
+
+def test_locked_origin_endpoint_starts_in_air() -> None:
+    """سرِ قفل‌شدهٔ ابتدای قطعه در هوا آغاز می‌شود و انتهای زمینِ قطعه معمولی است."""
+    router = _two_layer_router()
+    stacked = router.multi_graph.to_stacked_graph(
+        NEYSHABUR, SABZEVAR, layers=(2000.0,), endpoint_altitudes=(2000.0, None)
+    )
+    origin = stacked.graph.get_node(stacked.origin_id)
+    assert origin is not None
+    assert origin.altitude == pytest.approx(2000.0)
+    assert origin.is_ground is False
+
+    result = router.find_optimal_path(
+        NEYSHABUR, SABZEVAR, layers=(2000.0,), endpoint_altitudes=(2000.0, None)
+    )
+    alts = result.node_altitudes
+    assert alts[0] == pytest.approx(2000.0)
+    assert alts[-1] == pytest.approx(0.0)
+
+
+def test_locked_endpoint_outside_stacked_layers_is_rejected() -> None:
+    """قفلی که جزو سطوح انباشته نیست، خطای شفاف می‌دهد نه مسیر نادرست."""
+    router = _two_layer_router()
+    with pytest.raises(ValueError, match="must be one of the stacked layers"):
+        router.find_optimal_path(
+            SABZEVAR,
+            NEYSHABUR,
+            layers=(500.0,),
+            endpoint_altitudes=(None, 2000.0),
+        )
+
+
+def test_locked_endpoint_air_and_ground_between_two_checkpoints() -> None:
+    """هر دو سر قفل‌شده: قطعه در-هوا از قفل آغاز و به قفل ختم می‌شود."""
+    router = _two_layer_router()
+    result = router.find_optimal_path(
+        NEYSHABUR,
+        MASHHAD,
+        layers=(2000.0,),
+        endpoint_altitudes=(2000.0, 2000.0),
+    )
+    alts = result.node_altitudes
+    assert alts[0] == pytest.approx(2000.0)
+    assert alts[-1] == pytest.approx(2000.0)
