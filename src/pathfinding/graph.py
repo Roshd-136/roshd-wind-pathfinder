@@ -786,6 +786,7 @@ class MultiLayerWindGraph:
         ground_altitude: float = 0.0,
         layers: Sequence[float] | None = None,
         ground_elevation_at: Callable[[float, float], float] | None = None,
+        endpoint_altitudes: Sequence[float | None] | None = None,
     ) -> StackedGraph:
         """همه لایه‌ها را در یک گراف سه‌بعدی ادغام می‌کند تا مسیر بین لایه‌ها جابجا شود.
 
@@ -814,11 +815,20 @@ class MultiLayerWindGraph:
             معیار و تنظیمات مدل هزینه‌ای که گراف ادغام‌شده باید با آن وزن داشته باشد.
         ground_altitude : float
             ارتفاع گره‌های زمین (متر، پیش‌فرض صفر = روی زمین).
+        layers : Sequence[float], اختیاری
+            زیرمجموعه‌ای از لایه‌ها برای ادغام؛ ``None`` یعنی همهٔ لایه‌ها.
+        ground_elevation_at : Callable, اختیاری
+            تابع ارتفاع زمین برای ارتفاع واقعی گره‌های زمین (متر MSL).
+        endpoint_altitudes : Sequence[float | None], اختیاری
+            قفل ارتفاعی مبدأ/مقصد به‌ترتیب (طول ۲). اگر برای یک سر مقدار
+            داده شود، به‌جای گره زمین یک «لنگر هوایی» روی همان مختصات و در
+            همان سطح ساخته می‌شود؛ یعنی مسیر از آن نقطه در هوا شروع/خاتمه
+            می‌یابد و هنگام رسیدن به آن، به زمین نمی‌رسد.
 
         برمی‌گرداند
         ----------
         StackedGraph
-            گراف ادغام‌شده به‌همراه شناسه گره زمین مبدأ/مقصد.
+            گراف ادغام‌شده به‌همراه شناسه گره مبدأ/مقصد (زمین یا لنگر هوایی).
 
         استثناها
         --------
@@ -956,15 +966,112 @@ class MultiLayerWindGraph:
         # همان «قلابِ» ابتدای مسیر. حالا گره زمین دقیقاً روی مختصات کاربر است و به
         # چند گرهٔ نزدیک در لایه‌های مختلف وصل می‌شود؛ وزن هر اتصال هزینهٔ افقی
         # مسافتش را هم دارد، پس بهینه‌ساز جهت درست خروج را خودش انتخاب می‌کند.
-        ground_ids: list[str] = []
-        ground_coords: list[tuple[float, float]] = []
-        for point in (origin, destination):
+        endpoint_ids: list[str] = []
+        endpoint_coords: list[tuple[float, float]] = []
+        for index, point in enumerate((origin, destination)):
             lat, lon = float(point[0]), float(point[1])
             local_ground = (
                 float(ground_elevation_at(lat, lon))
                 if ground_elevation_at is not None
                 else ground_altitude
             )
+            locked_alt = (
+                endpoint_altitudes[index]
+                if endpoint_altitudes is not None and index < len(endpoint_altitudes)
+                else None
+            )
+            if locked_alt is not None:
+                # لنگرِ هوایی — چک‌پوینت با ارتفاع قفل‌شده.
+                #
+                # نقطهٔ اتصال این قطعه «گره زمین» نیست؛ در غیر این صورت مسیر در
+                # انتهای قطعه تا زمین پایین می‌آمد و چک‌پوینت روی زمین عبور
+                # می‌کرد — دقیقاً همان چیزی که کاربر با قفل ارتفاع منع کرده.
+                # به‌جای آن یک گره روی همان مختصات دقیق و در سطح قفل ساخته
+                # می‌شود و به چند گرهٔ نزدیکِ *همان سطح* وصل می‌شود؛ چون
+                # اختلاف ارتفاع صفر است، هزینهٔ اتصال فقط افقی است و گذار
+                # صعود/فرود اضافی جعل نمی‌شود. برای انتهای قطعه «رسیدن به
+                # چک‌پوینت در همان ارتفاع»، برای ابتدای قطعهٔ بعد «برخاستن از
+                # همان نقطه و همان ارتفاع» معنا پیدا می‌کند.
+                # لنگر هوایی فقط در سطحی روشن است که در گراف انباشته حاضر است؛
+                # قفلِ بیرون از سطوح انباشته تناقض صریح است نه «بدشانسی
+                # برآمدنِ نامزد» — خطای شفاف می‌دهیم تا ردهٔ بالاتر با پیام
+                # فارسی همان را به کاربر برساند.
+                if locked_alt not in {float(x) for x in layers}:
+                    raise ValueError(
+                        f"Locked endpoint altitude {locked_alt:.0f} m must be "
+                        f"one of the stacked layers "
+                        f"{sorted({float(x) for x in layers})}."
+                    )
+                air_id = f"air|{locked_alt:.3f}|{lat:.6f},{lon:.6f}"
+                stacked.add_node(
+                    GraphNode(
+                        node_id=air_id,
+                        lat=lat,
+                        lon=lon,
+                        wind_speed_mps=0.0,
+                        wind_direction_deg=0.0,
+                        altitude=locked_alt,
+                        ground_elevation_m=local_ground,
+                        is_ground=False,
+                    )
+                )
+                air_node = stacked.get_node(air_id)
+                if air_node is None:
+                    raise ValueError(
+                        "Air anchor node could not be added to the stacked graph."
+                    )
+                layer = source.get_layer(locked_alt)
+                connected_km: list[float] = []
+                if layer is not None:
+                    nearby = sorted(
+                        (
+                            (haversine_km(lat, lon, node.lat, node.lon), node)
+                            for node in layer.nodes.values()
+                        ),
+                        key=lambda item: item[0],
+                    )
+                    for distance_km, node in nearby[:_ENDPOINT_CONNECTOR_CANDIDATES]:
+                        if distance_km > _ENDPOINT_CONNECTOR_RADIUS_KM:
+                            break
+                        layer_node = stacked.get_node(
+                            _stacked_node_id(locked_alt, node.node_id)
+                        )
+                        if layer_node is None:
+                            continue
+                        stacked.add_edge(
+                            _build_endpoint_connector(
+                                air_node,
+                                layer_node,
+                                distance_km,
+                                target_config,
+                                target_criterion,
+                                target_time_weight,
+                                vertical,
+                                "climb",
+                            )
+                        )
+                        stacked.add_edge(
+                            _build_endpoint_connector(
+                                layer_node,
+                                air_node,
+                                distance_km,
+                                target_config,
+                                target_criterion,
+                                target_time_weight,
+                                vertical,
+                                "descent",
+                            )
+                        )
+                        connected_km.append(distance_km)
+                if not connected_km:
+                    raise ValueError(
+                        f"No usable node at the locked altitude {locked_alt:.0f} m "
+                        f"near ({lat:.4f}, {lon:.4f}); this flight level is "
+                        "unflyable there (terrain, corridor limits or clearance)."
+                    )
+                endpoint_ids.append(air_id)
+                endpoint_coords.append((lat, lon))
+                continue
             ground_id = f"ground|{lat:.6f},{lon:.6f}"
             stacked.add_node(
                 GraphNode(
@@ -1092,18 +1199,18 @@ class MultiLayerWindGraph:
                         "descent",
                     )
                 )
-            ground_ids.append(ground_id)
-            ground_coords.append((lat, lon))
+            endpoint_ids.append(ground_id)
+            endpoint_coords.append((lat, lon))
 
-        if ground_ids[0] == ground_ids[1]:
+        if endpoint_ids[0] == endpoint_ids[1]:
             raise ValueError("Origin and destination snap to the same ground node.")
 
         return StackedGraph(
             graph=stacked,
-            origin_id=ground_ids[0],
-            destination_id=ground_ids[1],
-            origin_coords=ground_coords[0],
-            destination_coords=ground_coords[1],
+            origin_id=endpoint_ids[0],
+            destination_id=endpoint_ids[1],
+            origin_coords=endpoint_coords[0],
+            destination_coords=endpoint_coords[1],
             layer_altitudes=tuple(layers),
             ground_altitude=ground_altitude,
         )

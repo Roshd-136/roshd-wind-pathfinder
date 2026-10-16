@@ -485,6 +485,7 @@ class WindRouter:
         origin: tuple[float, float],
         destination: tuple[float, float],
         layers: Sequence[float] | None = None,
+        endpoint_altitudes: Sequence[float | None] | None = None,
     ) -> RouteResult:
         """مسیر بهینه از مبدأ به مقصد با انتخاب خودکار لایه.
 
@@ -501,6 +502,10 @@ class WindRouter:
             هزینه صعود و فرود را می‌پردازد؛ به همین دلیل برای مقایسه منصفانه
             با مسیر آزاد مناسب است (بر خلاف ``route_on_single_layer`` که فقط
             روی خود لایه و بدون گره زمین می‌چرخد).
+        endpoint_altitudes : Sequence[float | None], اختیاری
+            قفل ارتفاعی سرهای این قطعه به‌ترتیب (مبدأ، مقصد). برای سرِ قفل‌شده
+            مسیر ** روی زمین شروع/ختم نمی‌شود**؛ از لنگر هوایی در همان ارتفاع
+            می‌گذرد — قرارداد چک‌پوینت با ارتفاع قفل‌شده.
 
         برمی‌گرداند
         ----------
@@ -513,7 +518,12 @@ class WindRouter:
             اگر هیچ لایه‌ای در دسترس نباشد یا مسیری یافت نشود.
         """
         if self.allow_layer_changes:
-            return self._route_across_layers(origin, destination, layers=layers)
+            return self._route_across_layers(
+                origin,
+                destination,
+                layers=layers,
+                endpoint_altitudes=endpoint_altitudes,
+            )
         if layers is not None:
             raise ValueError(
                 "`layers` only applies when allow_layer_changes=True; otherwise "
@@ -620,6 +630,7 @@ class WindRouter:
         origin: tuple[float, float],
         destination: tuple[float, float],
         layers: Sequence[float] | None = None,
+        endpoint_altitudes: Sequence[float | None] | None = None,
     ) -> RouteResult:
         """مسیر بهینه روی گراف سه‌بعدی ادغام‌شده (با امکان تغییر لایه در میانه راه).
 
@@ -627,6 +638,8 @@ class WindRouter:
         از یک لایه به لایه دیگر صعود/فرود کند و هزینه آن گذار (``vertical_cost``)
         هم در تابع هدف حساب می‌شود. مسیر از گره زمین مبدأ شروع و به گره زمین
         مقصد ختم می‌شود، پس صعود اولیه و فرود نهایی هم بخشی از مسیر بهینه‌اند.
+        سرِ قفل‌شده (``endpoint_altitudes``) استثناست: به‌جای گره زمین از لنگر
+        هوایی در همان ارتفاع عبور می‌کند.
 
         استثناها
         --------
@@ -642,6 +655,7 @@ class WindRouter:
             time_weight=self.time_weight,
             layers=layers,
             ground_elevation_at=self.ground_elevation_at,
+            endpoint_altitudes=endpoint_altitudes,
         )
         result = self._route_on_graph(
             stacked.graph, stacked.origin_id, stacked.destination_id
