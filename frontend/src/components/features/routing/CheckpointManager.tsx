@@ -9,6 +9,9 @@ interface CheckpointManagerProps {
   adding?: boolean
   onToggleAdd?: () => void
   canAdd?: boolean
+  /** دلیل روشن قطع‌بودن دکمه (مثلاً «فقط در نمایش ۲بعدی») — به‌جای
+   * سکوتِ دکمهٔ کم‌رنگ که کاربر را گیج می‌کرد. */
+  disabledHint?: string
 }
 
 /**
@@ -23,23 +26,32 @@ export function CheckpointManager({
   adding = false,
   onToggleAdd,
   canAdd = true,
+  disabledHint,
 }: CheckpointManagerProps) {
   const { t } = useTranslation()
 
   const addButton = (
-    <button
-      type="button"
-      onClick={onToggleAdd}
-      disabled={!canAdd}
-      aria-pressed={adding}
-      className={`w-full rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-        adding
-          ? 'border-accent bg-accent/15 text-accent'
-          : 'border-border bg-surface-raised text-text-secondary hover:text-text-primary disabled:opacity-40'
-      }`}
-    >
-      {adding ? t('routing.addingCheckpoint') : t('routing.addCheckpoint')}
-    </button>
+    <div className="space-y-1">
+      <button
+        type="button"
+        onClick={onToggleAdd}
+        disabled={!canAdd}
+        aria-pressed={adding}
+        aria-describedby={disabledHint ? 'checkpoint-disabled-hint' : undefined}
+        className={`w-full rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+          adding
+            ? 'border-accent bg-accent/15 text-accent'
+            : 'border-border bg-surface-raised text-text-secondary hover:text-text-primary disabled:opacity-40'
+        }`}
+      >
+        {adding ? t('routing.addingCheckpoint') : t('routing.addCheckpoint')}
+      </button>
+      {!canAdd && disabledHint && (
+        <p id="checkpoint-disabled-hint" className="text-xs text-amber-500">
+          {disabledHint}
+        </p>
+      )}
+    </div>
   )
 
   if (checkpoints.length === 0) {

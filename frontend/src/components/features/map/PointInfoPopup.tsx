@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import type { WindPointSample } from '../../../types/routing'
+import { formatAltitudeM, formatSpeedMps } from '../../../utils/format'
+import { useFormatLang } from '../../../hooks/useFormatLang'
 import { Card } from '../../ui/Card'
 
 interface PointInfoPopupProps {
@@ -13,6 +15,7 @@ interface PointInfoPopupProps {
  */
 export function PointInfoPopup({ samples, onClose }: PointInfoPopupProps) {
   const { t } = useTranslation()
+  const lang = useFormatLang()
 
   return (
     <Card className="absolute end-4 top-4 w-56 text-sm">
@@ -30,8 +33,8 @@ export function PointInfoPopup({ samples, onClose }: PointInfoPopupProps) {
       <ul className="space-y-1">
         {samples.map((s) => (
           <li key={s.altitude_m} className="flex items-center justify-between text-text-secondary">
-            <span>{s.altitude_m} m</span>
-            <span className="text-text-primary">{s.speed_mps.toFixed(1)} m/s</span>
+            <span>{formatAltitudeM(s.altitude_m, lang)}</span>
+            <span className="text-text-primary">{formatSpeedMps(s.speed_mps, lang)}</span>
           </li>
         ))}
       </ul>

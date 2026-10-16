@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import i18n from '../../../i18n'
 import { WindSpeedLegend } from './WindSpeedLegend'
 
 describe('WindSpeedLegend', () => {
@@ -24,5 +25,16 @@ describe('WindSpeedLegend', () => {
     render(<WindSpeedLegend range={[7, 7]} />)
     expect(screen.getByText('0')).toBeInTheDocument()
     expect(screen.getByText('20 m/s')).toBeInTheDocument()
+  })
+
+  it('labels speed in Persian metres-per-second in fa («م/ث»)', async () => {
+    await i18n.changeLanguage('fa')
+    try {
+      render(<WindSpeedLegend range={[4.2, 13.8]} />)
+      expect(screen.getByText('13.8 م/ث')).toBeInTheDocument()
+      expect(screen.queryByText('13.8 m/s')).not.toBeInTheDocument()
+    } finally {
+      await i18n.changeLanguage('en')
+    }
   })
 })

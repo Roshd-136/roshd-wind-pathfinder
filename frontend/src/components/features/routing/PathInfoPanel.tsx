@@ -13,6 +13,8 @@ import {
   WIND_ALTITUDE_MAX,
   altitudeBandRange,
 } from '../../../config/routing'
+import { formatAltitudeM, formatDistanceKm, formatDurationHours } from '../../../utils/format'
+import { useFormatLang } from '../../../hooks/useFormatLang'
 import { Button } from '../../ui/Button'
 import { Card } from '../../ui/Card'
 import { Collapsible } from '../../ui/Collapsible'
@@ -33,6 +35,9 @@ interface PathInfoPanelProps {
   addingCheckpoint: boolean
   onToggleAddCheckpoint: () => void
   canAddCheckpoint: boolean
+  /** دلیل قطع دکمهٔ افزودن چک‌پوینت (مثلاً «فقط در ۲بعدی») — فقط وقتی
+   * `canAddCheckpoint` برقرار نیست نمایش داده می‌شود. */
+  addCheckpointDisabledHint?: string
   onPointInfo: () => void
   canPointInfo: boolean
   /** پاک‌کردن کل انتخاب‌ها — دکمه در خود پنل است (نه شناور روی نقشه). */
@@ -74,6 +79,7 @@ export function PathInfoPanel({
   addingCheckpoint,
   onToggleAddCheckpoint,
   canAddCheckpoint,
+  addCheckpointDisabledHint,
   onPointInfo,
   canPointInfo,
   onClear,
@@ -84,6 +90,7 @@ export function PathInfoPanel({
   void onClear
   void canClear
   const { t } = useTranslation()
+  const lang = useFormatLang()
 
   const altitudeMode = altitudeModeOf(layerVisibility)
   const band = altitudeBandRange(altitudeMode)
@@ -157,18 +164,20 @@ export function PathInfoPanel({
           <div className="grid grid-cols-3 gap-2 text-center">
             <div>
               <div className="text-sm font-bold text-text-primary">
-                {result.total_distance_km.toFixed(1)} km
+                {formatDistanceKm(result.total_distance_km, lang)}
               </div>
               <div className="text-xs text-text-muted">{t('results.distance')}</div>
             </div>
             <div>
               <div className="text-sm font-bold text-text-primary">
-                {result.estimated_time_hours.toFixed(2)} h
+                {formatDurationHours(result.estimated_time_hours, lang)}
               </div>
               <div className="text-xs text-text-muted">{t('results.eta')}</div>
             </div>
             <div>
-              <div className="text-sm font-bold text-text-primary">{result.layer_altitude_m} m</div>
+              <div className="text-sm font-bold text-text-primary">
+                {formatAltitudeM(result.layer_altitude_m, lang)}
+              </div>
               <div className="text-xs text-text-muted">{t('results.layerAltitude')}</div>
             </div>
           </div>
@@ -224,6 +233,7 @@ export function PathInfoPanel({
           adding={addingCheckpoint}
           onToggleAdd={onToggleAddCheckpoint}
           canAdd={canAddCheckpoint}
+          disabledHint={!canAddCheckpoint ? addCheckpointDisabledHint : undefined}
         />
       </section>
 

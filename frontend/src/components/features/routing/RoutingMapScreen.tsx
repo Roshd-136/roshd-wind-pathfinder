@@ -15,6 +15,7 @@ import { fieldSpeedRange } from '../../../utils/windField'
 import { WIND_LAYER_BANDS } from '../../../config/routing'
 import { ApiError } from '../../../services/api/client'
 import { PathInfoPanel } from './PathInfoPanel'
+import { RouteErrorDialog } from './RouteErrorDialog'
 import { StepsWizard } from './StepsWizard'
 import { MapTools } from '../map/MapTools'
 
@@ -158,6 +159,17 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
   // حالتِ درخواست در ۳بعدی نادیده گرفته می‌شود (حالت مشتق، بدون اثر).
   const placingCheckpoint = placingCheckpointRequested && mode !== '3d'
 
+  // نشانگر متقاطع روی بوم نقشه در حالت افزودن چک‌پوینت — کاربر باید بفهمد
+  // کلیک بعدی «ثبت» می‌کند، نه انتخاب مبدأ/مقصد (منتظر سکوت نباشد).
+  useEffect(() => {
+    const canvas = mapRef.current?.getCanvas()
+    if (!canvas) return
+    canvas.style.cursor = placingCheckpoint ? 'crosshair' : ''
+    return () => {
+      canvas.style.cursor = ''
+    }
+  }, [placingCheckpoint])
+
   // ————— ویرایشگر نقطه در صحنهٔ سه‌بعدی (گیمبال سه‌محوره) —————
   // هدف فعال گیمبال؛ در بازگشت به ۲بعدی پنهان می‌شود (فقط در ۳بعدی معنا دارد).
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null)
@@ -228,7 +240,12 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
       canPointInfo={Boolean(origin)}
       addingCheckpoint={placingCheckpoint}
       onToggleAddCheckpoint={() => setPlacingCheckpoint((v) => !v)}
-      canAddCheckpoint={Boolean(origin && destination)}
+      // در ۳بعدی گذاشتن چک‌پوینت معنا ندارد (کلیک روی صحنهٔ دست‌ساز) — دکمه
+      // با دلیلِ روشن قطع می‌شود، نه سکوت؛ علت اصلی «چک‌پوینت کار نمی‌کند».
+      canAddCheckpoint={Boolean(origin && destination) && mode !== '3d'}
+      addCheckpointDisabledHint={
+        mode === '3d' ? t('routing.checkpoints2dOnly') : undefined
+      }
       onClear={handleClear}
       canClear={canClear}
       result={result}
@@ -278,16 +295,24 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
             />
           </div>
         )}
-        {routeError && (
-          // خطای محاسبه — پیام موتور (مثل «در باند ارتفاعی مسیر پروازپذیری
-          // پیدا نشد») زیر ویزارد دیده می‌شود؛ پیش‌تر خطاها بی‌صدا ناپدید
-          // می‌شدند و کاربر نمی‌فهمید چرا مسیری نیامد.
+        {placingCheckpoint && (
+          // راهنمای حالت افزودن چک‌پوینت — دکمهٔ «در حال افزودن» به‌تنهایی
+          // کافی نبود؛ کاربر نمی‌فهمید باید روی خودِ نقشه کلیک کند.
           <div
-            role="alert"
-            className="absolute top-28 left-1/2 z-20 w-[24rem] max-w-[94vw] -translate-x-1/2 rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger shadow-[var(--shadow-card)] backdrop-blur-sm"
+            role="status"
+            className="absolute top-28 left-1/2 z-20 w-max max-w-[94vw] -translate-x-1/2 rounded-xl border border-accent/50 bg-accent/15 px-3 py-2 text-xs font-medium text-accent shadow-[var(--shadow-card)] backdrop-blur-sm"
           >
-            {t('routing.routeError', { message: routeError.message })}
+            {t('routing.checkpointPlacingHint')}
           </div>
+        )}
+        {routeError && (
+          // خطای محاسبه در فریم جدای مودال — پیام فارسی موتور (مثل «در باند
+          // ارتفاعی مسیر پروازپذیری پیدا نشد»). بنر کوچک روی نقشه قبلاً در
+          // شلوغی گم می‌شد؛ کاربر خواست خطا کادر مستقل بگیرد.
+          <RouteErrorDialog
+            message={t('routing.routeError', { message: routeError.message })}
+            onClose={() => pathfinding.reset()}
+          />
         )}
         {/* ویزارد مراحل — قاب وسط بالا؛ بازگشت انتخابِ گام فرود را پاک می‌کند
             (کاربر باید دوباره انتخاب کند تا «بعدی» باز شود) */}

@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
+import i18n from '../../../i18n'
 import { PathInfoPanel } from './PathInfoPanel'
 
 /** PlaceLabel داخل پنل از react-query استفاده می‌کند — ارائه‌دهندهٔ تست. */
@@ -33,23 +34,43 @@ const baseProps = {
 }
 
 describe('PathInfoPanel', () => {
+  const sampleResult = {
+    route_id: 'r1',
+    path: [],
+    layer_altitude_m: 500,
+    algorithm: 'a_star' as const,
+    criterion: 'time' as const,
+    total_distance_km: 173.1,
+    estimated_time_hours: 2.5,
+    total_cost: 1.2,
+    created_at: new Date().toISOString(),
+  }
+
   it('shows the route result summary once a result is available', () => {
+    withProviders(<PathInfoPanel {...baseProps} result={sampleResult} />)
+    expect(screen.getByTestId('route-result-summary')).toHaveTextContent('173.1 km')
+  })
+
+  it('formats the summary with Persian units in fa («ک.م» and «۱س۲۰د» style)', async () => {
+    await i18n.changeLanguage('fa')
+    try {
+      withProviders(<PathInfoPanel {...baseProps} result={sampleResult} />)
+      expect(screen.getByTestId('route-result-summary')).toHaveTextContent('۱۷۳٫۱ ک.م')
+      expect(screen.getByTestId('route-result-summary')).toHaveTextContent('۲س۳۰د')
+      expect(screen.getByTestId('route-result-summary')).toHaveTextContent('۵۰۰ متر')
+    } finally {
+      await i18n.changeLanguage('en')
+    }
+  })
+
+  it('explains why checkpoint adding is disabled (2D-only rule)', () => {
     withProviders(
       <PathInfoPanel
         {...baseProps}
-        result={{
-          route_id: 'r1',
-          path: [],
-          layer_altitude_m: 500,
-          algorithm: 'a_star',
-          criterion: 'time',
-          total_distance_km: 173.1,
-          estimated_time_hours: 2.5,
-          total_cost: 1.2,
-          created_at: new Date().toISOString(),
-        }}
+        canAddCheckpoint={false}
+        addCheckpointDisabledHint="افزودن چک‌پوینت فقط در نمایش ۲بعدی امکان‌پذیر است؛ به نمای ۲بعدی بروید."
       />,
     )
-    expect(screen.getByTestId('route-result-summary')).toHaveTextContent('173.1 km')
+    expect(screen.getByText(/۲بعدی/)).toBeInTheDocument()
   })
 })
