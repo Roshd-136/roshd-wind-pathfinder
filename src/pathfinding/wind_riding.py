@@ -285,6 +285,14 @@ class WindRidingPlan:
     parallel_mean_deg: float = math.nan
     final_correction_km: float = 0.0
     corridor_fraction: float = 0.0
+    # حالت عبوری چک‌پوینت قفل‌شدهٔ ارتفاعی (فاقد فرود در مقصد قطعه) و
+    # ارتفاعِ رسیدن در مبدأ قطعه. با شناخت این دو، لایهٔ گزارش
+    # (``wind_riding_route_result``) می‌داند کدام دو سر مسیر «روی زمین» است
+    # و باید صفر گزارش شود و کدام دو سر «در هوا» و باید همان ارتفاع واقعی MSL
+    # بماند — پیش‌تر هر دو سر همیشه صفر می‌شد و مسیر عملاً در چک‌پوینت
+    # قفل‌شده به زمین می‌نشست.
+    land_at_end: bool = True
+    start_altitude_m: float | None = None
 
     @property
     def wind_aligned_fraction(self) -> float:
@@ -495,6 +503,8 @@ def _simulate_heading(
     track_wind: bool = False,
     sampler_for_altitude: Callable[[float], WindSampler] | None = None,
     max_climb_gradient: float | None = None,
+    land_at_end: bool = True,
+    start_altitude_m: float | None = None,
 ) -> _Simulation:
     """Integrates one air heading from the origin through landing and closure.
 
@@ -512,11 +522,26 @@ def _simulate_heading(
     The descent slope is now a *policy*: gentler than max glide with partial
     engine power, that power computed from the thrust balance — so "more
     gradual" does not mean "free", only differently distributed.
+
+    Pass-through mode (``land_at_end=False``)
+    ----------------------------------------
+    An intermediate waypoint the user lifted in the 3D scene (the locked
+    altitude of a checkpoint) must be crossed **in the air**, not landed on.
+    In that mode phase 3 never starts: the flight cruises to the destination
+    of the segment, the final point keeps the cruise altitude (or the
+    terrain-guided level if the ground floor lifted it), and the wind of the
+    final leg is read at the cruise layer. This is how a multi-segment route
+    can chain "origin → air-point → destination" without touching down at
+    every checkpoint — which was exactly the bug: each segment glided to its
+    segment-end ground level, so the route visibly dived to the ground at the
+    checkpoint the user had dragged up.
     """
     # Glide basis (km/1000): the altitude is spent from the cruise level down
     # to the *destination ground elevation*, not sea level — anchoring at sea
     # level would overstate the height to lose and start the descent early.
-    height_to_lose_m = max(altitude_m - ground_end_m, 0.0)
+    # در حالت عبوری فرودی نیست؛ ارتفاع «باید-بقدرشود» صفر می‌ماند تا هیچ فاز
+    # فرودی — حتی دربست منطقی `remaining <= descent_span_km` — فعال نشود.
+    height_to_lose_m = 0.0 if not land_at_end else max(altitude_m - ground_end_m, 0.0)
     # Horizontal distance of the descent on the policy slope (``h · ratio``). The
     # descent starts where this distance equals the remaining distance.
     descent_span_km = height_to_lose_m * descent_ratio / 1000.0
@@ -536,7 +561,12 @@ def _simulate_heading(
     points: list[tuple[float, float]] = [(lat, lon)]
     # Display altitude profile: with a terrain model altitudes are **absolute**
     # and origin/destination sit on their own ground; without one, the same
-    altitudes: list[float] = [_terrain_height(origin, ground_elevation_at)]
+    # نخستین نقطهٔ مسیر: وقتی قطعه *در هوا* شروع می‌شود (چک‌پوینتِ قفل‌شدهٔ
+    # قبل مسیر را همان‌جا در ارتفاع تحویل داده است) نقطهٔ شروع هم همان ارتفاع است،
+    # نه زمینِ زیرش — وگرنه مسیر رندرشده در نقشهراه شیرجهٔ عمودی می‌زد.
+    altitudes: list[float] = [
+        start_altitude_m if start_altitude_m is not None else _terrain_height(origin, ground_elevation_at)
+    ]
     legs: list[LegSample] = []
     ride_km = 0.0
     descent_km = 0.0
@@ -714,7 +744,7 @@ def _simulate_heading(
             break
 
         dt = config.step_s
-        if not descending and remaining <= descent_span_km:
+        if land_at_end and not descending and remaining <= descent_span_km:
             # The wind-riding/descent boundary closes *here*. Otherwise the
             # current sampling window (up to 2 minutes of cruise flight) would
             # be attributed to the descent phase, and the distance and engine
@@ -901,7 +931,10 @@ def _simulate_heading(
     final_leg_km = 0.0
     final_leg_hours = 0.0
     if miss_km > config.arrival_radius_km:
-        speed, direction = descent_sampler(lat, lon)
+        # بادِ پارکت پایانی: در حالت فرودی زمین دارد (modal لایهٔ پایین)، در
+        # حالت عبوری هنوز در سطح کروزی است — باد باید از همان لایه خوانده شود.
+        wind_sampler = descent_sampler if land_at_end else sampler
+        speed, direction = wind_sampler(lat, lon)
         wind_east, wind_north = _wind_vector(speed, direction)
         trail = math.radians(final_bearing)
         v_east = airspeed_mps * math.sin(trail) + wind_east
@@ -930,12 +963,18 @@ def _simulate_heading(
     # up in the plotted profile as a "sharp dip" right at the destination,
     # something no aircraft does. Replacing unifies geometry with physics: the
     # reported route ends exactly where the simulation judged "arrived".
+    # ارتفاع نقطهٔ انتهایی: فرودی → ارتفاع زمین مقصد؛ عبوری → ارتفاع کروز
+    # (آخرین نمونه ممکن است از کف زمین بالا رانده شده باشد — همان را نگه می‌داریم).
+    if not land_at_end and altitudes:
+        end_altitude_m = altitudes[-1]
+    else:
+        end_altitude_m = ground_end_m
     if len(points) > 1 and miss_km <= config.arrival_radius_km:
         points[-1] = destination
-        altitudes[-1] = ground_end_m
+        altitudes[-1] = end_altitude_m
     else:
         points.append(destination)
-        altitudes.append(ground_end_m)
+        altitudes.append(end_altitude_m)
 
     return _Simulation(
         heading_deg=heading_deg,
@@ -1010,6 +1049,8 @@ def plan_wind_riding_route(
     ground_elevation_at: Callable[[float, float], float] | None = None,
     min_clearance_m: float = 0.0,
     cruise_altitudes: Sequence[float] | None = None,
+    land_at_end: bool = True,
+    start_altitude_m: float | None = None,
 ) -> WindRidingPlan | None:
     """بهترین مسیر بادسواری را برای یک مبدأ/مقصد پیدا می‌کند.
 
@@ -1030,6 +1071,18 @@ def plan_wind_riding_route(
         ارتفاع‌های کروزی که باید جست‌وجو شوند. پیش‌فرض، همان ارتفاع‌های
         ``layers``. جدا کردن این دو یعنی می‌توان کارنامهٔ یک سطح را خواست در
         حالی که هواپیما اجازه دارد برای رد شدن از کوه به سطح باالتر برود.
+    land_at_end : bool, پیش‌فرض True
+        فرود در انتهای قطعه (مقصد قطعه، یعنی مبدأ/مقصد/چک‌پوینت). وقتی
+        ``False``، مسیر مقصد قطعه را **در ارتفاع کروز** رد می‌کند و فرود
+        نمی‌گیرد — حالت عبوری برای چک‌پوینت‌های قفل‌شدهٔ ارتفاعی: نقطهٔ
+        وسطِ مسیر که کاربر در صحنه به بالا کشیده، باید در هوا دیده شود نه
+        روی زمین. (پیش از این، هر قطعه در انتهایش فرود می‌گرفت و مسیر عملاً
+        «روی زمین» از آن چک‌پوینت می‌گذشت.)
+    start_altitude_m : float, اختیاری
+        ارتفاعِ رسیدنِ هواپیما در مبدأ این قطعه — ارتفاع قفل‌شدهٔ چک‌پوینتِ
+        قبلی. صرفاً هزینهٔ صعود از آن سطح حساب می‌شود (نه از زمین) و نقطهٔ
+        نخستِ پروفایل ارتفاعی مسیر همان مقدار می‌شود تا پیوستگی عمودی دو
+        قطعهٔ پشت هم حفظ شود.
     aircraft : CostModelConfig, اختیاری
         مشخصات هواپیما (فقط ``airspeed_mps``).
     vertical : VerticalCostConfig, اختیاری
@@ -1092,8 +1145,16 @@ def plan_wind_riding_route(
 
     for altitude_m in targets:
         sampler = sampler_at(altitude_m)
-        # صعود = اختلاف *سطح پرواز* با زمین زیر مبدأ، نه ارتفاع پرواز از صفر.
-        climb_m = max(altitude_m - ground_start, 0.0)
+        # صعود = اختلاف *سطح پرواز* با سطحِ رسیدن، نه زمین زیر مبدأ. وقتی
+        # قطعه در هوا شروع می‌شود (چک‌پوینت قفل‌شدهٔ قبلی)، هواپیما ارتفاع
+        # آن چک‌پوینت را «همین‌حالا» دارد: صعود از زمین دوباره حساب‌شدنِ
+        # ارتفاعی است که در قطعهٔ قبل پرداخت شده بود.
+        climb_base_m = (
+            max(ground_start, start_altitude_m)
+            if start_altitude_m is not None
+            else ground_start
+        )
+        climb_m = max(altitude_m - climb_base_m, 0.0)
         climb_hours = climb_m / verticals.climb_rate_mps / 3600.0
 
         def simulate(
@@ -1125,6 +1186,8 @@ def plan_wind_riding_route(
                 clearance_floor_m=min_clearance_m,
                 track_wind=settings.track_wind,
                 sampler_for_altitude=sampler_at,
+                land_at_end=land_at_end,
+                start_altitude_m=start_altitude_m,
                 # سقف شیب صعود (متر بر کیلومتر) = نرخ صعود ÷ سرعت زمینی. همان
                 # عددی که ``VerticalCostConfig`` به گراف می‌دهد، پس دو مدل
                 # «صعود ممکن» را با یک معیار می‌سنجند.
@@ -1283,6 +1346,8 @@ def plan_wind_riding_route(
             parallel_mean_deg=chosen_profile.parallel_mean_deg,
             final_correction_km=chosen_profile.final_correction_km,
             corridor_fraction=chosen_fraction,
+            land_at_end=land_at_end,
+            start_altitude_m=start_altitude_m,
         )
         if best_plan is None or _plan_preference(plan, best_plan, settings):
             best_plan = plan
@@ -1528,7 +1593,13 @@ def wind_riding_route_result(
     # همهٔ مسیرهای صحنه یک معنا داشته باشد (گلاید با موتور دور آرام).
     ramped_path, ramped_altitudes = ramp_vertical_transitions(
         plan.path,
-        _ground_anchored_altitudes(plan.node_altitudes),
+        # لنگرگاه دو سر: تنها سرهای «روی زمین» صفر می‌شوند (سرهای در-هوای
+        # چک‌پوینت قفل‌شده، ارتفاع واقعی MSLشان حفظ می‌شود).
+        _ground_anchored_altitudes(
+            plan.node_altitudes,
+            anchor_start=plan.start_altitude_m is None,
+            anchor_end=plan.land_at_end,
+        ),
         climb_rate_mps=verticals.climb_rate_mps,
         descent_rate_mps=verticals.descent_rate_mps,
         ground_speed_mps=_mean_ground_speed_from_legs(legs, plane.airspeed_mps),
@@ -1597,6 +1668,9 @@ def _mean_ground_speed_from_legs(
 
 def _ground_anchored_altitudes(
     altitudes: Sequence[float],
+    *,
+    anchor_start: bool = True,
+    anchor_end: bool = True,
 ) -> list[float]:
     """ارتفاع گره‌های زمین را صفر می‌کند (قرارداد ``RouteResult.node_altitudes``).
 
@@ -1604,12 +1678,20 @@ def _ground_anchored_altitudes(
     گرهٔ زمین‌اند و مثل مسیرهای گرافی باید صفر گزارش شوند. مقدار واقعی زمین
     (که ۹۰۰ تا ۳۰۰۰ متر است) در همان قرارداد گفته نمی‌شود؛ مصرف‌کنندهٔ صحنه
     خودش ارتفاع زمین محلی را از DEM می‌گیرد.
+
+    در حالت عبوری چک‌پوینت قفل‌شدهٔ ارتفاعی، سرِ در-هوا این قرارداد را ندارد:
+    گره‌ای که در ارتفاع ``start_altitude_m`` شروع می‌کند (قطعهٔ بعد از یک
+    چک‌پوینتِ قفل‌شده) یا مقصدِ قطعه که خودش همان چک‌پوینتِ در-هواست
+    (``land_at_end=False``) باید با ارتفاع واقعی MSL خودش بماند؛ صفرکردنش
+    یعنی «شیرجه تا زمین» در همان نقطه — همان باگِ گزارش‌شدهٔ کاربر.
     """
     values = list(altitudes)
     if not values:
         return values
-    values[0] = 0.0
-    values[-1] = 0.0
+    if anchor_start:
+        values[0] = 0.0
+    if anchor_end:
+        values[-1] = 0.0
     return values
 
 
