@@ -23,8 +23,6 @@ const baseProps = {
   checkpoints: [],
   onRemoveCheckpoint: vi.fn(),
   onMoveCheckpoint: vi.fn(),
-  onPointInfo: vi.fn(),
-  canPointInfo: true,
   onClear: vi.fn(),
   canClear: true,
   addingCheckpoint: false,
@@ -63,14 +61,11 @@ describe('PathInfoPanel', () => {
     }
   })
 
-  it('explains why checkpoint adding is disabled (2D-only rule)', () => {
-    withProviders(
-      <PathInfoPanel
-        {...baseProps}
-        canAddCheckpoint={false}
-        addCheckpointDisabledHint="افزودن چک‌پوینت فقط در نمایش ۲بعدی امکان‌پذیر است؛ به نمای ۲بعدی بروید."
-      />,
-    )
-    expect(screen.getByText(/۲بعدی/)).toBeInTheDocument()
+  it('does not render the removed "wind layers at point" button anymore', () => {
+    withProviders(<PathInfoPanel {...baseProps} />)
+    // دکمهٔ «مشاهده لایه‌های باد در نقطه» به‌درخواست کاربر حذف شده — نباید
+    // هیچ ردی از آن در پنل بماند.
+    expect(screen.queryByText(/لایه‌های باد در نقطه/)).not.toBeInTheDocument()
+    expect(screen.queryByText('View Wind Layers at Point')).not.toBeInTheDocument()
   })
 })

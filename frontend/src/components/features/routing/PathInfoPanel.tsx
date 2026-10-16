@@ -1,4 +1,4 @@
-import { MapPin, RefreshCw } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type {
   Algorithm,
@@ -35,11 +35,6 @@ interface PathInfoPanelProps {
   addingCheckpoint: boolean
   onToggleAddCheckpoint: () => void
   canAddCheckpoint: boolean
-  /** دلیل قطع دکمهٔ افزودن چک‌پوینت (مثلاً «فقط در ۲بعدی») — فقط وقتی
-   * `canAddCheckpoint` برقرار نیست نمایش داده می‌شود. */
-  addCheckpointDisabledHint?: string
-  onPointInfo: () => void
-  canPointInfo: boolean
   /** پاک‌کردن کل انتخاب‌ها — دکمه در خود پنل است (نه شناور روی نقشه). */
   onClear: () => void
   canClear: boolean
@@ -62,7 +57,7 @@ function altitudeModeOf(v: LayerVisibility): AltitudeMode {
  * پنل تنظیمات مسیر — بازطراحی‌شده با سلسله‌مراتبِ تصمیم کاربر:
  * ۱) نتیجه (بعد از محاسبه در صدر پنل)، ۲) «بهینه‌سازی برای» به‌صورت سگمنت
  * (معیار، مهم‌ترین انتخاب)، ۳) محدودیت‌های پرواز (حداکثر باد + باند ارتفاع
- * یکپارچه)، ۴) چک‌پوینت‌ها، ۵) اطلاعات نقطه، ۶) تنظیمات پیشرفته (الگوریتم
+ * یکپارچه)، ۴) چک‌پوینت‌ها، ۵) تنظیمات پیشرفته (الگوریتم
  * و اجتناب از مناطق) جمع‌شونده. تنظیمات «نمایش نقشه» جای جداگانه خود را
  * دارد (پاپ‌آور نوار ابزار) و در این پنل تکرار نمی‌شود.
  */
@@ -79,9 +74,6 @@ export function PathInfoPanel({
   addingCheckpoint,
   onToggleAddCheckpoint,
   canAddCheckpoint,
-  addCheckpointDisabledHint,
-  onPointInfo,
-  canPointInfo,
   onClear,
   canClear,
   result,
@@ -233,22 +225,7 @@ export function PathInfoPanel({
           adding={addingCheckpoint}
           onToggleAdd={onToggleAddCheckpoint}
           canAdd={canAddCheckpoint}
-          disabledHint={!canAddCheckpoint ? addCheckpointDisabledHint : undefined}
         />
-      </section>
-
-      {/* اطلاعات باد یک نقطه */}
-      <section className="space-y-1.5 border-t border-border pt-3">
-        <Button
-          variant="secondary"
-          className="w-full justify-center gap-2"
-          onClick={onPointInfo}
-          disabled={!canPointInfo}
-        >
-          <MapPin size={14} aria-hidden />
-          {t('windLayers.viewAtPoint')}
-        </Button>
-        <p className="text-xs text-text-muted">{t('windLayers.viewAtPointHint')}</p>
       </section>
 
       {/* تنظیمات پیشرفته — الگوریتم و اجتناب از مناطق، جمع‌شونده */}

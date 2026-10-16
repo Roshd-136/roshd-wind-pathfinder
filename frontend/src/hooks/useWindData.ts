@@ -1,8 +1,7 @@
 import { useQuery, useQueries } from '@tanstack/react-query'
 import { WIND_LAYER_BANDS } from '../config/routing'
-import { getWindAtPointAllLayers, getWindField, listWindLayers } from '../services/api/windLayers'
-import type { Coordinate, WindField, WindPointSample } from '../types/routing'
-import { sampleWindAtPoint } from '../utils/windField'
+import { getWindField, listWindLayers } from '../services/api/windLayers'
+import type { WindField } from '../types/routing'
 
 /**
  * ارتفاع نمایندهٔ میدان باد سه لایهٔ رابط کاربری (سطحی ۰-۵۰ / میانی ۵۰-۲۰۰ /
@@ -40,28 +39,4 @@ export function useWindFields() {
     .filter((f): f is WindField => f !== undefined)
   const isLoading = queries.some((q) => q.isLoading)
   return { fields, isLoading }
-}
-
-/**
- * GET /wind-layers/point-all — سرعت باد یک نقطه در همه لایه‌ها (Point Info).
- * اگر بک‌اند در دسترس نباشد (فقط dev)، از میدان‌های بارگذاری‌شده با
- * درون‌یابی دوخطی نمونه‌برداری می‌شود — همان دادهٔ واقعی فیکسچرها.
- */
-export function useWindAtPoint(point: Coordinate | null, fields: WindField[]) {
-  return useQuery({
-    queryKey: ['wind-point', point?.lat, point?.lon, fields.map((f) => f.altitude_m)],
-    queryFn: async (): Promise<WindPointSample[]> => {
-      if (point === null) return []
-      try {
-        return await getWindAtPointAllLayers(point.lat, point.lon)
-      } catch (error) {
-        if (!import.meta.env.DEV || fields.length === 0) throw error
-        return fields.map((f) => ({
-          altitude_m: f.altitude_m,
-          ...sampleWindAtPoint(f, point.lat, point.lon),
-        }))
-      }
-    },
-    enabled: point !== null,
-  })
 }

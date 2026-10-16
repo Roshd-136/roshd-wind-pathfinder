@@ -29,6 +29,8 @@ interface MapViewProps {
   paused?: boolean
   /** هدف فعال گیمبال ویرایش نقطه در صحنهٔ سه‌بعدی. */
   editTarget?: EditTarget | null
+  /** حالت «افزودن چک‌پوینت» — در ۳بعدی هم با کلیک روی دشتِ زمین می‌گذارد. */
+  placingPoint?: boolean
   /** جابه‌جایی نقطه از گیمبال سه‌بعدی. */
   onPointEdit?: (target: EditTarget, coord: Coordinate) => void
   /** کلیک روی گوی نشانگر سه‌بعدی — انتخاب نقطه (null = بستن گیمبال). */
@@ -515,7 +517,7 @@ function MapLibreView({
  */
 function MapView3D({
   origin, destination, checkpoints = [], path3d, windFields = [],
-  viewport, onMapClick, paused = false, editTarget = null, onPointEdit, onPointPick,
+  viewport, onMapClick, paused = false, editTarget = null, placingPoint, onPointEdit, onPointPick,
 }: MapViewProps) {
   const has3dPath = Boolean(path3d && path3d.length > 1)
   return (
@@ -530,6 +532,7 @@ function MapView3D({
           showArrows={viewport.showArrows}
           paused={paused}
           editTarget={editTarget}
+          placingPoint={placingPoint}
           onPointEdit={onPointEdit}
           onPointPick={onPointPick}
           onMapClick={onMapClick}

@@ -3,11 +3,10 @@ import { useTranslation } from 'react-i18next'
 import type maplibregl from 'maplibre-gl'
 import { MapView } from '../map/MapView'
 import type { EditTarget } from '../../../three/manual/scene-gl'
-import { PointInfoPopup } from '../map/PointInfoPopup'
 import { WindSpeedLegend } from '../layers/WindSpeedLegend'
 import { MobileBottomSheet } from '../../layout/MobileBottomSheet'
 import { usePathfinding } from '../../../hooks/usePathfinding'
-import { useWindAtPoint, useWindFields } from '../../../hooks/useWindData'
+import { useWindFields } from '../../../hooks/useWindData'
 import { useRouteStore } from '../../../store/useRouteStore'
 import { useUiStore } from '../../../store/useUiStore'
 import type { Checkpoint, Coordinate, RouteResult, WindField, LayerVisibility } from '../../../types/routing'
@@ -37,10 +36,10 @@ const LAYER_VISIBILITY_KEYS: (keyof LayerVisibility)[] = [
 
 /**
  * پیاده‌سازی مشترک صفحات Map2D/Map3D — همان چیدمان و منطق، فقط `mode`
- * فرق می‌کند. کلیک روی نقشه بسته به گامِ ویزارد عمل می‌کند: گام ۱ =
- * مبدأ (یا جایگزینی مبدأ)، گام ۲ = مقصد (یا جایگزینی مقصد)، گام ۳ =
- * اطلاعات باد نقطه (mockup: «View wind Layers at Point»)؛ و در حالت
- * «افزودن چک‌پوینت» = گذاشتن چک‌پوینت. بازگشتِ ویزارد انتخاب‌ها را پاک
+ * فرق می‌کند. کلیک روی نقشه/دشتِ سه‌بعدی بسته به گامِ ویزارد عمل می‌کند:
+ * گام ۱ = مبدأ (یا جایگزینی مبدأ)، گام ۲ = مقصد (یا جایگزینی مقصد)؛
+ * و در حالت «افزودن چک‌پوینت» = گذاشتن چک‌پوینت در هر دو نما (در ۳بعدی
+ * کلیک روی دشتِ زمینِ واقعی ثبت می‌شود). بازگشتِ ویزارد انتخاب‌ها را پاک
  * نمی‌کند — انتخاب فعلی سر جایش می‌ماند تا کلیک بعدی جایگزینش کند.
  */
 export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
@@ -72,11 +71,9 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
     reset,
   } = useRouteStore()
 
-  const [infoPoint, setInfoPoint] = useState<Coordinate | null>(null)
   const [isDemoResult, setIsDemoResult] = useState(false)
   const pathfinding = usePathfinding()
   const { fields } = useWindFields()
-  const windAtPoint = useWindAtPoint(infoPoint, fields)
   const openMobileSheet = useUiStore((s) => s.openMobileSheet)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const isControlPanelOpen = useUiStore((s) => s.isControlPanelOpen)
@@ -153,14 +150,16 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
     )
     .sort((a, b) => a.altitude_m - b.altitude_m)
 
-  // حالت «افزودن چک‌پوینت»: کلیک بعدی روی نقشه چک‌پوینت می‌گذارد (بدون نگه‌داشتن)
-  const [placingCheckpointRequested, setPlacingCheckpoint] = useState(false)
-  // قاعدهٔ «چک‌پوینت فقط در ۲بعدی»: در ۳بعدی گذاشتن چک‌پوینت معنا ندارد —
-  // حالتِ درخواست در ۳بعدی نادیده گرفته می‌شود (حالت مشتق، بدون اثر).
-  const placingCheckpoint = placingCheckpointRequested && mode !== '3d'
+  // حالت «افزودن چک‌پوینت»: کلیک بعدی در هر دو نما چک‌پوینت می‌گذارد
+  // (بدون نگه‌داشتن). در ۲بعدی کلیک روی نقشه است؛ در ۳بعدی کلیک روی دشتِ
+  // زمین واقعی — پیکان‌یابی زمینی صحنه (`pickLatLon`) مختصات را می‌دهد و
+  // چک‌پوینتِ بی‌ارتفاع همان‌جا روی زمین می‌نشیند؛ ارتفاع عبور را اگر
+  // خواست، بعداً با گیمبالِ همان نقطه بالا می‌کشد.
+  const [placingCheckpoint, setPlacingCheckpoint] = useState(false)
 
   // نشانگر متقاطع روی بوم نقشه در حالت افزودن چک‌پوینت — کاربر باید بفهمد
-  // کلیک بعدی «ثبت» می‌کند، نه انتخاب مبدأ/مقصد (منتظر سکوت نباشد).
+  // کلیک بعدی «یک حالت خاص» را ثبت می‌کند. (بوم ۳بعدی افق جدید را از
+  // `ManualSceneView` می‌گیرد — نشاندن نشانگر متقاطع آن‌جا هم همان prop است.)
   useEffect(() => {
     const canvas = mapRef.current?.getCanvas()
     if (!canvas) return
@@ -210,15 +209,14 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
     } else if (wizardStep === 2) {
       setDestination(coord)
       setWizardStep(3)
-    } else {
-      setInfoPoint(coord)
     }
+    // گام ۳: کلیک آزاد ناترقی است — نقشه «به‌هرجای‌خوردی» پاسخ نمی‌دهد؛
+    // جابه‌جایی نقطه از همان نشانگر (یا گیمبال در ۳بعدی) انجام می‌شود.
   }
 
   function handleClear() {
     reset()
     setIsDemoResult(false)
-    setInfoPoint(null)
     setPlacingCheckpoint(false)
     setEditTarget(null)
   }
@@ -236,15 +234,17 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
       checkpoints={checkpoints}
       onRemoveCheckpoint={removeCheckpoint}
       onMoveCheckpoint={moveCheckpoint}
-      onPointInfo={() => setInfoPoint(origin)}
-      canPointInfo={Boolean(origin)}
       addingCheckpoint={placingCheckpoint}
       onToggleAddCheckpoint={() => setPlacingCheckpoint((v) => !v)}
-      // در ۳بعدی گذاشتن چک‌پوینت معنا ندارد (کلیک روی صحنهٔ دست‌ساز) — دکمه
-      // با دلیلِ روشن قطع می‌شود، نه سکوت؛ علت اصلی «چک‌پوینت کار نمی‌کند».
-      canAddCheckpoint={Boolean(origin && destination) && mode !== '3d'}
-      addCheckpointDisabledHint={
-        mode === '3d' ? t('routing.checkpoints2dOnly') : undefined
+      // در هر دو نما چک‌پوینت می‌گذاریم؛ حتی در ۳بعدی کلیک روی دشتِ زمینِ
+      // واقعی مختصات واقعی می‌دهد (پیش‌تر قاعدهٔ «فقط ۲بعدی» بود و کاربر
+      // در نمای ۳بعدی عملاً راهی برای گذاشتن چک‌پوینت نداشت). پیش‌شرط
+      // همان است: مبدأ و مقصد باید انتخاب شده باشند — و در ۳بعدی صحنه
+      // پیش از محاسبهٔ اولین مسیر هنوز mount نشده (کلیک پذنده نمی‌شود)،
+      // پس آن‌جا دکمه تا برخاستنِ مسیر قطع است.
+      canAddCheckpoint={
+        Boolean(origin && destination) &&
+        (mode !== '3d' || Boolean(result))
       }
       onClear={handleClear}
       canClear={canClear}
@@ -272,6 +272,7 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
             mapRef.current = m
           }}
           editTarget={editTarget}
+          placingPoint={placingCheckpoint}
           onPointEdit={handlePointEdit}
           onPointPick={handlePointPick}
         />
@@ -345,9 +346,6 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
           isCalculating={pathfinding.isPending}
           isStale={isStale}
         />
-        {infoPoint && windAtPoint.data && (
-          <PointInfoPopup samples={windAtPoint.data} onClose={() => setInfoPoint(null)} />
-        )}
       </div>
 
       {/* پنل شناور روی نقشه (دسکتاپ) — با دکمهٔ نوار ابزار تا لبه جمع می‌شود */}

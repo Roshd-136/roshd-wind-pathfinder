@@ -1,4 +1,4 @@
-import type { WindField, WindLayerMeta, WindPointSample } from '../../types/routing'
+import type { WindField, WindLayerMeta } from '../../types/routing'
 import { apiFetch } from './client'
 
 /**
@@ -21,14 +21,6 @@ export async function listWindLayers(): Promise<WindLayerMeta[]> {
   } catch {
     return devFallback('/wind-layers', '/mock/wind-layers.json')
   }
-}
-
-/** GET /wind-layers/point-all — برای پاپ‌آپ "Wind Layers" روی نقشه. */
-export async function getWindAtPointAllLayers(
-  lat: number,
-  lon: number,
-): Promise<WindPointSample[]> {
-  return apiFetch<WindPointSample[]>(`/v1/wind-layers/point-all?lat=${lat}&lon=${lon}`)
 }
 
 /** GET /wind-layers/{altitudeM}/field — میدان برداری باد یک لایه. */

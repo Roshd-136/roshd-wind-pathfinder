@@ -111,12 +111,6 @@ export interface WindLayerMeta {
   last_updated: string
 }
 
-export interface WindPointSample {
-  altitude_m: number
-  speed_mps: number
-  direction_deg: number
-}
-
 /** یک بردار باد روی شبکه — معادل schema `WindVector` در api/openapi.yaml. */
 export interface WindVector {
   lat: number

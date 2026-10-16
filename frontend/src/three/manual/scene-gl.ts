@@ -10,7 +10,6 @@
  */
 
 import { invertMat4, mat4LookAt, mat4Multiply, mat4Perspective, type Mat4, type Vec3 } from './mat4'
-import { nearestLayerAltitude } from '../../config/routing'
 import {
   ROUTE_TUBE_RADIUS_KM,
   SPLINE_SAMPLES,
@@ -356,6 +355,14 @@ export class Manual3DScene {
   private markerDots: Array<{ target: EditTarget; posKm: Vec3 }> = []
   /** کلیک روی گوی نشانگر — صفحه باید گیمبال را روی همان نقطه بنشاند. */
   onPointPick: ((target: EditTarget | null) => void) | null = null
+
+  /**
+   * حالت «افزودن چک‌پوینت» — رابط کاربری روشنش می‌کند و کلیک بعدیِ خالیِ
+   * دشت از `onMapClick` به‌عنوان نقطهٔ چک‌پوینت ثبت می‌شود. در این حالت
+   * نشانگر موس همیشه crosshair است؛ هاورِ grab/pointer گیمبال و گوی‌ها
+   * جای وضعیت «کلیک = ثبت» را نمی‌گیرد.
+   */
+  placingPoint = false
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
@@ -898,13 +905,14 @@ export class Manual3DScene {
   }
 
   private onPointerMove = (e: PointerEvent): void => {
-    // — هاور گیمبال حتی بدون کلیک —
-    if (!this.pointerDown && this.editTarget) {
+    // — حالت «افزودن چک‌پوینت» — همیشه crosshair؛ هاور عادی بی‌اثر است.
+    if (this.placingPoint) {
+      this.canvas.style.cursor = 'crosshair'
+    } else if (!this.pointerDown && this.editTarget) {
       this.hoverAxis = this.pickGizmoAxis(e.clientX, e.clientY)
       this.canvas.style.cursor = this.hoverAxis ? 'grab' : ''
-    }
-    // — هاور روی گوی نشانگر: نشانگر کلیک (وقتی گیمبال فعال نیست) —
-    if (!this.pointerDown && !this.editTarget) {
+    } else if (!this.pointerDown && !this.editTarget) {
+      // — هاور روی گوی نشانگر: نشانگر کلیک —
       const overDot = this.pickMarkerDot(e.clientX, e.clientY) !== null
       this.canvas.style.cursor = overDot ? 'pointer' : ''
     }
@@ -953,17 +961,19 @@ export class Manual3DScene {
         // lat/lon) موقعیت صحنه‌ای — و z کشیده‌شده — را بازننویسی کند.
         this.lastEditReport = { target, lat: coord.lat, lon: coord.lon }
         // محور «ارتفاع»: ارتفاع نهایی هم گزارش می‌شود؛ بقیه محورها ارتفاع
-        // هدف را تغییر نمی‌دهند (تنها جابه‌جایی افقی است). گزارشِ ارتفاع
-        // به نزدیک‌ترین «سطح پرواز واقعی» اسنپ می‌شود (همان سطح‌هایی که
-        // موتور مسیریابی واقعاً می‌پرد) — اسنپِ آزاد، ظاهرِ «من ۲۲۳۷ متر
-        // گذاشتم، مسیر ۲۲۰۰ نشد» می‌سازد. کف = زمین + ۲۰۰ متر (افقند مقادیر).
+        // هدف را تغییر نمی‌دهند (تنها جابه‌جایی افقی است). پیش‌تر گزارشِ
+        // ارتفاع به «نزدیک‌ترین سطح پرواز» اسنپ می‌شد و کاربر عملاً نمی‌
+        // توانست چک‌پوینت را وسطِ دل لایه‌ها (مثلاً ۱۸۰۰<N<۲۲۰۰) بگذارد.
+        // حالا ارتفاع آزاد است: موتور در همان ارتفاعِ دلخواه لایهٔ باد
+        // واقعی می‌سازد و مسیر دقیقاً از همان‌جا می‌گذرد. کف = زمین + ۲۰۰
+        // متر (معادل همان قید رسم صحنه) تا نشانگر زیر خارج‌نرود.
         if (axis === 'up' && coord.altM !== undefined) {
           const groundM = this.terrainData
             ? terrainElevationAt(this.terrainData, coord.lat, coord.lon)
             : 0
           const editTarget: EditTarget = {
             ...target,
-            altM: nearestLayerAltitude(coord.altM, groundM + 200),
+            altM: Math.round(Math.max(coord.altM, groundM + 200)),
           }
           this.onPointEdit(editTarget, { lat: coord.lat, lon: coord.lon })
         } else {
@@ -976,7 +986,10 @@ export class Manual3DScene {
     // — کلیک بدون کشیدن روی گوی نشانگر: انتخاب همان نقطه برای گیمبال —
     if (!this.dragMoved) {
       const picked = this.pickMarkerDot(e.clientX, e.clientY)
-      if (picked) {
+      // با حالت «افزودن چک‌پوینت» فعال، کلیک روی گوی هم به ثبت نقطه می‌رود:
+      // گویِ زیرِ کلیک نباید گیمبال را باز کند و حالتِ «کلیک = ثبت» را منحرف
+      // سازد؛ گیمبال فقط بسته می‌شود.
+      if (picked && !this.placingPoint) {
         this.onPointPick?.(picked)
         return
       }

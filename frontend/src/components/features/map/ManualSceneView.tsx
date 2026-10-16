@@ -15,6 +15,8 @@ interface ManualSceneViewProps {
   paused?: boolean
   /** هدف فعال گیمبال ویرایش نقطه — null = گیمبال پنهان. */
   editTarget?: EditTarget | null
+  /** حالت «افزودن چک‌پوینت» — کلیک بعدی روی دشت زمین نقطه را ثبت می‌کند. */
+  placingPoint?: boolean
   /** جابه‌جایی نقطه از گیمبال — در رهاکردن پیکان. */
   onPointEdit?: (target: EditTarget, coord: Coordinate) => void
   /** کلیک روی گوی نشانگر (انتخاب نقطه) — null = کلیک خالی (بستن گیمبال). */
@@ -38,6 +40,7 @@ export function ManualSceneView({
   showArrows = true,
   paused = false,
   editTarget = null,
+  placingPoint = false,
   onPointEdit,
   onPointPick,
   onMapClick,
@@ -124,6 +127,13 @@ export function ManualSceneView({
     if (!scene) return
     scene.setEditTarget(editTarget, editCoordOf(editTarget, { origin, destination, checkpoints }))
   }, [editTarget, origin, destination, checkpoints])
+
+  // وضعیت «افزودن چک‌پوینت» — نشانگر موس صحنه را هم نگه‌دار می‌کند.
+  useEffect(() => {
+    const scene = sceneRef.current
+    if (!scene) return
+    scene.placingPoint = placingPoint
+  }, [placingPoint])
 
   return <canvas ref={canvasRef} className="h-full w-full touch-none" aria-label="3d scene" role="application" />
 }
