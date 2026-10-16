@@ -40,4 +40,25 @@ describe('CheckpointManager', () => {
     expect(screen.getByText('#2 — 36.300, 58.900')).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /remove/i })).toHaveLength(2)
   })
+
+  it('badges a locked altitude next to the checkpoint coordinate', () => {
+    render(
+      <CheckpointManager
+        {...baseProps}
+        checkpoints={[{ lat: 36.2, lon: 58.6, order: 0, alt: 2200 }]}
+      />,
+    )
+    const locked = screen.getByText(/Locked at/i)
+    expect(locked.textContent).toBe('Locked at 2,200 m')
+  })
+
+  it('does not badge altitude for plain checkpoints', () => {
+    render(
+      <CheckpointManager
+        {...baseProps}
+        checkpoints={[{ lat: 36.2, lon: 58.6, order: 0 }]}
+      />,
+    )
+    expect(screen.queryByText(/Locked at/i)).not.toBeInTheDocument()
+  })
 })

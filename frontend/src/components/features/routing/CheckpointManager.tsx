@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import type { Checkpoint } from '../../../types/routing'
+import { formatAltitudeM } from '../../../utils/format'
+import { useFormatLang } from '../../../hooks/useFormatLang'
 
 interface CheckpointManagerProps {
   checkpoints: Checkpoint[]
@@ -29,6 +31,7 @@ export function CheckpointManager({
   disabledHint,
 }: CheckpointManagerProps) {
   const { t } = useTranslation()
+  const lang = useFormatLang()
 
   const addButton = (
     <div className="space-y-1">
@@ -74,6 +77,11 @@ export function CheckpointManager({
         >
           <span className="text-text-secondary">
             #{i + 1} — {cp.lat.toFixed(3)}, {cp.lon.toFixed(3)}
+            {cp.alt != null && (
+              <span className="ms-1.5 inline-block rounded bg-accent/10 px-1 text-accent">
+                {t('routing.lockedAltitude', { alt: formatAltitudeM(cp.alt, lang) })}
+              </span>
+            )}
           </span>
           <span className="flex gap-1">
             <button

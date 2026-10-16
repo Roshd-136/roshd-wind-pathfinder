@@ -10,6 +10,7 @@
  */
 
 import { invertMat4, mat4LookAt, mat4Multiply, mat4Perspective, type Mat4, type Vec3 } from './mat4'
+import { nearestLayerAltitude } from '../../config/routing'
 import {
   ROUTE_TUBE_RADIUS_KM,
   SPLINE_SAMPLES,
@@ -952,10 +953,22 @@ export class Manual3DScene {
         // lat/lon) موقعیت صحنه‌ای — و z کشیده‌شده — را بازننویسی کند.
         this.lastEditReport = { target, lat: coord.lat, lon: coord.lon }
         // محور «ارتفاع»: ارتفاع نهایی هم گزارش می‌شود؛ بقیه محورها ارتفاع
-        // هدف را تغییر نمی‌دهند (تنها جابه‌جایی افقی است).
-        const editTarget: EditTarget =
-          axis === 'up' && coord.altM !== undefined ? { ...target, altM: coord.altM } : target
-        this.onPointEdit(editTarget, { lat: coord.lat, lon: coord.lon })
+        // هدف را تغییر نمی‌دهند (تنها جابه‌جایی افقی است). گزارشِ ارتفاع
+        // به نزدیک‌ترین «سطح پرواز واقعی» اسنپ می‌شود (همان سطح‌هایی که
+        // موتور مسیریابی واقعاً می‌پرد) — اسنپِ آزاد، ظاهرِ «من ۲۲۳۷ متر
+        // گذاشتم، مسیر ۲۲۰۰ نشد» می‌سازد. کف = زمین + ۲۰۰ متر (افقند مقادیر).
+        if (axis === 'up' && coord.altM !== undefined) {
+          const groundM = this.terrainData
+            ? terrainElevationAt(this.terrainData, coord.lat, coord.lon)
+            : 0
+          const editTarget: EditTarget = {
+            ...target,
+            altM: nearestLayerAltitude(coord.altM, groundM + 200),
+          }
+          this.onPointEdit(editTarget, { lat: coord.lat, lon: coord.lon })
+        } else {
+          this.onPointEdit(target, { lat: coord.lat, lon: coord.lon })
+        }
       }
       this.canvas.style.cursor = ''
       return

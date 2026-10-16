@@ -26,6 +26,24 @@ export const WIND_LAYER_BANDS: readonly WindLayerBand[] = [
 export const WIND_ALTITUDE_MAX = WIND_LAYER_BANDS[WIND_LAYER_BANDS.length - 1].rangeMax
 
 /**
+ * نزدیک‌ترین سطحِ پرواز واقعی به یک ارتفاع آزاد — برای قفل ارتفاع چک‌پوینت.
+ *
+ * گیمبال صحنهٔ ۳بعدی ارتفاع پیوسته گزارش می‌کند، ولی موتور مسیریابی روی
+ * سطح‌های معلوم پرواز می‌کند؛ درِ گزارش (رهاکردن محور «ارتفاع») ارتفاع به
+ * همین رده‌ها اسنپ می‌شود تا کاربر دقیقاً بفهمد مسیر «در ارتفاعِ قفل» از
+ * چک‌پوینت می‌گذرد. ``minM`` کف مطلق است (زمین + فاصلهٔ امن)؛ اگر هیچ رده
+ * از آن بالاتر نرفت، فهرست کامل ملاک است تا اسنپِ زیر زمین نشود.
+ */
+export function nearestLayerAltitude(altM: number, minM = 0): number {
+  const values = WIND_LAYER_BANDS.map((band) => band.fieldAltitude)
+  const valid = values.filter((value) => value >= minM)
+  const universe = valid.length > 0 ? valid : values
+  return universe.reduce((best, value) =>
+    Math.abs(value - altM) < Math.abs(best - altM) ? value : best,
+  )
+}
+
+/**
  * قید «حداکثر سرعت باد» هنوز در موتور مسیریابی اعمال نمی‌شود؛ تا آن روز
  * مقدار آن در درخواست فرستاده نمی‌شود (بک‌اند درخواست حامل این قید را
  * صریحاً رد می‌کند). ثابتی که پیش‌تر به‌عنوان «پیش‌فرض مؤثر» ارسال می‌شد

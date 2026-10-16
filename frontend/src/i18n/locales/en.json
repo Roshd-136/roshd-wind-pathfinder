@@ -61,6 +61,7 @@
     "checkpointHint": "After picking origin and destination, press “Add checkpoint” and then click on the map.",
     "addCheckpoint": "Add checkpoint",
     "addingCheckpoint": "Click on the map…",
+    "lockedAltitude": "Locked at {{alt}}",
     "moveUp": "Move up",
     "moveDown": "Move down",
     "remove": "Remove",
