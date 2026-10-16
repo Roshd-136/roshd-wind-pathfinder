@@ -23,6 +23,8 @@ Honesty notes
   distance/time come from the same wind field used for graph routes
   (``LayerField``), but the path is built in continuous space and may bypass
   graph nodes. So "shortest graph route" and "wind riding" are two different
+  routing models; the numbers are comparable because both read the same
+  wind field, but the geometries differ by construction.
 - Below the lowest layer (AGL < 500 m) the wind field is undefined; during the
   descent phase the **lowest available layer** wind is used. That is a data
   limitation, not a physical assumption.
@@ -31,16 +33,18 @@ Honesty notes
 - **Descent is a *glide slope*, not a dive.** Descent begins when the remaining
   distance equals ``h · descent_glideslope_ratio`` and then follows that fixed
   slope down to the destination's ground elevation. The default slope (1 in 40)
-   (1 in L/D = 1 in 12) *gentler* — i.e. a dead engine cannot sustain it;
-   so the engine runs at *partial* power, and that power is genuinely
-   accounted for. From the thrust balance at landing (``T = D − m·g·sinγ`` and
-   ``D = m·g/(L/D)``) the power fraction ``1 − (L/D)·sinγ`` follows; if the
-   required slope steepens beyond max glide, ``descent_idle_power_fraction``
+  is deliberately *gentler* than max glide (1 in L/D = 1 in 12) — i.e. a dead
+  engine cannot sustain it; so the engine runs at *partial* power, and that
+  power is genuinely accounted for. From the thrust balance at landing
+  (``T = D − m·g·sinγ`` and ``D = m·g/(L/D)``) the power fraction
+  ``1 − (L/D)·sinγ`` follows; if the required slope steepens beyond max glide,
+  ``descent_idle_power_fraction`` is the floor.
 - **The profile shape does not make fuel free.** Softening the descent means
-   more distance spent under the slope and that distance is taken from cruise;
-   energy conservation says for a route that starts and ends on the ground the
-   only real cost is *work against drag along the path*, not the altitude
-   profile shape. So a soft descent costs roughly the same as a steep one and
+  more distance spent under the slope and that distance is taken from cruise;
+  energy conservation says for a route that starts and ends on the ground the
+  only real cost is *work against drag along the path*, not the altitude
+  profile shape. So a soft descent costs roughly the same as a steep one,
+  and what changes is only how the same total work is distributed.
 """
 
 from __future__ import annotations
@@ -73,7 +77,8 @@ _KM_PER_DEG_LAT = 111.32
 
 @dataclass(frozen=True)
 class WindRidingConfig:
-    """Numerical parameters for wind-riding planning (all are "computational
+    """Numerical parameters for wind-riding planning (all are computational
+    parameters, not physical hypotheses).
 
     Parameters
     ----------
@@ -95,6 +100,7 @@ class WindRidingConfig:
         sensitive to heading: with a single 0.25 deg stage the route landed
         several hundred meters past the destination, and that residual forced
         a final leg (and one more heading correction) — defeating the whole
+        point of a single clean wind-riding ride.
     path_sample_s : float
         Time step for holding a point/segment in the reported route (seconds).
         Integration uses ``step_s``; for the route, one point is kept per
@@ -141,10 +147,12 @@ class WindRidingConfig:
     # correction. Measurement on this corridor (the "wind-riding trade-off"
     # table in the scene) shows the parallel share goes from 9% (corridor 0.2)
     # to 62% (corridor 0.95) and time from 2.12 to 2.31 h. So the best corridor
+    # is itself a search result, not a constant.
     search_fractions: tuple[float, ...] = (0.5, 0.75, 0.95)
     # Objective: maximize wind-parallel distance, subject to time not exceeding
     # this factor over the fastest plan of the same layer. Without this cap,
     # "maximum parallel" degenerates into a meaningless route (it would wander
+    # away from the destination just to stay parallel).
     alignment_first: bool = True
     alignment_slack_ratio: float = 1.15
     # **One explicit corridor, instead of a search.** When this value is given,
@@ -153,6 +161,7 @@ class WindRidingConfig:
     # the same trade-off (narrow corridor = fastest, least-parallel; wide
     # corridor = most parallel), so the scene and table can show them side by
     # side and the strategy difference becomes comparable. ``None`` means the
+    # automatic policy search runs instead.
     corridor_override: float | None = None
     # **Band ceiling (MSL).** When given, a plan that would have to climb above
     # this ceiling to clear terrain is *rejected* (``terrain_climb_feasible``
@@ -192,14 +201,17 @@ class WindRidingConfig:
     #   drag and crosswind terms vanish (the aircraft follows the wind instead
     #   of fighting it). Course correction happens only as needed to keep the
     #   landing corridor (``wind_corridor_fraction``) satisfied — a few short
+    #   crab corrections near the destination.
     #
     # ``track_wind=False`` — **fixed heading.** The previous model: one air
     #   heading for the whole leg; the wind carries the aircraft and the ground
     #   track skews off. With it, the wind-riding route was a straight line,
+    #   not the wind's own path.
     #
     # Reason for the change: measurement on the scene showed the old route had
     # 0.04 deg mean turning — a straight line — and its *track* angle sat about
     # 20 deg off the local wind (the drift angle), so nowhere was it parallel
+    # to the wind.
 
 
 @dataclass(frozen=True)
@@ -208,8 +220,10 @@ class WindRidingPlan:
 
     Attributes
     ----------
-    altitude_m : float
-        Wind-riding altitude (above ground).
+        altitude_m : float
+            Wind-riding altitude (metres). With a terrain model this is an
+            *absolute* (MSL) level; without one the historic AGL meaning holds
+            and terrain collision is not modelled.
     heading_deg : float
         Air heading of the route. In ``track_wind=False`` mode this is the fixed
         heading held through the wind-riding and descent phases; in
@@ -356,6 +370,7 @@ def _approx_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     ``haversine_km`` is too expensive. Every *reported* number (segment
     distances, total difference) is recomputed with great-circle
     distance in ``wind_riding_route_result``, so this approximation never
+    leaks into the report.
     """
     d_lat = (lat2 - lat1) * _KM_PER_DEG_LAT
     d_lon = (lon2 - lon1) * _KM_PER_DEG_LAT * math.cos(math.radians(lat1))
@@ -498,9 +513,9 @@ def _simulate_heading(
     engine power, that power computed from the thrust balance — so "more
     gradual" does not mean "free", only differently distributed.
     """
-    # Glide range (km): from cruise level down to the *destination ground
-    # elevation*, not sea level, for the altitude that actually has to be
-    # spent. Keeping sea level as the basis stretches the range too far and
+    # Glide basis (km/1000): the altitude is spent from the cruise level down
+    # to the *destination ground elevation*, not sea level — anchoring at sea
+    # level would overstate the height to lose and start the descent early.
     height_to_lose_m = max(altitude_m - ground_end_m, 0.0)
     # Horizontal distance of the descent on the policy slope (``h · ratio``). The
     # descent starts where this distance equals the remaining distance.
@@ -576,6 +591,7 @@ def _simulate_heading(
                 air_heading_deg=current_heading,
                 # In the descent phase part of the thrust comes from gravity, so
                 # the fuel of this distance is less than cruise; the fuel model
+                # reads that extra thrust from ``power_fraction`` below.
                 power_fraction=(
                     min(
                         max(
@@ -603,7 +619,8 @@ def _simulate_heading(
         if remaining < closest_remaining:
             closest_remaining = remaining
         elif remaining > closest_remaining + config.abandon_margin_km:
-        # This heading circles around the destination; continuing only slows the
+            # This heading circles away from the destination; running it to
+            # ``max_hours`` only slows the whole search.
             break
 
         # **Wind at the aircraft's *actual* altitude.** When a vertical profile
@@ -624,26 +641,25 @@ def _simulate_heading(
             # arrows). But this corridor's wind does not blow toward the
             # destination; further along, the wind veers right, so "flying
             # parallel to the wind" alone would carry the aircraft past the
-            #
-            #     destination. Let ``delta`` be the track angle relative to
-            #     "straight to the destination". With remaining distance ``R``
-            #     and current lateral offset ``x``, the final offset becomes
-            #     ``x − R·sin(delta)`` (the minus sign comes from azimuth
-            #     increasing turning *right* in the east–north frame). To keep
-            #
-            #     |that value| inside the corridor ``±b``:
+            # destination. Let ``delta`` be the track angle relative to
+            # "straight to the destination". With remaining distance ``R``
+            # and current lateral offset ``x``, the final offset becomes
+            # ``x − R·sin(delta)`` (the minus sign comes from azimuth
+            # increasing turning *right* in the east–north frame). To keep
+            # |that value| inside the corridor ``±b``:
             #
             #         delta ∈ [asin((x − b)/R), asin((x + b)/R)]
             # The chosen ``delta`` is the wind's own direction when it falls
             # inside this interval, otherwise the nearest interval end. I.e.
-            #
             # "as parallel to the wind as possible, then the least correction
+            # possible".
             # The corridor ``b`` shrinks relative to remaining distance
             # (``wind_corridor_fraction``), so in the last few kilometers the
             # interval closes to zero and the aircraft lands on the destination.
             # Those few degrees of crab also activate induced drag and headwind
             # terms in the fuel model. With constant wind and an 8.2 deg offset,
             # this control flies *fully* parallel to the wind for 112 km and
+            # corrects towards the destination only in the last kilometers.
             direct_bearing = _bearing(lat, lon, destination[0], destination[1])
             cross_track = _cross_track_km(origin, destination, lat, lon)
             wind_magnitude = math.hypot(wind_east, wind_north)
@@ -652,6 +668,7 @@ def _simulate_heading(
                 # is no wind direction and ``atan2(0, 0)`` returns an arbitrary
                 # number (north). In that case the only defensible track is the
                 # one that zeroes the lateral offset — i.e. straight to the
+                # destination.
                 deviation = math.degrees(
                     math.asin(min(max(cross_track / remaining, -1.0), 1.0))
                 )
@@ -700,23 +717,27 @@ def _simulate_heading(
         if not descending and remaining <= descent_span_km:
             # The wind-riding/descent boundary closes *here*. Otherwise the
             # current sampling window (up to 2 minutes of cruise flight) would
-            # be attributed to the descent phase and the distance/speed of
+            # be attributed to the descent phase, and the distance and engine
+            # power of that boundary segment would be misaccounted.
             before = last_point
             close_window(lat, lon, altitude_m)
             if last_point != before:
                 ride_km += _approx_km(before[0], before[1], lat, lon)
             # Descent start is a *timing event*, not a heading change: one short
             # step lands exactly on the descent-start point and the heading is
+            # kept unchanged across the boundary.
             descending = True
             # The *actual* slope is built from this point: altitude is a linear
             # function of remaining distance, so the aircraft lands exactly on
-            # the destination and the descent-start step error does not carry
+            # the destination and the descent-start step error does not drift
+            # into the profile.
             descent_start_km = max(remaining, 1e-6)
             # Engine power fraction in descent comes from the thrust balance, not
             # an arbitrary number: ``T = D − m·g·sinγ`` and ``D = m·g/(L/D)``
             # give ``T/D = 1 − (L/D)·sinγ``. A 1-in-40 slope with L/D = 12 means
             # 0.7 cruise power — not idle. Idle is the *floor*: whenever the
             # required slope steepens beyond max glide (short route or late
+            # descent start), the fraction bottoms out at idle.
             descent_power = min(
                 max(
                     1.0
@@ -736,7 +757,9 @@ def _simulate_heading(
             descent_hours += dt / 3600.0
             # Glide slope: altitude decreases proportionally to remaining
             # distance, so the aircraft reaches the destination ground elevation
-            # exactly when it arrives. The slope is 1/(L/D) — idle-engine glide,
+            # exactly when it arrives — the slope is the *policy* slope
+            # (``height_to_lose`` over ``descent_start``), flown with the
+            # engine's partial ``descent_power``.
             left_km = _approx_km(lat, lon, destination[0], destination[1])
             agl_now = ground_end_m + max(
                 height_to_lose_m * min(left_km / descent_start_km, 1.0), 0.0
@@ -746,6 +769,7 @@ def _simulate_heading(
             # the mountain, so the policy profile is held up over the *summit*.
             # In the final approach the floor ramps down to the destination
             # ground elevation (``approach_km``), otherwise the aircraft could
+            # never legally descend to it.
             if ground_elevation_at is not None and clearance_floor_m > 0.0:
                 fade = min(left_km / approach_km, 1.0)
                 floor_msl = (
@@ -768,7 +792,8 @@ def _simulate_heading(
             # The aircraft necessarily *climbs* to clear the terrain, and that
             # same climb changes its altitude, so from here on the wind is read at
             # the new altitude (see ``sampler_for_altitude``). This is the only
-            # place where the two models lean on each other, and both use the same
+            # place where the two models lean on each other, and both use the
+            # same clearance floor and climb ceiling.
             if ground_elevation_at is not None and clearance_floor_m > 0.0:
                 floor_msl = float(ground_elevation_at(lat, lon)) + clearance_floor_m
                 # سقف باند (حالت «ارتفاع انتخابی»): صعود برای رد شدن از کوه
@@ -787,8 +812,9 @@ def _simulate_heading(
                 # only works on paper. So the *climb needed to reach the floor* is
                 # checked against the aircraft climb-gradient ceiling; beyond it,
                 # this level is not flyable: exactly what the graph does by
-                # dropping nodes below the threshold. For this corridor levels
-                # 1500-2900 m are rejected (the edge climbs to 3175 m) and wind
+                # dropping nodes below the threshold. For this corridor the low
+                # cruise levels are rejected (the edge climbs to 3175 m) and
+                # only a level above that ceiling survives.
                 if floor_msl > agl_now:
                     rise = floor_msl - agl_now
                     allowed = (
@@ -812,6 +838,7 @@ def _simulate_heading(
         # destination ground, the aircraft in the final approach is still above
         # the altitude threshold and those few reduced meters would count as a
         # "safety violation" although nothing else could be done. Distance is
+        # the definition that matches what the pilot can still change.
         if (
             min_clearance is not None
             and ground_elevation_at is not None
@@ -867,6 +894,7 @@ def _simulate_heading(
             lat, lon = points[closest_index]
 
     # Final leg: straight remainder to the destination (if outside the arrival
+    # radius).
     miss_km = haversine_km(lat, lon, destination[0], destination[1])
     final_bearing = _bearing(lat, lon, destination[0], destination[1])
 
@@ -892,6 +920,7 @@ def _simulate_heading(
         )
     # If the aircraft is already inside the arrival radius, the last point is
     # replaced *with* the destination; appending it would create a short
+    # backward-pointing segment at the very end of the route.
     #
     # Why this matters: the loop breaks when distance to destination drops below
     # the arrival radius, and that moment is checked *before* the next step, so
@@ -899,7 +928,8 @@ def _simulate_heading(
     # 20-second step is about 0.6 km). Appending the destination after that
     # point would fold the route end back on itself, and that small kink shows
     # up in the plotted profile as a "sharp dip" right at the destination,
-    # something no aircraft does. Replacing unifies geometry with physics:
+    # something no aircraft does. Replacing unifies geometry with physics: the
+    # reported route ends exactly where the simulation judged "arrived".
     if len(points) > 1 and miss_km <= config.arrival_radius_km:
         points[-1] = destination
         altitudes[-1] = ground_end_m
@@ -927,7 +957,8 @@ def _simulate_heading(
         # from the policy: if the terrain floor held part of the descent up, the
         # mean slope steepens beyond 1-in-``descent_ratio`` and that is the number
         # to report. Descent power comes from the thrust balance of *that same*
-        # mean slope so the two table columns agree, rather than one column
+        # actual slope, so the two table columns agree, rather than one column
+        # quoting the policy and the other quoting the flight.
         descent_slope_ratio=(
             descent_km * 1000.0 / height_to_lose_m if height_to_lose_m > 0.0 else 0.0
         ),
@@ -975,9 +1006,10 @@ def plan_wind_riding_route(
     aircraft: CostModelConfig | None = None,
     vertical: VerticalCostConfig | None = None,
     effort: MotorEffortConfig | None = None,
-    config: WindRidingConfig | None = None,            ground_elevation_at: Callable[[float, float], float] | None = None,
-            min_clearance_m: float = 0.0,
-            cruise_altitudes: Sequence[float] | None = None,
+    config: WindRidingConfig | None = None,
+    ground_elevation_at: Callable[[float, float], float] | None = None,
+    min_clearance_m: float = 0.0,
+    cruise_altitudes: Sequence[float] | None = None,
 ) -> WindRidingPlan | None:
     """بهترین مسیر بادسواری را برای یک مبدأ/مقصد پیدا می‌کند.
 

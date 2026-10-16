@@ -36,7 +36,7 @@ from dataclasses import dataclass
 from preprocessing.consistency import haversine_km
 
 # Valid criterion values for cost computation
-CRITERIA = ("time", "energy", "balanced", "distance")
+CRITERIA = ("time", "energy", "balanced", "distance", "safety")
 
 __all__ = [
     "CostModelConfig",
@@ -250,6 +250,7 @@ def compute_edge_cost(
         "energy": energy_hours,
         "balanced": balanced_hours,
         "distance": distance_km,
+        "safety": energy_hours + 0.5 * max(0.0, -along_track_mps) / config.airspeed_mps * time_hours,  # Penalize headwinds for safety
     }
 
     return EdgeCostResult(

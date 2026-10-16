@@ -3,22 +3,23 @@
 خروجی‌ها را در ``frontend/public/mock/`` می‌نویسد تا پیش‌نمایش dev بدون بک‌اند
 هم میدان باد و مسیر واقعی این پروژه را نشان دهد:
 
-    wind-field-50.json / wind-field-200.json / wind-field-500.json
-        میدان باد سه لایهٔ رابط کاربری (۵۰/۲۰۰/۵۰۰ متر بالای زمین) در قالب
-        دقیق ``WindField`` از ``api/openapi.yaml`` — بردارهای منظم روی شبکه.
+    wind-field-{FLIGHT_LEVELS_MSL}.json
+        میدان باد هر سطح پرواز MSL (۱۵۰۰/۲۲۰۰/۲۹۰۰/۳۶۰۰) در قالب دقیق
+        ``WindField`` از ``api/openapi.yaml`` — بردارهای منظم روی شبکه. همان
+        ارتفاع‌هایی که بک‌اند سرو می‌کند تا پیش‌نمایش dev با تولید یکی باشد.
     route-demo.json
         مسیر نمایشی R2 صحنه (سریع‌ترین، A*) بین مبدأ/مقصد دموی کریدور، در قالب
         ``RouteResult`` قرارداد.
     wind-layers.json
-        خروجی ``GET /wind-layers`` (سه لایهٔ بالا).
+        خروجی ``GET /wind-layers`` برای همان سطوح پرواز.
 
 هشدار صداقت داده
 -----------------
 باد ایستگاه‌ها **واقعی** است (``data/khorasan_wind_qc_cleaned.csv``، ساعت با
 بیشینهٔ باد از ``select_scene_hour``) و درون‌یابی با همان IDW خط لولهٔ
-بصری‌سازی است (``viz.wind_field``). نمایهٔ عمودی (ضریب سرعت/چرخش جهت در
-ارتفاع‌های ۵۰/۲۰۰/۵۰۰ متر) «فرض مدل» اعلام‌شدهٔ همان ماژول است
-(``profile_at``) — نه اندازه‌گیری. مسیر نمایشی با ``WindRouter`` واقعی روی
+بصری‌سازی است (``viz.wind_field``). نمایهٔ عمودی (ضریب سرعت/چرخش جهت بر
+حسب ارتفاع بالای زمین) «فرض مدل» اعلام‌شدهٔ همان ماژول است (``profile_at``)
+— نه اندازه‌گیری. مسیر نمایشی با ``WindRouter`` واقعی روی
 گراف چندلایهٔ سطوح پرواز MSL (با زمین‌مرجع DEM) محاسبه می‌شود؛ همان مسیری که
 در صحنهٔ سه‌بعدی پذیرش‌آزمایی شده است.
 
@@ -53,23 +54,25 @@ from viz.scene3d import (  # noqa: E402
 from viz.terrain import TERRAIN_CSV_PATH, load_terrain  # noqa: E402
 from viz.wind_field import (  # noqa: E402
     CORRIDOR_BBOX,
+    FLIGHT_LEVELS_MSL,
     build_level_fields,
     build_multi_layer_graph,
     corridor_lattice,
-    interpolate_layer_field,
+    interpolate_level_field,
     load_station_winds,
-    profile_at,
     select_scene_hour,
 )
 
 WIND_CSV_PATH = ROOT / "data" / "khorasan_wind_qc_cleaned.csv"
 OUTPUT_DIR = ROOT / "frontend" / "public" / "mock"
 
-# ارتفاع‌های «بالای زمین» سه لایهٔ رابط کاربری (میان‌باند همان چک‌باکس‌ها:
-# سطحی ۰-۵۰، میانی ۵۰-۲۰۰، بالا ۲۰۰-۵۰۰).
-UI_LAYER_AGL_M: tuple[float, ...] = (50.0, 200.0, 500.0)
+# ارتفاع لایه‌های نمایش باد = سطوح پرواز MSL بک‌اند (``FLIGHT_LEVELS_MSL``)
+# — منبع یگانه؛ اگر بک‌اند سطح پرواز تازه‌ای بیاورد، فقط همان ثابت عوض می‌شود.
+UI_LAYER_MSL_M: tuple[float, ...] = FLIGHT_LEVELS_MSL
 
-# شبکهٔ منظم خروجی وب — ریزتر از شبکهٔ گراف تا رنگ ملایم درآید.
+# شبکهٔ منظم خروجی وب — ریزتر از شبکهٔ گراف تا رنگ ملایم درآید. **بدون** نقطهٔ
+# ایستگاه‌ها (خلاف گراف) تا شبکه کاملاً منظم بماند؛ لایهٔ نقشهٔ فرانت با
+# درون‌یابی دوخطی روی همین نظم حساب می‌کند.
 FIELD_LAT_STEP = 0.03
 FIELD_LON_STEP = 0.05
 
@@ -90,16 +93,25 @@ def _regular_lattice() -> tuple[np.ndarray, np.ndarray]:
 
 
 def export_fields(stations: pd.DataFrame, output_dir: Path) -> None:
-    """میدان باد سه لایهٔ UI را در قالب ``WindField`` قرارداد می‌نویسد."""
+    """میدان باد سطوح پرواز MSL را در قالب ``WindField`` قرارداد می‌نویسد.
+
+    همان فیزیک بک‌اند: باد هر گره در ارتفاع *واقعی خودش بالای زمین*
+    (``level_msl - elevation``) نمونه‌برداری می‌شود، نه ارتفاع ثابت AGL. پس روی
+    قلهٔ کوه، سطح ۱۵۰۰ متری باد ارتفاع بالاتری را می‌بیند — دقیقاً مثل تولید.
+    """
+    terrain = load_terrain(TERRAIN_CSV_PATH)
     lats, lons = _regular_lattice()
-    for agl_m in UI_LAYER_AGL_M:
-        scale, rotation = profile_at(agl_m)
-        field = interpolate_layer_field(
-            stations, (float(agl_m), float(scale), float(rotation)), lats, lons
+    # زمین روی همان شبکهٔ منظمِ خروجی — ترتیب آرگومان‌ها (lat, lon) است.
+    lon_mesh, lat_mesh = np.meshgrid(lons, lats)
+    corridor_ground = terrain.elevation_at(lat_mesh, lon_mesh).reshape(lat_mesh.shape)
+    lat_flat, lon_flat = lat_mesh.ravel(), lon_mesh.ravel()
+
+    for level_msl in UI_LAYER_MSL_M:
+        field = interpolate_level_field(
+            stations, float(level_msl), lats, lons, corridor_ground
         )
-        lon_mesh, lat_mesh = np.meshgrid(field.lons, field.lats)
         payload = {
-            "altitude_m": float(agl_m),
+            "altitude_m": float(level_msl),
             "vectors": [
                 {
                     "lat": round(float(la), 4),
@@ -108,24 +120,24 @@ def export_fields(stations: pd.DataFrame, output_dir: Path) -> None:
                     "direction_deg": round(float(di), 1),
                 }
                 for la, lo, sp, di in zip(
-                    lat_mesh.ravel(),
-                    lon_mesh.ravel(),
+                    lat_flat,
+                    lon_flat,
                     field.speed_mps.ravel(),
                     field.direction_deg.ravel(),
                     strict=True,
                 )
             ],
         }
-        path = output_dir / f"wind-field-{int(agl_m)}.json"
+        path = output_dir / f"wind-field-{int(level_msl)}.json"
         path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
         print(f"  {path.name}: {len(payload['vectors'])} vectors")
 
 
 def export_layers(output_dir: Path) -> None:
-    """خروجی ``GET /wind-layers`` برای سه لایهٔ UI."""
+    """خروجی ``GET /wind-layers`` برای سطوح پرواز MSL."""
     payload = [
         {
-            "altitude_m": float(agl_m),
+            "altitude_m": float(level_msl),
             "unit": "mps",
             "bbox": [
                 CORRIDOR_BBOX["lon_min"],
@@ -135,7 +147,7 @@ def export_layers(output_dir: Path) -> None:
             ],
             "last_updated": datetime.now(timezone.utc).isoformat(),
         }
-        for agl_m in UI_LAYER_AGL_M
+        for level_msl in UI_LAYER_MSL_M
     ]
     (output_dir / "wind-layers.json").write_text(
         json.dumps(payload, ensure_ascii=False), encoding="utf-8"
@@ -185,12 +197,22 @@ def export_demo_route(stations: pd.DataFrame, output_dir: Path) -> None:
         min_clearance_m=MIN_TERRAIN_CLEARANCE_M,
     )
     result = routes["demo"]
+    # ارتفاع مطلق هر گره (MSL) — برای نقشهٔ سه‌بعدی فرانت‌اند (مسیر به‌صورت
+    # اسپلاین/لولهٔ سه‌بعدی روی ترن). قرارداد ``node_altitudes`` مسیر: «صفر»
+    # گره‌های مبدأ/مقصد یعنی *روی زمین*؛ صحنهٔ فرانت برای همان ارتفاع زمین
+    # زیر آن‌ها را جایگزین صفر می‌کند (همان تبدیل که خود routing_scene
+    # انجام می‌دهد؛ انکر گیاهری این مسیر همیشه هم‌خ با قرارداد API است).
+    path_3d = [
+        {"lat": round(float(la), 4), "lon": round(float(lo), 4), "alt": round(float(alt), 1)}
+        for (la, lo), alt in zip(result.path, result.node_altitudes, strict=True)
+    ]
     payload = {
         "route_id": "demo-khorasan-fastest",
         "path": [
             {"lat": round(float(la), 4), "lon": round(float(lo), 4)}
             for la, lo in result.path
         ],
+        "path_3d": path_3d,
         "layer_altitude_m": float(result.layer_altitude),
         "algorithm": "a_star",
         "criterion": "time",

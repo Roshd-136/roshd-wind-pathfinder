@@ -1,56 +1,56 @@
-"""هندسهٔ *منحنی* مسیر: دو مرحله روی هر مسیر چندضلعی مسیریابی‌شده.
+"""Curved route geometry: two passes over every routed polygon path.
 
-۱) ``round_path_corners`` گوشه‌های تیز را با کمان دایره‌ای (فیلت) جایگزین
-   می‌کند.
-۲) ``relax_path_curvature`` انحنای تمرکز‌یافته را در طول مسیر پخش می‌کند تا خط
-   *منحنی* دیده شود، نه «راستِ دراز + شکستگی» (مورد دوم اندازه‌گیری‌شده: R4 یک
-   بخش ۸۴ کیلومتری کاملاً راست داشت و بعد در یک نمونه ۶.۲ درجه می‌چرخید).
+1) ``round_path_corners`` replaces sharp corners with circular arcs
+   (fillets).
+2) ``relax_path_curvature`` spreads concentrated curvature along the path
+   so the line reads as *curved*, not 'long straight + kink' (measured case:
+   R4 had a fully straight 84 km section that then turned 6.2 deg in one sample).
 
-هیچ‌کدام از دو مرحله به کریدور یا دادهٔ خاصی وابسته نیست: ورودی هر مسیر
-چندضلعی جغرافیایی است و خروجی همان قرارداد ``(path, levels)``.
+Neither pass depends on a specific corridor or dataset: the input is any
+geographic polygon path and the output follows the same ``(path, levels)`` contract.
 
-مسئله
+Problem
+-------
+The routing graph is a regular lattice: nodes sit on 0.05 deg latitude and
+0.1 deg longitude steps, and every edge is a straight segment. So any graph
+route — even from a 'soft' algorithm — is a sequence of **perfectly straight**
+segments meeting at nodes, forming corners.
 
-مسئله
------
-گراف مسیریابی یک شبکهٔ منظم است: گره‌ها روی گام‌های ۰.۰۵ درجه عرض و ۰.۱ درجه
-طول می‌نشینند و هر یال یک پارهٔ خط مستقیم است. پس هر مسیر گرافی — حتی مسیری که
-الگوریتم «نرم» تولید می‌کند — دنباله‌ای از پاره‌های **کاملاً مستقیم** است که در
-گره‌ها به هم می‌رسند و گوشه می‌سازند.
+Measurement on the generated scene confirms this: 97% of drawn segments turn
+less than 0.5 deg and the mean turn is 0.04-0.18 deg. The visible line is
+effectively a straight polyline, not a curve — and the 'smooth spline' claim
+in the display layer only operated on that polyline.
 
-اندازه‌گیری روی صحنهٔ تولیدشده این را نشان می‌دهد: ۹۷٪ پاره‌های رسم‌شده کمتر از
-۰.۵ درجه چرخش دارند و میانگین چرخش ۰.۰۴ تا ۰.۱۸ درجه است. یعنی خطی که دیده
-می‌شود عملاً یک خط شکستهٔ راست است، نه یک منحنی — و ادعای «اسپلاین نرم» در لایهٔ
-نمایش فقط روی همان خط شکسته اعمال می‌شد.
+Approach
+--------
+Every interior corner of the path is replaced by a **circular arc (fillet)**.
+Classic fillet: two tangent points are chosen on the adjacent segments and an
+arc of constant radius, tangent at both ends, sits between them — so the path
+turns continuously instead of kinking at nodes.
 
-روش
-----
-هر گوشهٔ داخلی مسیر با یک **کمان دایره‌ای (فیلت)** جایگزین می‌شود. فیلت کلاسیک
-است: دو نقطهٔ مماس روی دو پارهٔ مجاور انتخاب می‌شود و بین آن‌ها کمانی با شعاع
-ثابت می‌نشیند که در دو سر مماس است، پس مسیر در نقطهٔ اتصال هم G1 پیوسته است.
+Three constraints hold simultaneously:
 
-سه قید هم‌زمان رعایت می‌شود:
+1) **Radius must not exceed the segments.** The tangent length is capped at
+   ``MAX_TANGENT_FRACTION / 2`` (i.e. 40%) of each adjacent segment, so two
+   fillets on one segment never meet (0.8 < 1) and mid-segments keep room.
 
-۱) **شعاع از پاره‌ها بزرگ‌تر نشود.** طول مماس حداکثر ۴۵٪ طول هر پارهٔ مجاور است.
-   وگرنه فیلت دو گوشهٔ پشت‌سرهم را می‌خورد یا از پاره رد می‌شود.
+2) **Terrain is a hard constraint.** A fillet 'cuts the corner' and passes
+   through the triangle formed by three safe graph nodes — a triangle that may
+   contain a mountain edge no edge check ever saw. So terrain elevation is
+   sampled along the arc itself; if clearance drops below the limit the radius
+   shrinks and the fillet is retried; if even the minimum radius fails, the
+   sharp corner stays. Terrain wins over curve aesthetics.
 
-۲) **زمین قید سخت است.** فیلت «گوشه را می‌برد» و از داخل مثلثی می‌گذرد که سه
-   رأسش گره‌های امن مسیرند. داخل آن مثلث می‌تواند یال کوه باشد که هیچ‌کدام از
-   یال‌ها نمی‌دیدند. پس ارتفاع زمین روی خود کمان نمونه‌برداری می‌شود و اگر
-   فاصلهٔ ایمنی زیر حد مجاز برود، شعاع کوچک می‌شود و دوباره امتحان می‌شود؛ اگر
-   با کمترین شعاع هم نشد، همان گوشهٔ تیز دست‌نخورده می‌ماند. اولویت با زمین است،
-   نه با زیبایی منحنی.
+3) **Each point's altitude comes from the route itself, not a fresh number.**
+   Every arc sample is projected onto the nearest point of the *original* path
+   and takes that point's level; the vertical profile is untouched.
 
-۳) **ارتفاع هر نقطه از خود مسیر بیاید، نه از یک عدد تازه.** هر نمونهٔ کمان به
-   نزدیک‌ترین نقطه روی مسیر *اصلی* تصویر می‌شود و سطح همان نقطه را می‌گیرد. پس
-   پروفیل عمودی مسیر عوض نمی‌شود؛ فقط افق آن منحنی می‌شود.
-
-آنچه این ماژول **نمی‌کند**
+What this module does **not** do
 -------------------------
-هزینه‌ها را عوض نمی‌کند. مسافت، زمان، انرژی و سوخت همان چیزی می‌ماند که روتر روی
-گراف حساب کرده است. فیلت مسیر را کمی *کوتاه‌تر* می‌کند (گوشه را می‌برد) و همان
-کوتاه‌شدن جزئی در هیچ‌کدام از اعداد جدول حساب نمی‌شود — عدد گزارش‌شده همان مسافت
-پیموده‌شده بین گره‌ها است، یعنی چیزی که روتر واقعاً بهینه کرده است.
+It does not change costs. Distance, time, energy and fuel remain exactly what
+the router computed on the graph. A fillet makes the path slightly *shorter*
+(it cuts corners); none of the table figures account for it.
+The reported number is the node-to-node distance the router actually optimized.
 """
 
 from __future__ import annotations
@@ -68,15 +68,15 @@ __all__ = [
     "RELAX_SPREAD_SAMPLES",
 ]
 
-# تبدیل درجه به کیلومتر در عرض جغرافیایی خراسان (همان عدد بقیهٔ پروژه).
+# Degrees -> km conversion at Khorasan latitudes (same constant as the rest of the project).
 _KM_PER_DEG_LAT = 111.32
 
-# سهم بیشینهٔ هر پاره که می‌تواند صرف مماس فیلت شود. ۰.۴۵ یعنی دو فیلت روی دو
-# سر یک پاره هرگز به هم نمی‌رسند (۰.۹ < ۱) و برای پاره‌های میانی جا می‌ماند.
+# Max share of a segment that may be spent on fillet tangency. 0.45 means two
+# fillets on one segment never meet (0.9 < 1) and mid-segments keep room.
 MAX_TANGENT_FRACTION = 0.8
 
-# کمترین شعاعی که *معنا* دارد (کیلومتر). کوچک‌تر از این، فیلت عملاً دیده نمی‌شود
-# و فقط چند نقطهٔ اضافی به هندسه می‌افزاید.
+# Smallest radius that is *meaningful* (km). Below this the fillet is
+# practically invisible and only adds extra points to the geometry.
 MIN_RADIUS_KM = 0.35
 
 
@@ -86,13 +86,13 @@ def _nearest_arc_distance(
     x: float,
     y: float,
 ) -> float:
-    """مسافت کمانی نزدیک‌ترین نقطهٔ یک چندضلعی به یک نقطهٔ دلخواه (کیلومتر).
+    """Arc distance from the polygon point nearest to a target point (km).
 
-    چرا لازم است؟ وقتی نمونه‌ای *در طول* مسیر جابه‌جا می‌شود، مختصاتش دیگر به
-    ایندکس قبلی‌اش روی مسیر اصلی نمی‌خورد. هر قیدی که ارتفاع را با «ایندکس» یا
-    «مسافت کمانی قدیمی» بردارد، ارتفاع *جای دیگری* را با زمین *جای جدید* می‌سنجد؛
-    روی پروفیل صعود/فرود این اختلاف تا صدها متر می‌شود. این تابع مسافت کمانی
-    واقعی تصویرِ نمونه را می‌دهد تا ارتفاع و زمین به یک نقطه اشاره کنند.
+    Why needed: when a sample moves *along* the path, its coordinates no longer
+    match its previous index on the original path. Any check that reads altitude
+    by 'index' or 'old arc distance' compares one place's altitude against
+    another place's terrain — up to hundreds of meters on climb profiles. This
+    function gives the sample's true projected arc distance for both.
     """
     best_distance = 0.0
     best_error = math.inf
@@ -125,38 +125,38 @@ def round_path_corners(
     shrink_factor: float = 0.5,
     max_attempts: int = 6,
 ) -> tuple[list[tuple[float, float]], list[float]]:
-    """گوشه‌های تیز مسیر را با کمان دایره‌ای گرد می‌کند.
+    """Rounds the path's sharp corners with circular arcs.
 
-    پارامترها
+    Parameters
     ----------
     path : Sequence[tuple[float, float]]
-        نقاط مسیر (عرض، طول) به ترتیب حرکت. نقطهٔ اول و آخر دست‌نخورده می‌مانند.
+        Path points (lat, lon) in travel order; first and last stay untouched.
     levels : Sequence[float]
-        ارتفاع هر نقطه (متر) با همان قرارداد ``RouteResult`` (صفر = روی زمین).
-        ارتفاع نمونه‌های تازه از تصویر کردن آن‌ها روی مسیر اصلی می‌آید، پس پروفیل
-        عمودی عوض نمی‌شود.
+        Per-point altitude (m) under the ``RouteResult`` convention (0 = on
+        the ground). New samples take altitude from their projection onto the
+        original path, so the vertical profile is unchanged.
     radius_km : float
-        شعاع *هدف* فیلت. شعاع واقعی هر گوشه از طول پاره‌های مجاور و از قید زمین
-        کوچک‌تر می‌شود.
+        Target fillet radius. The actual radius per corner is shrunk by
+        adjacent segment lengths and the terrain constraint.
     min_turn_deg : float
-        گوشه‌هایی که کمتر از این مقدار می‌چرخند گرد نمی‌شوند. با نمونه‌های ۰.۵
-        کیلومتری، هر نقطهٔ *داخلی* مسیر کمی می‌چرخد؛ بدون این آستانه، هزاران فیلت
-        بی‌معنا ساخته می‌شد.
+        Corners turning less than this are not rounded. With 0.5 km samples
+        every *interior* point turns a little; without the threshold thousands
+        of pointless fillets would be created.
     arc_step_km : float
-        فاصلهٔ نمونه‌های روی کمان.
-    ground_elevation_at : Callable[[float, float], float], اختیاری
-        ارتفاع زمین. اگر داده شود، قید ۲ بالا اعمال می‌شود.
+        Spacing of samples along the arc.
+    ground_elevation_at : Callable[[float, float], float], optional
+        Terrain elevation. If given, constraint 2 above is enforced.
     min_clearance_m : float
-        کمترین فاصلهٔ مجاز از زمین (متر) روی نمونه‌های کمان.
+        Minimum allowed terrain clearance (m) on arc samples.
     shrink_factor, max_attempts : float, int
-        در هر شکست قید زمین، شعاع در ``shrink_factor`` ضرب می‌شود؛ پس از
-        ``max_attempts`` بار، گوشه تیز می‌ماند.
+        On each terrain violation the radius is multiplied by
+        ``shrink_factor``; after ``max_attempts`` tries the corner stays sharp.
 
-    برمی‌گرداند
+    Returns
     ----------
     (path, levels)
-        مسیر گردشده و ارتفاع هر نقطهٔ آن. طول هر دو یکی است و بزرگ‌تر یا مساوی
-        ورودی است (هر فیلت چند نمونه اضافه می‌کند).
+        The rounded path and per-point altitudes. Both lengths are equal and
+        greater than or equal to the input (each fillet adds a few samples).
     """
     if len(path) != len(levels):
         raise ValueError(
@@ -172,8 +172,8 @@ def round_path_corners(
     if not 0.0 < shrink_factor < 1.0:
         raise ValueError("shrink_factor must be in (0, 1).")
 
-    # صفحهٔ محلی: عرض جغرافیایی میانی به‌عنوان مبدأ. کمان‌ها روی این صفحه ساخته
-    # می‌شوند و در پایان به درجه برمی‌گردند.
+    # Local plane: mid-latitude as origin. Arcs are built on this plane and
+    # converted back to degrees at the end.
     lat0 = sum(lat for lat, _lon in points) / len(points)
     cos_lat = max(math.cos(math.radians(lat0)), 1e-6)
 
@@ -185,8 +185,8 @@ def round_path_corners(
 
     plane = [to_km(lat, lon) for lat, lon in points]
 
-    # مسافت تجمعی مسیر اصلی: هم برای آستانه‌های طول پاره و هم برای تصویر کردن
-    # نمونه‌های کمان روی مسیر اصلی (تا ارتفاع درست را بگیرند).
+    # Cumulative distance of the original path: used both for segment-length
+    # thresholds and for projecting arc samples (so they get the right level).
     cumulative = [0.0]
     for (x1, y1), (x2, y2) in zip(plane, plane[1:], strict=False):
         cumulative.append(cumulative[-1] + math.hypot(x2 - x1, y2 - y1))
@@ -195,27 +195,27 @@ def round_path_corners(
         return points, heights
 
     def level_at(distance_km: float) -> float:
-        """ارتفاع مسیر اصلی در یک مسافت مشخص (تابع پله‌ای روی گره‌ها)."""
+        """Original path altitude at a given distance (step function over nodes)."""
         index = 0
         while index + 1 < len(cumulative) and cumulative[index + 1] <= distance_km + 1e-9:
             index += 1
         return heights[min(index, len(heights) - 1)]
 
     def project_distance_km(x: float, y: float) -> float:
-        """مسافت نزدیک‌ترین نقطهٔ مسیر اصلی به یک نقطه (کیلومتر)."""
+        """Arc distance of the original path point nearest to a target (km)."""
         return _nearest_arc_distance(plane, cumulative, x, y)
 
     def arc_ok(samples: list[tuple[float, float]]) -> bool:
-        """قید زمین روی نمونه‌های کمان: فاصلهٔ ایمنی برقرار است؟"""
+        """Terrain check on arc samples: is clearance satisfied?"""
         if ground_elevation_at is None:
             return True
         for x, y in samples:
             lat, lon = to_degrees(x, y)
             try:
                 level = level_at(project_distance_km(x, y))
-            except Exception:  # pragma: no cover - تصویر کردن هرگز خطا نمی‌دهد
+            except Exception:  # pragma: no cover - projection never fails
                 return False
-            # گرهٔ زمین (سطح صفر) فیلت نمی‌گیرد؛ همان‌جا کف عوض می‌شود.
+            # Ground node (level zero) gets no fillet; the floor changes there.
             if level <= 0.0:
                 continue
             clearance = level - float(ground_elevation_at(lat, lon))
@@ -226,11 +226,11 @@ def round_path_corners(
     out_plane: list[tuple[float, float]] = [plane[0]]
     out_distance: list[float] = [0.0]
 
-    # **گره‌های هم‌مکان متوالی را این‌جا هم حذف کن** (همان برگشت‌های خیالی
-    # ±۷۵°/±۱۵۵° در دو سر مسیر — مبدأ/مقصدِ زمین که روی مختصاتِ گرهٔ هوایی
-    # می‌نشینند). بدون این، خروجی فیلت خودش دو پارهٔ صفر دارد که پروفیل
-    # چرخشِ مرحلهٔ بعد را منفجر می‌کند (اندازه‌گیری: بدترین نمونهٔ خروجی
-    # relax روی R4 از ۹ به ۵۵ درجه بر کیلومتر).
+    # **Drop consecutive co-located nodes here too** (the same phantom
+    # +/-75/+155 deg U-turns at both path ends — ground origin/destination
+    # sitting on an air-node coordinate). Without this, the fillet output itself
+    # carries two zero-length segments that blow up the next stage's turn
+    # profile (measured: worst relax sample on R4 went 9 -> 55 deg/km).
     dedup_plane: list[tuple[float, float]] = []
     dedup_distance: list[float] = []
     for point, distance in zip(plane, cumulative, strict=True):
@@ -263,7 +263,7 @@ def round_path_corners(
 
         u1x, u1y = (bx - ax) / prev_len, (by - ay) / prev_len
         u2x, u2y = (cx - bx) / next_len, (cy - by) / next_len
-        # زاویهٔ بین دو پاره. زاویهٔ ۰ یعنی مسیر راست است و فیلتی لازم نیست.
+        # Angle between the two segments; 0 means straight, no fillet needed.
         dot = max(min(u1x * u2x + u1y * u2y, 1.0), -1.0)
         turn_deg = math.degrees(math.acos(dot))
         if turn_deg < min_turn_deg:
@@ -277,7 +277,7 @@ def round_path_corners(
         for _attempt in range(max_attempts):
             if tangent < MIN_RADIUS_KM:
                 break
-            # فیلت: دو نقطهٔ مماس به فاصلهٔ ``tangent`` از گوشه روی دو پاره.
+        # Fillet: tangent points at ``tangent`` distance from the corner on both segments.
             t1 = (bx - u1x * tangent, by - u1y * tangent)
             t2 = (bx + u2x * tangent, by + u2y * tangent)
             samples = _arc_samples(t1, t2, u1x, u1y, u2x, u2y, tangent, arc_step_km)
@@ -289,7 +289,7 @@ def round_path_corners(
             placed = True
             break
         if not placed:
-            # زمین اجازه نداد؛ گوشه همان‌طور تیز می‌ماند (اولویت با زمین است).
+            # Terrain refused; corner stays sharp (terrain has priority).
             out_plane.append((bx, by))
             out_distance.append(cumulative[index])
 
@@ -298,9 +298,9 @@ def round_path_corners(
 
     rounded = [to_degrees(x, y) for x, y in out_plane]
     rounded_levels = [level_at(distance) for distance in out_distance]
-    # قرارداد دو سر مسیر: همان مقداری که ورودی داده بود (صفر = روی زمین)، نه
-    # ارتفاع زمین. ``level_at`` روی گرهٔ زمین ارتفاع *سطح* آن را برمی‌گرداند و
-    # اگر همان‌جا گزارش شود، قرارداد ``RouteResult`` می‌شکند.
+    # End-of-path convention: keep the input's own values (0 = on ground), not
+    # terrain elevation. ``level_at`` returns the ground node's *level*;
+    # reporting it there would break the ``RouteResult`` convention.
     rounded_levels[0] = heights[0]
     rounded_levels[-1] = heights[-1]
     return rounded, rounded_levels
@@ -316,20 +316,20 @@ def _arc_samples(
     tangent: float,
     arc_step_km: float,
 ) -> list[tuple[float, float]]:
-    """نمونه‌های کمان فیلت بین دو نقطهٔ مماس ``t1`` و ``t2``.
+    """Fillet arc samples between tangent points ``t1`` and ``t2``.
 
-    هندسه: ``φ`` زاویهٔ داخلی گوشه است (بین ``-u1`` و ``u2``). با طول مماس
-    ``t``، شعاع کمان ``r = t·tan(φ/2)`` و فاصلهٔ مرکز از گوشه ``t/cos(φ/2)``
-    می‌شود. مرکز روی نیمساز داخلی گوشه می‌نشیند؛ نیمساز همان
-    ``normalize(u2 − u1)`` است. پس کمان بدون حل مثلث، مستقیم از ``t`` ساخته
-    می‌شود و مماس‌بودن در دو سر تضمین‌شده است.
+    Geometry: ``phi`` is the corner's interior angle (between ``-u1`` and
+    ``u2``). With tangent length ``t``, the arc radius is ``r = t*tan(phi/2)``
+    and the center sits ``t/cos(phi/2)`` from the corner, on the interior
+    bisector ``normalize(u2 - u1)``. The arc is built directly from ``t``
+    without solving a triangle; tangency at both ends is guaranteed.
 
-    برای گوشهٔ خیلی باز (چرخش نزدیک صفر) ``tan(φ/2)`` بزرگ می‌شود و کمان به یک
-    منحنی ملایم با شعاع بزرگ می‌رسد — مطلوب است. برای گوشهٔ خیلی تیز (بازگشت
-    نزدیک ۱۸۰ درجه) شعاع کوچک می‌شود؛ حالت بیمارگونهٔ مسیر است و همان کمان
-    کوچک هم از گوشهٔ تیز بهتر است.
+    For a very open corner (near-zero turn) ``tan(phi/2)`` grows and the arc
+    becomes a gentle large-radius curve — desirable. For a very sharp corner
+    (near-180 deg reversal) the radius shrinks; a degenerate case where even a
+    small arc beats the sharp corner.
     """
-    # نیمساز داخلی: میانگین دو بردار یکه، نرمال‌شده.
+    # Interior bisector: mean of the two unit vectors, normalized.
     bis_x, bis_y = u2x - u1x, u2y - u1y
     norm = math.hypot(bis_x, bis_y)
     if norm <= 1e-9:
@@ -341,7 +341,7 @@ def _arc_samples(
     radius = tangent * math.tan(half)
     if radius <= 1e-9:
         return [t1, t2]
-    # گوشه همان نقطه‌ای است که دو نقطهٔ مماس را به هم وصل می‌کند.
+    # The corner is where the two tangent points would meet.
     corner = (t1[0] + u1x * tangent, t1[1] + u1y * tangent)
     offset = tangent / math.cos(half)
     center = (corner[0] + bis_x * offset, corner[1] + bis_y * offset)
@@ -364,37 +364,37 @@ def _arc_samples(
 
 
 # ---------------------------------------------------------------------------
-# پخش‌کردن انحنا: از «پاره‌های راست + گوشه» به یک منحنی با انحنای پیوسته
+# Curvature spreading: from straight segments + corners to continuous curvature.
 # ---------------------------------------------------------------------------
 
-# فاصلهٔ نمونه‌های بازنمونه‌شدهٔ منحنی (کیلومتر). ریزتر از گام گزارش (۰.۵ km)
-# تا هیچ بند انگشتی از هندسه در نمونه‌برداری بعدی گم نشود.
+# Resampled curve spacing (km), finer than the report step (0.5 km) so no
+# geometry detail is lost in later sampling.
 RELAX_STEP_KM = 0.25
 
-# سقف *هدف* چرخش محلی (درجه بر کیلومتر). چشم، «شکستگی» را با آهنگ چرخش در واحد
-# طول می‌بیند، نه با زاویهٔ کل گوشه: یک چرخش ۶ درجه‌ای در یک گام ۰.۳ کیلومتری
-# ۲۰ درجه بر کیلومتر است و مثل یک شکستگی دیده می‌شود، ولی همان ۶ درجه اگر در
-# ۳ کیلومتر پخش شود یک خم آرام است. مسیرهای بادسواری (که با انتگرال‌گیری گام‌به‌گام
-# ساخته می‌شوند) عملاً همین ترتیب را دارند و همین است که آن‌ها را «نرم» نشان می‌دهد.
+# Target cap on local turn rate (deg/km). The eye reads a 'kink' via turn
+# rate per unit length, not the total corner angle: 6 deg inside a 0.3 km step
+# is 20 deg/km and looks like a kink, while the same 6 deg spread over 3 km
+# is a gentle bend. Wind-riding paths (built by step-by-step integration)
+# naturally have this profile, which is why they read as smooth.
 RELAX_MAX_TURN_DEG_PER_KM = 1.5
 
-# پهنای هستهٔ گاوسی پخش چرخش، بر حسب *نمونهٔ* ۰.۲۵ کیلومتری. این عدد سرعت
-# همگرایی را تعیین می‌کند و از اندازه‌گیری آمده: نسخه‌ای که مازاد هر نمونه را فقط
-# به دو همسایهٔ فوری می‌داد (انتشار شعاع ۱ نمونه در هر پاس) برای خوشهٔ شکستگی
-# ۵۷ نمونه‌ای مسیرهای گرافی به ~۱۰۰۰ پاس نیاز داشت — بودجهٔ ۱۲۰ پاس همیشه پیش
-# از همگرایی تمام می‌شد و همان «راستِ دراز + خوشهٔ گوشه» روی صحنه می‌ماند.
-# گاوسی با σ = ۸ نمونه (۲ کیلومتر) در هر پاس چند کیلومتر پخش می‌کند؛ همان
-# خوشه در ~۳۰ پاس روی می‌نشیند. هیچ‌کدام به کریدور خاصی وابسته نیست.
+# Gaussian kernel width for turn spreading, in 0.25 km *samples*. Sets the
+# convergence speed, from measurement: giving each sample's surplus only to
+# its two immediate neighbors (radius-1 spread per pass) needed ~1000 passes
+# for a 57-sample kink cluster on graph routes — the 120-pass budget always
+# ran out first, leaving 'long straight + corner cluster' on the scene.
+# A Gaussian with sigma = 8 samples (2 km) spreads several km per pass; the
+# same cluster settles in ~30 passes. Nothing here is corridor-specific.
 RELAX_SPREAD_SAMPLES = 8.0
 
-# **قید سخت**: بیشینهٔ جابه‌جایی هر نمونه از جای خودش روی مسیر مسیریابی‌شده
-# (کیلومتر). این عدد سقف «آزادی هنری» است و عمداً کوچک است: گام شبکهٔ مسیریابی
-# ۵.۶ × ۹ کیلومتر است، پس ۱.۵ کیلومتر انحراف درون همان ابهامی است که خودِ گره‌بندی
-# گراف دارد — اما بیشتر از آن دیگر «همان مسیر» نیست و باید صریح رد شود.
+# **Hard constraint**: max displacement of any sample from its routed position
+# (km) — a deliberately small 'artistic freedom' cap. The routing grid step is
+# 5.6 x 9 km, so 1.5 km of drift stays within the lattice's own ambiguity;
+# anything more is a different route and must be rejected outright.
 RELAX_MAX_DEVIATION_KM = 2.5
 
-# سقف تکرار پاس‌های هموارسازی. یک پاس = یک گام انتشار گرما؛ تعداد لازم از
-# اندازهٔ شکستگی‌ها می‌آید ولی این سقف جلوی حلقه‌های بی‌پایان را می‌گیرد.
+# Cap on smoothing passes. One pass = one heat-spreading step; the required
+# count follows kink size, but the cap prevents runaway loops.
 RELAX_MAX_PASSES = 120
 
 def relax_path_curvature(
@@ -408,62 +408,63 @@ def relax_path_curvature(
     ground_elevation_at: Callable[[float, float], float] | None = None,
     min_clearance_m: float = 0.0,
 ) -> tuple[list[tuple[float, float]], list[float]]:
-    """انحنای مسیر را روی کل طول پخش می‌کند تا *منحنی* دیده شود، نه شکستگی.
+    """Spreads path curvature over the full length so it reads as *curved*, not kinked.
 
-    مسئله
+    Problem
     -----
-    مسیر گرافی دنباله‌ای از پاره‌های مستقیم است. ``round_path_corners`` گوشه‌ها را
-    با کمان گرد می‌کند، ولی خودِ پاره‌ها راست می‌مانند و کمان کوتاه است؛ نتیجه
-    اندازه‌گیری‌شده روی صحنهٔ منتشرشده: مسیر R4 یک بخش **۸۴ کیلومتری کاملاً راست**
-    دارد و بعد در یک نمونهٔ ۰.۳ کیلومتری ۶.۲ درجه می‌چرخد (≈ ۲۱ درجه بر کیلومتر).
-    همین «راستِ دراز + شکستگی» است که مسیرهای گرافی را ماشینی نشان می‌دهد، در
-    حالی که مسیرهای بادسواری (که گام‌به‌گام انتگرال گرفته می‌شوند) چرخش را در طول
-    مسیر پخش می‌کنند و چشم آن‌ها را منحنی می‌بیند.
+    A graph route is a sequence of straight segments. ``round_path_corners``
+    rounds corners with arcs, but the segments themselves stay straight and
+    the arc is short. Measured on the published scene: route R4 has a fully
+    straight 84 km section that then turns 6.2 deg within one 0.3 km sample
+    (~= 21 deg/km). That 'long straight + kink' shape is what makes graph
+    routes look mechanical, while wind-riding routes (integrated step by step)
+    spread their turning along the path and the eye reads them as curved.
 
-    روش
+    Approach
     ----
-    مسیر با گام یکنواخت بازنمونه‌شده و سپس **پروفیل چرخش** پردازش می‌شود: هر
-    نمونهٔ داخلی یک گام چرخش دارد و نمونه‌ای که از سقف بیشتر شود، مازادش با
-    **هستهٔ گاوسی** (σ = ``RELAX_SPREAD_SAMPLES`` نمونه) روی همسایه‌های دور و بر
-    پخش می‌شود — نه فقط دو همسایهٔ فوری. جمع چرخش در هر پاس دقیقاً حفظ می‌شود
-    (وزن‌ها نرمال‌اند)، پس شکل مسیر و دو سر آن (میخ‌شده) می‌ماند و فقط *تمرکز*
-    انحنا در طول مسیر پخش می‌گردد.
+    The path is resampled at a uniform step and the **turn profile** is then
+    processed: each interior sample has a turn step, and any sample above the
+    cap has its surplus spread over its neighborhood with a **Gaussian kernel**
+    (sigma = ``RELAX_SPREAD_SAMPLES`` samples) — not just its two immediate
+    neighbors. The total turn is preserved exactly (weights normalized), so the
+    route shape and its pinned ends stay; only curvature *concentration* spreads.
 
-    سه قید هم‌زمان
+    Three simultaneous constraints
     -------------
-    ۱) ``max_turn_deg_per_km`` — هدف کیفیت: تا وقتی چرخش محلی از این آستانه
-       کم نشده، پاس‌ها ادامه دارند. اگر با بیشینهٔ انحراف قابل‌قبول به هدف نرسد،
-       همان بهترین حالت برمی‌گردد (بهترین تلاش، نه یک وعده).
-    ۲) ``max_deviation_km`` — قید سخت: اگر پاس بعدی هر نمونه‌ای را بیش از این از
-       جای خودش روی مسیر مسیریابی‌شده دور کند، همان پاس پذیرفته نمی‌شود. پس
-       هندسه هرگز «یک چیز دیگر» نمی‌شود.
-    ۳) **زمین** — قید سخت‌تر: روی هر نمونه ارتفاع مسیر (از تصویر نقطه روی مسیر
-       اصلی) با زمین همان نقطه سنجیده می‌شود و **اجازه ندارد از فاصلهٔ ایمنی
-       مسیر مسیریابی‌شده بدتر شود**. آن نمونه به اندازهٔ لازم به سمت مسیر اصلی
-       کشیده می‌شود (با وزنی که در همسایگی نرم می‌شود). دقت کنید که این قاعده
-       «نسبت به ورودی» است، نه «کمینهٔ مطلق»: خودِ گراف لبه‌ها را روی چند نقطه
-       بررسی می‌کند، پس ممکن است مسیر ورودی جایی فاصلهٔ ایمنی‌اش کمتر از
-       آستانه باشد و قاعدهٔ مطلق همهٔ نرم‌شدن را رد می‌کرد (اندازه‌گیری‌شده روی
-       همین کریدور). کمبود خودِ روتر در ستون «کمینه فاصله از زمین» جدول دیده
-       می‌شود؛ این تابع نه آن را بهتر می‌کند و نه پنهان.
+    1) ``max_turn_deg_per_km`` — the quality target: passes continue until the
+       local turn drops below this threshold. If it cannot be met within the
+       acceptable deviation, the best state reached is returned (best effort).
+    2) ``max_deviation_km`` — hard constraint: if the next pass would move any
+       sample further than this from its routed position, that pass is
+       rejected; the geometry therefore never becomes 'something else'.
+    3) **Terrain** — the harder constraint: on every sample the route altitude
+       (from the projection onto the original path) is compared with the terrain
+       there and **may not become worse than the routed path's clearance**. The
+       sample is pulled toward the original path as much as needed (with a
+       weight smoothed over its neighborhood). Note this rule is 'relative to
+       the input', not an absolute minimum: the graph checks edges only at a
+       few sample points, so the routed input path may already sit below the
+       clearance threshold somewhere, and an absolute rule would reject all
+       smoothing (measured on this corridor). The router's own shortfall is
+       surfaced separately — the smoother never hides it.
 
-    ارتفاع هر نمونه از خود مسیر اصلی می‌آید (تصویر بر پایهٔ مسافت کمانی)، پس
-    پروفیل عمودی دست‌نخورده می‌ماند و قرارداد دو سر مسیر (صفر = روی زمین) حفظ
-    می‌شود.
+    Each sample's altitude comes from the original path itself (arc-distance
+    projection), so the vertical profile is untouched and the two-end contract
+    (zero = on the ground) is preserved.
 
-    عمومی بودن
+    Generality
     ----------
-    هیچ ثابتی این‌جا به کریدور مشهد–سبزوار وابسته نیست: ورودی هر چندضلعی دلخواه
-    در مختصات جغرافیایی است و خروجی همان قرارداد ``(path, levels)`` مرحلهٔ فیلت.
-    هر مسیر چندضلعی (گرافی یا هر مسیر دیگری که از گره می‌گذرد) از همین تابع رد
-    می‌شود؛ مسیرهای بادسواری مسیرِ خودشان را گام‌به‌گام می‌سازند و همین حالا
-    انحنای پیوسته دارند (این تابع روی آن‌ها تقریباً کاری نمی‌کند).
+    No constant here is tied to the Mashhad-Sabzevar corridor: the input is any
+    polygon path in geographic coordinates and the output follows the same
+    ``(path, levels)`` contract as the fillet stage. Every polygon path (graph
+    or otherwise, as long as it passes through nodes) goes through this function;
+    wind-riding routes already have continuous curvature (this barely touches them).
 
-    برمی‌گرداند
+    Returns
     ----------
     (path, levels)
-        تعداد نمونه‌ها از ورودی بیشتر است (گام یکنواخت ۰.۲۵ کیلومتر)؛ ترتیب حرکت
-        و دو سر مسیر یکی است.
+        The sample count exceeds the input's (uniform 0.25 km step); travel
+        order and both path ends are unchanged.
     """
     if len(path) != len(levels):
         raise ValueError(
@@ -479,12 +480,12 @@ def relax_path_curvature(
 
     points = [(float(lat), float(lon)) for lat, lon in path]
     heights = [float(level) for level in levels]
-    # **حذف گره‌های هم‌مکان متوالی.** گراف گرهٔ زمینِ مبدأ/مقصد را روی همان
-    # مختصاتِ گرهٔ هوایی می‌گذارد؛ پارهٔ صفرِ بعدی در پروفیل چرخش یک برگشت
-    # خیالی می‌سازد (atan2(0,0)) — اندازه‌گیری‌شده روی R4: دو قلهٔ کاذب
-    # ±۷۵.۵° و ±۱۵۵° در دو سر مسیر که صحنه آن‌ها را «شکستگی» نشان می‌داد.
-    # گرهٔ *زمین* (کمینهٔ ارتفاع) نگه داشته می‌شود تا قرارداد «صفر = روی
-    # زمین» دو سر مسیر دست‌نخورده بماند و صعود/فرود از سطح زمین ساخته شود.
+    # **Drop consecutive co-located nodes.** The graph places the ground
+    # origin/destination node at the same coordinates as the air node; the
+    # following zero-length segment creates a phantom U-turn in the turn
+    # profile (atan2(0,0)) — measured on R4: two false peaks of +/-75.5 and
+    # +/-155 deg at both path ends that the scene drew as 'kinks'.
+    # The *ground* node (min altitude) is kept so the 'zero = on the ground'
     cleaned: list[tuple[float, float]] = []
     cleaned_levels: list[float] = []
     for point, level in zip(points, heights, strict=True):
@@ -515,31 +516,31 @@ def relax_path_curvature(
         return points, heights
 
     def level_at(distance_km: float) -> float:
-        # مقدار پله‌ای عمداً حفظ شده: قرارداد «صفر = روی زمین» یعنی پارهٔ
-        # برخاست/فرود گارد ایمنی نمی‌گیرد. میان‌یابی خطی این‌جا آزموده شد و
-        # درست درآمد نداشت: از گرهٔ زمین (صفر) تا گرهٔ کروز میان‌یابی می‌کرد
-        # و ارتفاع‌های خیلی زیر زمین می‌ساخت (تست رشته‌کوه را می‌شکست).
-        # پیوستگیِ پروفیل عمودی حالا کارِ ترتیب تازهٔ خط‌لولهٔ روتر است:
-        # ``ramp_vertical_transitions`` *پیش* از این تابع اجرا می‌شود تا
-        # گارد زمین پروفیل واقعی پیوسته را ببیند، نه پلهٔ لایه‌ها.
+        # The step value is kept deliberately: the 'zero = on the ground'
+        # contract means the takeoff/landing segment gets no safety guard.
+        # Linear interpolation was tried here and failed: interpolating from
+        # the ground node (zero) to the cruise node produced altitudes far
+        # below the terrain (it broke the mountain-ridge test). Vertical-
+        # profile continuity is now the router pipeline's job:
+        # ``ramp_vertical_transitions`` runs *before* this function.
         index = 0
         while index + 1 < len(cumulative) and cumulative[index + 1] <= distance_km + 1e-9:
             index += 1
         return heights[min(index, len(heights) - 1)]
 
-    # **ارتفاعِ جای *جدید*، نه ارتفاعِ ایندکس قدیمی.** توزیع انحنا نمونه را در
-    # طول مسیر جابه‌جا می‌کند؛ هر گاردی که ارتفاع را با ایندکس یا مسافت کمانیِ
-    # قدیمی بردارد، ارتفاعِ یک نقطه را با زمینِ نقطهٔ دیگری می‌سنجد. اندازه‌گیری
-    # روی R1/R2: روی پروفیل صعود/فرود نزدیک مشهد، همین ناهم‌خوانی گارد را
-    # وادار می‌کرد نمونه‌های امن را «متخلف» ببیند و نرم‌شدن روی کف ایمنی
-    # میخکوب می‌شد (بدترین چرخش ۱۱.۸ درجه بر کیلومتر با خوشهٔ متناوب‌العلامت
-    # در ارتفاع ۱۷۹۰ متری جایی که زمین ۱۴۹۰ متر است).
+    # **Altitude of the *new* location, not the old index.** Curvature
+    # redistribution moves samples along the path; any guard reading altitude
+    # by old index or old arc distance compares one point's altitude against
+    # another point's terrain. Measured on R1/R2: on the climb/descent profile
+    # near Mashhad this mismatch made the guard flag safe samples as violators
+    # and smoothing got pinned to the clearance floor (worst turn 11.8 deg/km
+    # with an alternating-sign cluster at 1790 m where the terrain is 1490 m).
     def level_here(x: float, y: float) -> float:
         return level_at(_nearest_arc_distance(plane, cumulative, x, y))
 
     # ------------------------------------------------------------------
-    # بازنمونه‌برداری یکنواخت: نقاطی که روی مسیر *اصلی* می‌نشینند و مرجع سنجش
-    # انحراف‌اند. هر نمونهٔ منحنی بعداً فقط حول همین مرجع حرکت می‌کند.
+    # Uniform resampling: points sitting on the *original* path — the
+    # deviation reference. Curved samples later move only around this reference.
     # ------------------------------------------------------------------
     count = max(int(math.ceil(total_km / step_km)) + 1, 3)
     base: list[tuple[float, float]] = []
@@ -561,52 +562,35 @@ def relax_path_curvature(
     base[0] = plane[0]
     base[-1] = plane[-1]
 
-    def turns_deg(samples: Sequence[tuple[float, float]]) -> list[float]:
-        """اندازهٔ چرخش در هر نمونهٔ داخلی (درجه)."""
-        result: list[float] = []
-        for index in range(1, len(samples) - 1):
-            ax, ay = samples[index - 1]
-            bx, by = samples[index]
-            cx, cy = samples[index + 1]
-            first = math.atan2(bx - ax, by - ay)
-            second = math.atan2(cx - bx, cy - by)
-            delta = math.degrees(second - first)
-            while delta > 180.0:
-                delta -= 360.0
-            while delta < -180.0:
-                delta += 360.0
-            result.append(abs(delta))
-        return result
-
     def deviation_km(samples: Sequence[tuple[float, float]]) -> float:
-        """بیشینهٔ فاصلهٔ نمونه‌ها از جای خودشان روی مسیر اصلی."""
+        """Max distance of samples from their routed positions."""
         return max(
             math.hypot(x - bx, y - by)
             for (x, y), (bx, by) in zip(samples, base, strict=False)
         )
 
     def bearings(samples: Sequence[tuple[float, float]]) -> list[float]:
-        """سمت هر پاره (رادیان از شمال)."""
+        """Side of each segment (radians from north)."""
         return [
             math.atan2(bx - ax, by - ay)
             for (ax, ay), (bx, by) in zip(samples, samples[1:], strict=False)
         ]
 
     def wrap(value: float) -> float:
-        """زاویه را به بازهٔ (−π, π] می‌آورد."""
+        """Wraps the angle into (-pi, pi]."""
         return (value + math.pi) % (2.0 * math.pi) - math.pi
 
     # ------------------------------------------------------------------
-    # سقف زمین برای هر نمونه: **نه کمتر از خود مسیر مسیریابی‌شده**.
+    # Terrain ceiling per sample: **never lower than the routed path itself**.
     #
-    # چرا «کمینهٔ مطلق» کافی نبود؟ چون گراف لبه‌ها را فقط روی چند نقطهٔ نمونه
-    # بررسی می‌کند (گاه ۷ نقطه روی یک یال ۹ کیلومتری)، پس خودمسیرِ مسیریابی‌شده
-    # می‌تواند جایی فاصلهٔ ایمنی‌اش کمتر از آستانه باشد. با قاعدهٔ مطلق، چنین
-    # مسیری در پاس اول رد می‌شد و **هیچ** نرم‌شدنی نمی‌گرفت — اندازه‌گیری روی
-    # آرتیفکت همین را نشان داد: R1/R2 (۲۹۰۰ m) و R4 (۲۲۰۰ m) که به رشته‌کوه
-    # نزدیک‌اند دست‌نخورده می‌ماندند، در حالی که R3/R6 در ۳۶۰۰ m نرم می‌شدند.
-    # قاعدهٔ درست همین است: نرم‌کردن نباید ایمنی را *کم* کند؛ کمبودی که خودِ
-    # روتر دارد چیز دیگری است و پنهان نمی‌شود (ستون «کمینه فاصله از زمین» جدول).
+    # Why an 'absolute minimum' was not enough: the graph checks edges only at
+    # a few sample points (sometimes 7 points on a 9 km edge), so the routed
+    # path itself can sit below the clearance threshold somewhere. Under an
+    # absolute rule such a route would be rejected on the first pass and get
+    # **no** smoothing at all — measured on this artifact: R1/R2 (2900 m) and
+    # R4 (2200 m), close to the ridge, stayed untouched while R3/R6 smoothed at
+    # 3600 m. The right rule: smoothing must not *reduce* safety; the router's
+    # own shortfall is separate and not hidden (the 'min terrain clearance' column).
     # ------------------------------------------------------------------
     allowed_clearance: list[float] = []
     for index, (x, y) in enumerate(base):
@@ -619,7 +603,7 @@ def relax_path_curvature(
         allowed_clearance.append(local if local < min_clearance_m else min_clearance_m)
 
     def clearance_ok(samples: Sequence[tuple[float, float]]) -> bool:
-        """آیا هیچ نمونه‌ای ایمنی‌اش از مسیر اصلی *بدتر* نشده است؟"""
+        """Did any sample's clearance become *worse* than the original path?"""
         for index, (x, y) in enumerate(samples):
             floor = allowed_clearance[index]
             if floor <= 0.0:
@@ -633,15 +617,15 @@ def relax_path_curvature(
     def clamp_to_terrain(
         candidate: list[tuple[float, float]],
     ) -> list[tuple[float, float]]:
-        """نمونه‌ای که به کوه می‌خورد، تا *آخرین* نقطهٔ امن به عقب کشیده می‌شود.
+        """A sample hitting the mountain is pulled back to the *last* safe point.
 
-        کشیدنِ همه‌جا به عقب (یا رد کردن کل پاس) یعنی مسیری که یک جا زمین را لمس
-        می‌کند هیچ‌جا نرم نشود — و اندازه‌گیری روی همین آرتیفکت نشان داد این‌طور
-        می‌شود: R1/R2 (سطح ۲۹۰۰) و R4 (۲۲۰۰) دست‌نخورده می‌ماندند چون به رشته‌کوه
-        نزدیک‌اند، در حالی که R3/R6 در ۳۶۰۰ متر نرم می‌شدند. پس کاهش *محلی* است:
-        برای هر نمونهٔ متخلف، عامل اختلاط بین جای اصلی و جای نرم‌شده با نصف‌کردن
-        دودویی تا آخرین مقدار امن کم می‌شود و این عامل در همسایگی با مینیمم پخش
-        می‌شود تا خودش شکستگی نسازد.
+        Pulling everything back (or rejecting the whole pass) means a route that
+        touches ground once gets smoothed nowhere — measured on this artifact:
+        R1/R2 (2900 m) and R4 (2200 m) stayed untouched because they hug the
+        ridge, while R3/R6 smoothed at 3600 m. So the reduction is *local*: for
+        each violating sample, a blend factor between its original and smoothed
+        position is reduced by binary halving to the last safe value, and that
+        factor is spread over the neighborhood so it creates no kink of its own.
         """
         if ground_elevation_at is None or min_clearance_m <= 0.0:
             return candidate
@@ -666,11 +650,11 @@ def relax_path_curvature(
             blend[index] = low
         if all(value >= 1.0 for value in blend):
             return candidate
-        # پخش محلی با وزن گاوسی: کمبود ظرفیت هر نمونه با فاصله کم می‌شود، پس
-        # همسایه‌ها *تدریجاً* عقب می‌کشند و خودِ عقب‌کشیدن گوشهٔ تازه نمی‌سازد.
-        # (پیش‌تر مینیمم پنجرهٔ ۵ نمونه‌ای بود: یک پلهٔ ناگهانی که همان گوشهٔ
-        # تازه را روی لبهٔ ناحیهٔ امن می‌ساخت — اندازه‌گیری: R4 می‌ماند با ۹.۹
-        # درجه بر کیلومتر، باقی مسیرها روی ۲.۴.)
+        # Local spread with Gaussian weights: each sample's missing capacity
+        # decays with distance, so neighbors pull back *gradually* and the pull
+        # itself creates no new corner. (Previously the window minimum was 5
+        # samples: a sudden step that built exactly that new corner on the safe-
+        # zone edge — measured: R4 stayed at 9.9 deg/km, the rest reached 2.4.)
         deficit = [1.0 - value for value in blend]
         sigma = 2.0
         spread = [1.0] * len(blend)
@@ -692,19 +676,19 @@ def relax_path_curvature(
         return candidate
 
     # ------------------------------------------------------------------
-    # **چرخش را پخش می‌کنیم، نه مسیر را صاف.**
+    # **Spread the turn, not the path.**
     # ------------------------------------------------------------------
-    # نسخهٔ اول همین تابع، عملگر انتشار گرما روی *موقعیت* بود. دو ایراد داشت و
-    # هر دو روی مسیرهای واقعی همین کریدور اندازه‌گیری شدند:
-    #   ۱) مسیری که انحنایش در کل طول پخش شده — مثل R4 که برای دور زدن رشته‌کوه
-    #      منحنی است — را به سمت وتر می‌کشد؛ یعنی شکل *واقعی* مسیر را عوض می‌کند
-    #      تا یک گوشه را نرم کند (سقف انحراف زود پر می‌شد).
-    #   ۲) نتیجه: R4 با ۹.۹ درجه بر کیلومتر رها می‌شد در حالی که R1/R2/R6 به ۲.۴
-    #      می‌رسیدند.
-    # حالا **پروفیل چرخش** پردازش می‌شود: هر نمونهٔ داخلی یک گام چرخش دارد و اگر
-    # از سقف بیشتر شود، مازادش نصف‌نصف به دو همسایه داده می‌شود. جمع چرخش ثابت
-    # می‌ماند، پس شکل مسیر (از جمله دور زدن‌ها) حفظ می‌شود و فقط *تمرکز* چرخش
-    # پخش می‌گردد — دقیقاً همان چیزی که یک منحنی چشم‌نواز دارد.
+    # The first version of this function was a heat-spreading operator on
+    # *positions*. It had two defects, both measured on real corridor routes:
+    #   1) A route whose curvature is already spread over its length — like R4,
+    #      curved to dodge the ridge — got pulled toward its chord, i.e. it
+    #      changed the route's *actual* shape just to soften one corner
+    #      (the deviation cap filled up early).
+    #   2) Result: R4 was left at 9.9 deg/km while R1/R2/R6 reached 2.4.
+    # Now the **turn profile** is processed: each interior sample has a turn
+    # step and any surplus is split half-and-half to its two neighbors. The
+    # total turn stays constant, so the route shape (including detours) is
+    # preserved and only the *concentration* of turning is spread — exactly
     base_bearings = bearings(base)
     lengths = [
         math.hypot(bx - ax, by - ay)
@@ -715,11 +699,13 @@ def relax_path_curvature(
         turns[index] = wrap(base_bearings[index] - base_bearings[index - 1])
 
     def rebuild(profile: Sequence[float]) -> list[tuple[float, float]]:
-        """مسیر را از مبدأ با یک پروفیل چرخش می‌سازد و مقصد را با برش می‌بندد.
+        """Rebuilds the path from the origin with a turn profile.
 
-        اختلاف‌ماندهٔ مقصد: پخش‌کردن چرخش طول گام‌ها را نگه می‌دارد ولی جهت پایانی
-        را کمی جابه‌جا می‌کند. یک «برش» خطی در طول مسیر — که انحنای تازه‌ای نمی‌سازد
-        — مقصد را دقیقاً روی مقصد می‌نشاند؛ مبدأ هم دست‌نخورده می‌ماند.
+        Destination residual: spreading the turn keeps segment lengths but
+        shifts the final heading slightly, so integrating from the origin no
+        longer lands exactly on the destination. A linear 'cut' along the path
+        — which creates no new curvature — distributes that residual over the
+        interior samples and lands the last point exactly on the destination.
         """
         built: list[tuple[float, float]] = [base[0]]
         heading = base_bearings[0]
@@ -743,38 +729,38 @@ def relax_path_curvature(
             built[-1] = base[-1]
         return built
 
-    # **قیدها درون حلقه سنجیده می‌شوند، نه در پایان.** نسخه‌ای که همهٔ پاس‌ها را
-    # اول اجرا می‌کرد و بعد قید را بررسی می‌کرد، پروفیل چرخش را آن‌قدر پخش می‌کرد
-    # که مسیر به یک قوس بزرگ بدل شود؛ آن‌وقت یا کل کار رد می‌شد (R1/R2/R4
-    # دست‌نخورده) یا یک حالت نیم‌کاره با گوشه‌های ۲۳ تا ۳۵ درجه می‌ماند (اندازه‌گیری
-    # شد). حالا هر پاس ابتدا ساخته و سنجیده می‌شود و تنها اگر **هم** انحراف و
-    # **هم** ایمنی قبول باشند پذیرفته می‌گردد؛ آخرین حالت پذیرفته‌شده خروجی است.
-    # پس خروجی همیشه یک مسیر معتبر است و «بیشترین نرم‌شدنی که ایمنی می‌دهد».
+    # **Constraints are measured inside the loop, not at the end.** A version
+    # that ran all passes first and checked afterwards spread the turn profile
+    # so far the route became one big arc; then either the whole work was
+    # rejected (R1/R2/R4 untouched) or a half-done state with 23-35 deg corners
+    # remained (measured). Now each pass is built and checked first, and
+    # accepted only if **both** deviation and safety pass; the last accepted
+    # state is the output — always a valid route: the most smoothing safety allows.
     cap = math.radians(max_turn_deg_per_km * step_km)
     current: list[tuple[float, float]] | None = None
-    # **σ تطبیقی**: اگر یک پاس انحراف/ایمنی را نقض کند، هستهٔ پخش *باریک‌تر* می‌شود
-    # و همان پاس دوباره تلاش می‌شود — نه این‌که کل کار رها شود. با σ=۱ هر جابه‌جایی
-    # محدود به یک نمونه است، پس پاس ردشدنی وجود ندارد (هر جابه‌جایی یکنمونه‌ای
-    # همیشه از انحراف قبلی کوچک‌تر است). این همان تفاوت R4 بود: اولین پاسِ بزرگ
-    # قید انحراف را می‌شکست و مسیر دست‌نخورده می‌ماند؛ حالا به‌تدریج باریک می‌شود
-    # تا جایی که قیدها اجازهٔ ادامه بدهند.
+    # **Adaptive sigma**: if a pass violates deviation/safety, the spread
+    # kernel gets *narrower* and the same pass is retried — the work is not
+    # abandoned. With sigma=1 each displacement is limited to one sample, so
+    # no pass is ever rejectable (any one-sample displacement is always smaller
+    # than the previous deviation). That was exactly the R4 difference: the
+    # first big pass broke the cap; now it narrows gradually as constraints allow.
     sigma = RELAX_SPREAD_SAMPLES
     min_sigma = 1.0
     for _pass in range(max_passes):
         if max((abs(value) for value in turns[1:-1]), default=0.0) <= cap + 1e-12:
             break
-        # **انتشار حرارتی پروفیل چرخش.** تاریخچهٔ سه نسخهٔ قبلی (هر سه
-        # اندازه‌گیری‌شده):
-        #   ۱) نوشتن مستقیم سقف، سهمِ گرفته‌شده از همسایه‌ها را پاک می‌کرد؛
-        #      هر پاس چرخش «گم» می‌شد و مقصد ۱۱ کیلومتر جابه‌جا می‌شد.
-        #   ۲) دادن مازاد فقط به دو همسایهٔ فوری، برای خوشهٔ ۵۷ نمونه‌ای
-        #      مسیرهای گرافی به ~۱۰۰۰ پاس نیاز داشت؛ بودجهٔ پاس می‌گذشت.
-        #   ۳) گرفتن مازاد «فقط از نمونه‌های بالای سقف» کمان یکنواخت فیلت را
-        #      ناهمگون می‌کرد (R4 بدتر شد: ۱۲.۸ ← ۲۰.۱) و خوشه‌ها را فقط
-        #      جابه‌جا می‌کرد، نه پخش.
-        # نسخهٔ کنونی هر نمونه را به سمت میانگین گاوسی همسایگی می‌کشد؛ جمع
-        # چرخش تقریباً ثابت می‌ماند (دو سر میخ‌اند) و مقصد با برش پایانیِ
-        # ``rebuild`` دقیق بسته می‌شود.
+        # **Heat spreading on the turn profile.** History of the three previous
+        # versions (all measured):
+        #   1) Writing the cap directly erased the share taken from neighbors;
+        #      each pass "lost" turn and the destination drifted 11 km.
+        #   2) Giving surplus only to the two immediate neighbors needed ~1000
+        #      passes for the 57-sample kink cluster of graph routes; the pass
+        #      budget ran out.
+        #   3) Taking surplus 'only from above-cap samples' made the uniform
+        #      fillet arc inhomogeneous (R4 got worse: 12.8 -> 20.1) and only
+        #      moved clusters around, not spread them.
+        # The current version pulls each sample toward the Gaussian mean of its
+        # neighborhood; the destination closes exactly via the final ``rebuild`` cut.
         n = len(turns)
         radius = max(1, int(math.ceil(3.0 * sigma)))
         weight = [
@@ -783,21 +769,21 @@ def relax_path_curvature(
         ]
         kernel_total = sum(weight)
         weight = [value / kernel_total for value in weight]
-        # **انتشار حرارتی روی پروفیل چرخش — نه فقط مازادِ بالای سقف.**
-        # نسخهٔ قبلی فقط از نمونه‌های بالای سقف چرخش می‌گرفت و به همسایه‌ها
-        # می‌داد؛ دو ایراد اندازه‌گیری‌شده:
-        #   ۱) کمان فیلت (چرخش یکنواخت ~۱.۷° بر نمونه) بالای سقف بود؛ گرفتن
-        #      مازادِ لبه‌هایش کمان یکنواخت را ناهمگون می‌کرد — روی R4
-        #      بدترین نمونه از ۱۲.۸ به ۲۰.۱ درجه بر کیلومتر *بدتر* شد.
-        #   ۲) نمونه‌های زیر سقف هرگز نمی‌دادند، پس «خوشه»ٔ چرخش جابه‌جا
-        #      می‌شد ولی پخش نمی‌شد؛ بودجهٔ پاس تمام می‌شد و خوشه می‌ماند.
-        # انتشار واقعی هر نمونه را به سمت میانگین وزنی‌گاوسی همسایگی می‌کشد؛
-        # قوس یکنواخت هم مثل هر پروفیل دیگری *پهن‌تر* می‌شود — همان چرخش کل
-        # روی مسافت بیشتر، یعنی دقیقاً «نرم‌تر». حفظ شکل مسیر کار سقف نیست:
-        # قید انحراف (``max_deviation_km``) و قید زمین هر پاس را می‌سنجند و
-        # پاسِ ردشده با هستهٔ باریک‌تر دوباره تلاش می‌شود؛ با σ=۱ جابه‌جایی
-        # هر پاس چند متر است و هرگز قید نمی‌شکند، پس حلقه به «نرم‌ترین
-        # منحنیِ درون بودجهٔ انحراف» همگرا می‌شود.
+        # **Heat spreading on the turn profile — not just above-cap surplus.**
+        # The previous version took turn only from above-cap samples and gave
+        # it to neighbors; two measured defects:
+        #   1) The fillet arc (uniform ~1.7 deg/sample turn) was itself above
+        #      the cap; taking its edges' surplus made the uniform arc
+        #      inhomogeneous — on R4 the worst sample went 12.8 -> 20.1 deg/km,
+        #      *worse*.
+        #   2) Below-cap samples never gave, so the turn cluster only *moved*,
+        #      never spread; the pass budget ran out and the cluster remained.
+        # Real spreading pulls every sample toward the Gaussian-weighted mean of
+        # its neighborhood; the uniform arc, like any profile, gets *wider* — the
+        # same total turn over more distance, i.e. exactly 'smoother'. Keeping the
+        # route shape is not the cap's job: the deviation cap (``max_deviation_km``)
+        # and the terrain constraint judge every pass; a rejected pass is retried
+        # with a narrower kernel and converges within the deviation budget.
         alpha = 0.6
         updated = [turns[0]]
         for index in range(1, n - 1):
@@ -815,26 +801,26 @@ def relax_path_curvature(
         updated.append(turns[n - 1])
         candidate = clamp_to_terrain(rebuild(updated))
         if deviation_km(candidate) > max_deviation_km or not clearance_ok(candidate):
-            # پاس رد شد: هسته را باریک‌کن و دوباره — به‌جای رهاکردن کل کار.
+            # Pass rejected: narrow the kernel and retry instead of dropping all work.
             if sigma <= min_sigma + 1e-12:
                 break
             sigma = max(min_sigma, sigma * 0.5)
             continue
         turns = updated
         current = candidate
-        # پس از هر پاس پذیرفته‌شده، دوباره از هستهٔ پهن شروع کن: به‌محض این‌که
-        # قیدها اجازه بدهند، پخش سریع برمی‌گردد.
+        # After each accepted pass, start again from the wide kernel: as soon as
+        # the constraints allow, fast spreading returns.
         sigma = RELAX_SPREAD_SAMPLES
 
     if current is None:
-        # مسیر ورودی از قبل نرم است یا قیدها اجازهٔ هیچ تغییری ندادند: همان
-        # هندسهٔ مسیریابی‌شده برمی‌گردد، بدون ادعای اضافه.
+        # The input path is already smooth or the constraints allowed no change:
+        # return the routed geometry as-is, no extra claims.
         return points, heights
 
 
     relaxed = [to_degrees(x, y) for x, y in current]
     relaxed_levels = [level_at(distance) for distance in distances]
-    # همان قرارداد دو سر مسیر که فیلت هم رعایت می‌کند: مقدار ورودی، نه سطح زمین.
+    # Same two-end contract the fillet stage keeps: the input value, not ground
     relaxed_levels[0] = heights[0]
     relaxed_levels[-1] = heights[-1]
     return relaxed, relaxed_levels

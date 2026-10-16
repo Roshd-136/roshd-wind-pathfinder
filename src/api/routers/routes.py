@@ -3,11 +3,13 @@ Routes Router — POST /routes, GET /routes/{routeId}, GET /routes/jobs/{jobId},
 
 Implements the routing endpoints per api/openapi.yaml.
 """
-from datetime import datetime
+import math
+from datetime import datetime, timezone
 from typing import Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from pathfinding.cost import CostModelConfig
@@ -193,12 +195,21 @@ def _init_pathfinding() -> None:
     )
 
     # Build multi-layer graph
+    # **فیلتر زمین روی یال‌ها — همان کاری که صحنهٔ مرجع می‌کند.** سازندهٔ گراف
+    # فقط *گره‌های* بی‌فاصله را حذف می‌کند؛ یالی که از روی یک قله می‌گذرد ولی دو
+    # سرش پایین است بی‌فیلتر می‌ماند. نتیجه: مسیر باند از روی آن قله رد می‌شد و
+    # رمپ ایمنی برای نگه‌داشتن فاصلهٔ ۳۰۰ متری، هواپیما را *بالاتر از سقف باند*
+    # می‌برد (اندازه‌گیری: باند [۱۵۰۰,۲۲۰۰] تا ۲۷۳۰ متر بالا می‌رفت). صحنهٔ مرجع
+    # (``viz/scene3d.py``) از ابتدا ``edge_terrain_sampler`` را می‌دهد؛ رابط API
+    # نمی‌داد و همین تفاوت، علت «احترام‌نشدن باند» بود. حالا هر دو یک گراف
+    # می‌سازند: باند یا مسیر از کنارِ کوه پیدا می‌کند یا صادقانه می‌گوید نمی‌شود.
     _multi_graph = build_multi_layer_graph(
         fields=fields,
         config=None,
         criterion="balanced",  # will be overridden per request
         max_edge_distance_km=20.0,
         min_clearance_m=MIN_TERRAIN_CLEARANCE_M,
+        edge_terrain_sampler=terrain_model.elevation_at,
     )
 
     # Store fields globally for wind_riding algorithm
@@ -328,6 +339,24 @@ def compute_route_sync(request: RouteRequest) -> RouteResult:
     # بازهٔ ارتفاع انتخابی کاربر → سطوح پرواز؛ ``None`` یعنی «همهٔ لایه‌ها».
     band_levels = _resolve_altitude_band(request)
 
+    # **صداقت قیدها.** قیدهایی که موتور مسیریابی هنوز اعمال نمی‌کند، به‌جای
+    # «نادیده‌گرفتن خاموش» صریحاً رد می‌شوند: اگر بک‌اند قیدی را بپذیرد و
+    # نادیده بگیرد، نتیجهٔ مسیر با آنچه کاربر خواسته فرق می‌کند و کاربر هرگز
+    # نمی‌فهمد قیدش بی‌اثر بوده است (پیش‌تر ``max_wind_speed_mps`` تماماً
+    # بی‌اثر ارسال می‌شد). رابط کاربری تا پیاده‌شدن موتور، این قیدها را
+    # نمی‌فرستد؛ ردکردن صریح فقط مصرف‌کنندهٔ مستقیم API را هدایت می‌کند.
+    if request.constraints is not None:
+        if request.constraints.max_wind_speed_mps is not None:
+            raise ValueError(
+                "قید «حداکثر سرعت باد» هنوز در موتور مسیریابی اعمال نمی‌شود؛ "
+                "لطفاً درخواست را بدون این قید بفرستید."
+            )
+        if request.constraints.avoid_zones:
+            raise ValueError(
+                "مناطق ممنوعه هنوز در موتور مسیریابی پشتیبانی نمی‌شود؛ "
+                "لطفاً درخواست را بدون ممنوعه بفرستید."
+            )
+
     # Map API algorithm names to backend algorithm names
     algorithm_map = {
         "a_star": "astar",
@@ -375,7 +404,6 @@ def compute_route_sync(request: RouteRequest) -> RouteResult:
         destination = (waypoints[i + 1].lat, waypoints[i + 1].lon)
 
         # Skip if waypoints are too close (same H3 cell)
-        import math
         dist_km = math.hypot(
             (origin[0] - destination[0]) * 111.0,
             (origin[1] - destination[1]) * 111.0 * math.cos(math.radians(origin[0]))
@@ -609,7 +637,7 @@ def compute_route_sync(request: RouteRequest) -> RouteResult:
         total_distance_km=total_distance_km,
         estimated_time_hours=total_time_hours,
         total_cost=total_cost,
-        created_at=datetime.utcnow().isoformat() + "Z",
+        created_at=datetime.now(timezone.utc).isoformat(),
         is_saved=False,
         # Additional metrics from WindRouter
         total_energy_index=getattr(last_result, 'total_energy_index', None),
@@ -651,9 +679,14 @@ async def calculate_route(request: RouteRequest):
             progress=0,
         )
         # In production: enqueue background task (Celery, RQ, etc.)
-        return RouteJobAccepted(
-            job_id=job_id,
-            estimated_duration_seconds=30,
+        # قرارداد اسپک: پذیرش کار = ۲۰۲ (نه ۲۰۰) — کلاینت از وضعیت متمایز می‌فهمد
+        # که پاسخ «نتیجه» نیست و باید polling کند.
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content=RouteJobAccepted(
+                job_id=job_id,
+                estimated_duration_seconds=30,
+            ).model_dump(),
         )
 
     # Sync mode
@@ -685,33 +718,12 @@ async def compare_layers(job_id: str):
     if job.status != "completed":
         raise HTTPException(status_code=409, detail="Job not completed yet")
 
-    # TODO: Return real layer comparison from pathfinding engine
-    return LayerComparison(
-        layers=[
-            LayerComparisonRow(
-                layer_altitude_m=500,
-                estimated_time_hours=2.8,
-                total_distance_km=105.0,
-                total_cost=160.0,
-                tailwind_leg_fraction=0.35,
-                heading_changes=12,
-            ),
-            LayerComparisonRow(
-                layer_altitude_m=1000,
-                estimated_time_hours=2.5,
-                total_distance_km=100.0,
-                total_cost=150.0,
-                tailwind_leg_fraction=0.42,
-                heading_changes=10,
-            ),
-            LayerComparisonRow(
-                layer_altitude_m=2000,
-                estimated_time_hours=2.3,
-                total_distance_km=98.0,
-                total_cost=145.0,
-                tailwind_leg_fraction=0.55,
-                heading_changes=8,
-            ),
-        ],
-        best_layer_altitude_m=2000,
+    # مقایسهٔ واقعی لایه‌ها هنوز پیاده‌سازی نشده است. ردیف‌های جعلی قبلی
+    # (لایه‌های ۵۰۰/۱۰۰۰/۲۰۰۰ که اصلاً سطوح پرواز پروژه نیستند) حذف شدند:
+    # دادهٔ ساختگی معتبرتر از خطای شفاف نیست. تا پیاده‌سازی، پاسخ صادقانهٔ
+    # ۵۰۱ بدهید تا مصرف‌کننده روی دادهٔ دموی بی‌ربط به لایه‌های واقعی تصمیم
+    # نگیرد.
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="مقایسهٔ لایه‌ها هنوز پیاده‌سازی نشده است.",
     )

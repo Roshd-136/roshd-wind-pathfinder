@@ -1,46 +1,54 @@
-"""پروفیل عمودی پرواز: تبدیل «پله»های ارتفاع به یک مسیر نرم و تدریجی.
+"""Vertical flight profile: turns altitude "steps" into a smooth, gradual path.
 
-مسئله
------
-گراف مسیریابی *لایه‌ای* است: هر گره روی یک سطح پرواز ثابت می‌نشیند و گره زمین هم
-ارتفاع زمین دارد. پس هر گذر ارتفاعی در گراف یک **یال عمودی** است — گرهٔ بعدی همان‌جا
-است که گرهٔ قبلی و فقط ارتفاعش عوض می‌شود. برای *جست‌وجو* این درست است (هزینهٔ گذر
-جدا پرداخت می‌شود)، ولی همان مسیر که رسم شود یک دیوار عمودی است و به چشم «افتادن از
-آسمان» می‌آید.
+Problem
+-------
+The routing graph is *layered*: every node sits on a fixed flight level and the
+ground node carries the terrain elevation. So every altitude transition in the
+graph is a **vertical edge** — the next node sits exactly where the previous one
+does, only its altitude changes. That is correct for *search* (the transition
+cost is paid separately), but once the same route is plotted it becomes a
+vertical wall and reads as "falling out of the sky".
 
-هواپیما این‌طور پرواز نمی‌کند. صعود و فرود **نرخ** دارند، پس هر گذر ارتفاعی به همان
-اندازه مسافت افقی می‌خواهد، و شیب آن هم ثابت نیست: گذر با شیب صفر شروع می‌شود
-(پایان بخش تراز)، به شیب بیشینه می‌رسد، و دوباره به صفر برمی‌گردد.
+Aircraft do not fly that way. Climb and descent have **rates**, so every
+altitude transition consumes the same amount of horizontal distance, and the
+slope is not constant either: a transition starts at zero slope (end of the
+level segment), reaches its maximum slope, and returns to zero.
 
-روش
-----
-پروفیل با یک «پیروِ نرخ‌محدود» ساخته می‌شود، نه با پنجره‌بندی روی هر گذر، و بعد
-گوشه‌هایش گرد می‌شود:
+Method
+------
+The profile is built with a "rate-limited follower" rather than windowing each
+transition, and its corners are then rounded:
 
-۱) مسیر با گام ثابت نمونه‌برداری می‌شود و ارتفاع هر نمونه به **هدف** آن نقطه
-   (ارتفاع گره‌ای که در آن قرار دارد) کشیده می‌شود، ولی هیچ‌گاه سریع‌تر از سقف
-   شیب آن فاز:
+1) The route is sampled at a fixed step, and the altitude of each sample is
+   pulled toward the **target** of that point (the altitude of the node it sits
+   on), but never faster than that phase's slope cap:
 
-   * گذر صعودی فقط به اندازهٔ ``سقف صعود × Δs`` جلو می‌رود، پس از نقطه‌ای که هدف
-     بالا می‌رود به بعد پخش می‌شود؛
-   * گذر نزولی فقط به همان اندازه، ولی *عقب‌گرد* شمارش می‌شود تا درست روی همان
-     نقطه‌ای که هدف پایین می‌آید (مقصد) تمام شود.
+   * a climb advances by at most ``climb cap × Δs``, so it spreads from the
+     point where the target starts rising onward;
+   * a descent advances by the same amount, but is *counted backwards* so it
+     ends exactly at the point where the target comes back down (the
+     destination).
 
-   این دو پاس هر پروفیلی را می‌پذیرد — از جمله مسیرهایی که چند بار بالا و پایین
-   می‌روند. پنجره‌بندی روی هر گذر در چنین مسیرهایی یا پنجره‌ها را روی هم
-   می‌انداخت یا یکی را کوتاه می‌کرد و همان پلهٔ اول را برمی‌گرداند.
+   These two passes accept any profile — including routes that go up and down
+   repeatedly. Per-transition windowing on such routes either stacked the
+   windows on top of each other or shortened one of them and returned the same
+   first step again.
 
-۲) **گوشه‌ها گرد می‌شوند.** پیروی نرخ‌محدود یک خط شکسته می‌دهد: تراز، رمپ با شیب
-   بیشینه، تراز. همان سه‌قطعی است که «پله‌ای» دیده می‌شود. چند دور میانگین‌گیری
-   وزنی روی نمونه‌های داخلی (با دو سر ثابت) شیب را در دو سر هر گذر به صفر
-   می‌رساند: گذر مثل یک منحنی S شروع می‌شود، اوج می‌گیرد و تمام می‌شود. میانگین
-   وزنی هیچ‌وقت از بیشینهٔ همسایگی بالاتر نمی‌رود، پس نه از سقف شیب می‌زند و نه از
-   سطح هدف. یک نتیجهٔ جانبی هم دارد که همان چیزی است که فرود واقعی دارد: **فلر**
-   — نزدیک مقصد شیب به‌تدریج کم می‌شود و هواپیما به‌جای «کوبیدن» می‌نشیند.
+2) **Corners are rounded.** The rate-limited follower yields a broken line:
+   level, ramp at maximum slope, level. That is exactly the three-piece shape
+   that looks "stepped". A few rounds of weighted averaging over interior
+   samples (with both ends held fixed) brings the slope to zero at both ends of
+   each transition: it starts like an S-curve, peaks, and finishes. The
+   weighted average never exceeds the neighborhood maximum, so it neither
+   exceeds the slope cap nor the target level. A side effect is that the
+   actual peak slope falls slightly below the cap, so the transition distance
+   grows a little — this is acceptable within the chosen margin. The same side
+   effect is what a real landing has: **flare** — near the destination the
+   slope decreases gradually and the aircraft lands instead of "slamming" down.
 
-   آخرین دور گردکردن *کف‌آگاه* است: اگر میانگین به زیر زمین برسد، همان کف
-   گذاشته می‌شود. بدون این، "چسبیدن به کف" روی یک دامنه یک گوشهٔ تیز باقی
-   می‌گذاشت که هیچ دور بعدی آن را نرم نمی‌کرد.
+   The final rounding pass is *floor-aware*: if the average dips below ground,
+   the floor is clamped in place. Without this, "sticking to the floor" on a
+   slope would leave a sharp corner that no subsequent round would smooth.
 
 ۳) **شیب فرود، گلاید دور آرام است.** فرود نیازی به نرخ موتور ندارد: ارتفاع خرج
    می‌شود و مسافت به دست می‌آید. پس سقف شیب فرود از نسبت برآر به پسار
