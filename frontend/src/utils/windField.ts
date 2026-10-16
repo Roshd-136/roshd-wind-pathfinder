@@ -92,17 +92,23 @@ export function sampleWindAtPoint(
   const v11 = lookupVector(field, meta, r1, c1)
 
   const lerp = (a: number, b: number, t: number) => a + t * (b - a)
+  // جهت باد زاویهٔ دایره‌ای است — درون‌یابی خطی روی ۰/۳۶۰ غلط می‌دهد
+  // (میانهٔ ۳۵۰° و ۱۰° باید ۰° باشد، نه ۱۸۰°)؛ کوتاه‌ترین کمان.
+  const lerpAngle = (a: number, b: number, t: number) => a + t * (((b - a + 540) % 360) - 180)
+  const direction =
+    lerpAngle(
+      lerpAngle(v00.direction_deg, v01.direction_deg, tx),
+      lerpAngle(v10.direction_deg, v11.direction_deg, tx),
+      ty,
+    )
+  // اول گرد، بعد پیچش — وگرنه ۳۵۹٫۹۹…° با گردشدن «۳۶۰٫۰» می‌شود و از
+  // بازهٔ [۰، ۳۶۰) بیرون می‌زند.
+  const directionWrapped = (((Math.round(direction * 10) / 10) % 360) + 360) % 360
   return {
     speed_mps: Number(
       lerp(lerp(v00.speed_mps, v01.speed_mps, tx), lerp(v10.speed_mps, v11.speed_mps, tx), ty).toFixed(2),
     ),
-    direction_deg: Number(
-      lerp(
-        lerp(v00.direction_deg, v01.direction_deg, tx),
-        lerp(v10.direction_deg, v11.direction_deg, tx),
-        ty,
-      ).toFixed(1),
-    ),
+    direction_deg: directionWrapped,
   }
 }
 

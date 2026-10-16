@@ -9,7 +9,7 @@ interface AlgorithmSelectorProps {
 
 /**
  * انتخاب الگوریتم مسیریابی — گزینه‌ها منطبق با `GET /algorithms` در
- * api/openapi.yaml (`a_star` پیش‌فرض، `dijkstra` جایگزین).
+ * api/openapi.yaml (`a_star` پیش‌فرض، `dijkstra` جایگزین، `smooth` صاف‌کرده، `wind_riding` پیروی از باد).
  */
 export function AlgorithmSelector({ value, onChange }: AlgorithmSelectorProps) {
   const { t } = useTranslation()
@@ -22,6 +22,8 @@ export function AlgorithmSelector({ value, onChange }: AlgorithmSelectorProps) {
       options={[
         { value: 'a_star', label: 'A* (Wind Aware)' },
         { value: 'dijkstra', label: 'Dijkstra' },
+        { value: 'smooth', label: 'Smoothed A*' },
+        { value: 'wind_riding', label: 'Wind Riding' },
       ]}
     />
   )

@@ -1,3 +1,10 @@
+/**
+ * Legend سرعت باد — گرادیان آبی→سبز→زرد→قرمز. رنگ‌آمیزی نقشه **نسبی** است
+ * (کمینهٔ میدان → آبی، بیشینه → قرمز؛ `colorForFieldSpeed`)، پس برچسب‌های
+ * طیف هم باید بازهٔ *واقعی* میدان‌های نمایان باشند — پیش‌تر برچسب ثابت
+ * ۰/۵/۱۰/۱۵/۲۰+ م/ث بود و با رنگ‌های روی نقشه نمی‌خواند.
+ */
+
 const STOPS = [
   { value: 0, color: 'var(--wind-speed-0)' },
   { value: 5, color: 'var(--wind-speed-5)' },
@@ -6,23 +13,28 @@ const STOPS = [
   { value: 20, color: 'var(--wind-speed-20)' },
 ]
 
-/**
- * Legend سرعت باد — گرادیان آبی→سبز→زرد→قرمز با برچسب‌های 0/5/10/15/20+ m/s،
- * دقیقاً مطابق mockup. رنگ‌ها از توکن‌های `--wind-speed-*` در tokens.css.
- */
-export function WindSpeedLegend() {
+interface WindSpeedLegendProps {
+  /** بازهٔ [کمینه، بیشینه] سرعت میدان‌های نمایان (م/ث). */
+  range?: [number, number]
+}
+
+export function WindSpeedLegend({ range = [0, 20] }: WindSpeedLegendProps) {
   const gradient = `linear-gradient(to var(--legend-direction, right), ${STOPS.map((s) => s.color).join(', ')})`
+  const [min, max] =
+    Number.isFinite(range[0]) && Number.isFinite(range[1]) && range[1] > range[0]
+      ? range
+      : [0, 20]
+  const mid = (min + max) / 2
+  const format = (value: number) => (Math.round(value * 10) / 10).toString()
 
   return (
     <div className="ltr-only text-xs text-text-muted">
       <div className="h-2 w-full rounded-full" style={{ background: gradient }} />
-      <div className="mt-1 flex justify-between">
-        {STOPS.map((s, i) => (
-          <span key={s.value}>
-            {s.value}
-            {i === STOPS.length - 1 ? '+' : ''}
-          </span>
-        ))}
+      {/* برچسب‌ها لاتین‌اند (اعداد) — بازهٔ واقعی میدان: کمینه / میانه / بیشینه */}
+      <div className="mt-1 flex justify-between" dir="ltr">
+        <span>{format(min)}</span>
+        <span>{format(mid)}</span>
+        <span>{format(max)} m/s</span>
       </div>
     </div>
   )

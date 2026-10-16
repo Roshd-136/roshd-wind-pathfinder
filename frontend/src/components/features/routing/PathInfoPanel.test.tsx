@@ -15,7 +15,7 @@ function withProviders(ui: ReactNode) {
 const baseProps = {
   algorithm: 'a_star' as const,
   onAlgorithmChange: vi.fn(),
-  layerVisibility: { surface: true, mid: true, high: true },
+  layerVisibility: { surface: true, mid: true, high: true, top: true },
   onLayerVisibilityChange: vi.fn(),
   constraints: { max_wind_speed_mps: 20, criterion: 'time' as const },
   onConstraintsChange: vi.fn(),

@@ -69,7 +69,7 @@ describe('StepsWizard', () => {
     expect(nextButton()).toBeDisabled()
   })
 
-  it('fires onBack and onNext without clearing data (replace-on-click model)', async () => {
+  it('fires onBack and onNext (clearing of the landed step lives in the parent)', async () => {
     const user = userEvent.setup()
     const onBack = vi.fn()
     const onNext = vi.fn()

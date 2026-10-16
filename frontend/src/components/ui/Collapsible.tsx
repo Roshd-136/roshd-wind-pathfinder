@@ -16,7 +16,7 @@ export function Collapsible({ title, children, defaultOpen = false }: Collapsibl
   const contentId = useId()
 
   return (
-    <div className="rounded-md border border-border">
+    <div className="rounded-md border border-border bg-surface-raised shadow-[inset_0_1px_3px_rgba(0,0,0,0.2)]">
       <button
         type="button"
         aria-expanded={open}

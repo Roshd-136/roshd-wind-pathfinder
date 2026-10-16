@@ -1,14 +1,17 @@
 import { useQuery, useQueries } from '@tanstack/react-query'
+import { WIND_LAYER_BANDS } from '../config/routing'
 import { getWindAtPointAllLayers, getWindField, listWindLayers } from '../services/api/windLayers'
 import type { Coordinate, WindField, WindPointSample } from '../types/routing'
 import { sampleWindAtPoint } from '../utils/windField'
 
 /**
- * ارتفاع «بالای زمین» سه لایهٔ رابط کاربری (میان‌باند چک‌باکس‌های
- * سطحی ۰-۵۰ / میانی ۵۰-۲۰۰ / بالا ۲۰۰-۵۰۰). فیلدهای پیش‌نمایش dev با همین
- * ارتفاع‌ها توسط `scripts/export_web_wind_fixture.py` تولید شده‌اند.
+ * ارتفاع نمایندهٔ میدان باد سه لایهٔ رابط کاربری (سطحی ۰-۵۰ / میانی ۵۰-۲۰۰ /
+ * بالا ۲۰۰-۵۰۰ متر AGL). از پیکربندی مشترک می‌آید — این ارتفاع‌ها پیش‌تر
+ * در RoutingMapScreen هم به‌صورت هاردکد تکرار شده بود. فیلدهای پیش‌نمایش
+ * dev با همین ارتفاع‌ها توسط `scripts/export_web_wind_fixture.py` تولید
+ * شده‌اند.
  */
-export const UI_LAYER_ALTITUDES = [50, 200, 500] as const
+export const UI_LAYER_ALTITUDES = WIND_LAYER_BANDS.map((b) => b.fieldAltitude)
 
 /** GET /wind-layers — لیست لایه‌های ارتفاعی موجود. */
 export function useWindLayers() {

@@ -10,5 +10,9 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    includeSource: ['src/**/*.{ts,tsx}'],
+    // Force the React development build in tests: NODE_ENV=production leaks in
+    // from some shells and the prod build has no React.act, which breaks RTL.
+    env: { NODE_ENV: 'test' },
   },
 })

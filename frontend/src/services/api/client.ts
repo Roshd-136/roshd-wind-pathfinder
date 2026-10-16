@@ -100,7 +100,11 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}, re
 
   if (!response.ok) {
     throw new ApiError(
-      data?.message ?? 'خطای غیرمنتظره',
+      // پیام خطا: بک‌اند FastAPI خطا را در `detail` می‌گذارد (رشته یا فهرست
+      // خطاهای اعتبارسنجی) — پیش‌تر فقط `message` خوانده می‌شد و پیام‌های
+      // فارسی موتور (مثل «در این باند مسیر پروازپذیری نیست») هرگز به کاربر
+      // نمی‌رسید و همیشه «خطای غیرمنتظره» دیده می‌شد.
+      extractErrorMessage(data),
       data?.code ?? 'unknown_error',
       response.status,
       data?.request_id,
@@ -108,4 +112,19 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}, re
   }
 
   return data as T
+}
+
+/** پیام خطا را از بدن‌های متعارف FastAPI (`detail`) و قرارداد خودی (`message`) بیرون می‌کشد. */
+function extractErrorMessage(data: unknown): string {
+  if (typeof data !== 'object' || data === null) return 'خطای غیرمنتظره'
+  const record = data as Record<string, unknown>
+  if (typeof record.message === 'string' && record.message) return record.message
+  const detail = record.detail
+  if (typeof detail === 'string' && detail) return detail
+  // خطاهای اعتبارسنجی FastAPI: [{loc, msg, type}, ...]
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0] as { msg?: unknown }
+    if (typeof first?.msg === 'string') return first.msg
+  }
+  return 'خطای غیرمنتظره'
 }

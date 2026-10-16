@@ -5,8 +5,9 @@ import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { Checkbox } from '../components/ui/Checkbox'
 import { TextField } from '../components/ui/TextField'
+import { Switch } from '../components/ui/Switch'
+import { Segmented } from '../components/ui/Segmented'
 import { WindSpeedLegend } from '../components/features/layers/WindSpeedLegend'
-import { WindLayerControls } from '../components/features/layers/WindLayerControls'
 import { AlgorithmSelector } from '../components/features/routing/AlgorithmSelector'
 
 /**
@@ -31,6 +32,13 @@ describe('accessibility (axe)', () => {
     expect(await axe(container)).toHaveNoViolations()
   })
 
+  it('Switch (with label) has no violations', async () => {
+    const { container } = render(
+      <Switch label="جریان باد" description="ردّ جریان باد روی نقشه" checked onChange={() => {}} />,
+    )
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
   it('TextField (with label) has no violations', async () => {
     const { container } = render(<TextField label="ایمیل" type="email" />)
     expect(await axe(container)).toHaveNoViolations()
@@ -41,9 +49,18 @@ describe('accessibility (axe)', () => {
     expect(await axe(container)).toHaveNoViolations()
   })
 
-  it('WindLayerControls has no violations', async () => {
+  it('Segmented (radiogroup) has no violations', async () => {
     const { container } = render(
-      <WindLayerControls value={{ surface: true, mid: true, high: true }} onChange={vi.fn()} />,
+      <Segmented
+        ariaLabel="معیار بهینه‌سازی"
+        value="time"
+        onChange={vi.fn()}
+        options={[
+          { value: 'time', label: 'سریع‌ترین' },
+          { value: 'energy', label: 'کم‌مصرف' },
+          { value: 'balanced', label: 'متعادل' },
+        ]}
+      />,
     )
     expect(await axe(container)).toHaveNoViolations()
   })

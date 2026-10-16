@@ -65,28 +65,45 @@ export function MapTools({ panelOpen, onTogglePanel, onZoomIn, onZoomOut }: MapT
       </button>
 
 
-      <button
-        type="button"
-        onClick={() => setMapMode('2d')}
+      {/* ۲بعدی/۳بعدی — گروه عمودی هم‌عرض دکمه‌های تکی نوار ابزار: ظرفِ
+          باحاشیه با padding داخلی، دکمه‌های بدون حاشیه و هم‌اندازه (۴۰×۴۰)،
+          گوشهٔ ظرف هم‌شعاع بقیه، سایهٔ inset برای عمق. */}
+      <div
+        role="group"
         aria-label={t('map.toggle2d')}
-        title={t('map.toggle2d')}
-        aria-pressed={mode === '2d'}
-        className={mode === '2d' ? activeBtn : btn}
+        className="flex w-10 flex-col items-center rounded-lg border border-border bg-surface/95 p-1 shadow-[var(--shadow-card),inset_0_1px_2px_rgba(255,255,255,0.06),inset_0_-1px_2px_rgba(0,0,0,0.18)] backdrop-blur-sm"
       >
-        <MapIcon size={18} aria-hidden />
-      </button>
-      <button
-        type="button"
-        onClick={() => setMapMode('3d')}
-        aria-label={t('map.toggle3d')}
-        title={t('map.toggle3d')}
-        aria-pressed={mode === '3d'}
-        className={mode === '3d' ? activeBtn : btn}
-      >
-        <Mountain size={18} aria-hidden />
-      </button>
+        <button
+          type="button"
+          onClick={() => setMapMode('2d')}
+          aria-label={t('map.toggle2d')}
+          title={t('map.toggle2d')}
+          aria-pressed={mode === '2d'}
+          className={`flex h-8 w-full items-center justify-center rounded-md transition-colors ${
+            mode === '2d'
+              ? 'bg-accent text-white shadow-[inset_0_1px_3px_rgba(0,0,0,0.35)]'
+              : 'text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          <MapIcon size={16} aria-hidden />
+        </button>
+        <button
+          type="button"
+          onClick={() => setMapMode('3d')}
+          aria-label={t('map.toggle3d')}
+          title={t('map.toggle3d')}
+          aria-pressed={mode === '3d'}
+          className={`flex h-8 w-full items-center justify-center rounded-md transition-colors ${
+            mode === '3d'
+              ? 'bg-accent text-white shadow-[inset_0_1px_3px_rgba(0,0,0,0.35)]'
+              : 'text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          <Mountain size={16} aria-hidden />
+        </button>
+      </div>
 
-      <div className="my-1 h-px bg-border" aria-hidden />
+      <div className="h-px bg-border" aria-hidden />
 
       {/* تنظیمات «نمای نقشه» — زیر جداکننده و بالای زوم */}
       <button

@@ -9,11 +9,32 @@ export interface Coordinate {
   lon: number
 }
 
-export type Algorithm = 'a_star' | 'dijkstra'
-export type Criterion = 'time' | 'energy' | 'balanced'
+export interface Coordinate3D extends Coordinate {
+  alt: number // altitude in meters MSL
+}
+
+export type Algorithm = 'a_star' | 'dijkstra' | 'smooth' | 'wind_riding'
+export type Criterion = 'time' | 'energy' | 'balanced' | 'distance' | 'safety'
+
+/** کدام باندهای ارتفاعی لایه‌های باد روی نقشه نمایش داده شوند (فیلتر نمایش). */
+export interface LayerVisibility {
+  /** سطحی — باند (۰، ۱۵۰۰] متر MSL */
+  surface: boolean
+  /** میانی — باند (۱۵۰۰، ۲۲۰۰] متر MSL */
+  mid: boolean
+  /** بالا — باند (۲۲۰۰، ۲۹۰۰] متر MSL */
+  high: boolean
+  /** بالاترین — باند (۲۹۰۰، ۳۶۰۰] متر MSL */
+  top: boolean
+}
+
+/** باند ارتفاعی انتخاب‌شده در پنل مسیر — «همه» یعنی بدون محدودیت ارتفاع. */
+export type AltitudeMode = 'all' | 'surface' | 'mid' | 'high' | 'top'
 
 export interface Checkpoint extends Coordinate {
   order?: number
+  /** ارتفاع اجباری (متر MSL) — از کشیدن محور «ارتفاع» گیمبال در ۳بعدی. */
+  alt?: number
 }
 
 export interface AvoidZone {
@@ -28,6 +49,13 @@ export interface RouteConstraints {
   avoid_zones?: AvoidZone[]
   criterion?: Criterion
   weights?: { time: number; energy: number }
+  /** پیکربندی هواپیما/وسیلهٔ نقلیه — ارسال می‌شود به بک‌اند برای محاسبه هزینه */
+  vessel?: {
+    type: string
+    airspeed_mps: number
+    induced_drag_coeff: number
+    headwind_penalty_coeff: number
+  }
 }
 
 export interface RouteRequest {
@@ -44,6 +72,7 @@ export interface RouteRequest {
 export interface RouteResult {
   route_id: string
   path: Coordinate[]
+  path_3d?: Coordinate3D[]
   layer_altitude_m: number
   algorithm: Algorithm
   criterion: Criterion
@@ -52,6 +81,14 @@ export interface RouteResult {
   total_cost: number
   created_at: string
   is_saved?: boolean
+  // Additional metrics from WindRouter
+  total_energy_index?: number
+  tailwind_leg_fraction?: number
+  heading_changes?: number
+  total_climb_m?: number
+  total_descent_m?: number
+  climb_legs?: number
+  altitudes_used?: number[]
 }
 
 export interface LayerComparisonRow {

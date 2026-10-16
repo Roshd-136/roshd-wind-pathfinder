@@ -3,8 +3,9 @@ import { persist } from 'zustand/middleware'
 
 export type Theme = 'light' | 'dark' | 'system'
 export type Language = 'fa' | 'en'
-export type Algorithm = 'a_star' | 'dijkstra'
-export type Criterion = 'time' | 'energy' | 'balanced'
+export type Algorithm = 'a_star' | 'dijkstra' | 'smooth' | 'wind_riding'
+export type Criterion = 'time' | 'energy' | 'balanced' | 'distance' | 'safety'
+export type VesselType = 'default' | 'cargo_5000dwt' | 'tanker_10000dwt' | 'container_20000dwt' | 'bulk_15000dwt' | 'ferry_2000dwt'
 
 interface SettingsState {
   theme: Theme
@@ -12,11 +13,13 @@ interface SettingsState {
   units: 'metric' | 'imperial'
   defaultAlgorithm: Algorithm
   defaultCriterion: Criterion
+  defaultVessel: VesselType
   setTheme: (theme: Theme) => void
   setLanguage: (language: Language) => void
   setUnits: (units: 'metric' | 'imperial') => void
   setDefaultAlgorithm: (algorithm: Algorithm) => void
   setDefaultCriterion: (criterion: Criterion) => void
+  setDefaultVessel: (vessel: VesselType) => void
 }
 
 /**
@@ -30,13 +33,15 @@ export const useSettingsStore = create<SettingsState>()(
       theme: 'dark',
       language: 'fa',
       units: 'metric',
-      defaultAlgorithm: 'a_star',
+      defaultAlgorithm: 'dijkstra',
       defaultCriterion: 'time',
+      defaultVessel: 'default',
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
       setUnits: (units) => set({ units }),
       setDefaultAlgorithm: (defaultAlgorithm) => set({ defaultAlgorithm }),
       setDefaultCriterion: (defaultCriterion) => set({ defaultCriterion }),
+      setDefaultVessel: (defaultVessel) => set({ defaultVessel }),
     }),
     { name: 'windpath-settings' },
   ),

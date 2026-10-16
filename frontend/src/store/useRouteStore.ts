@@ -1,6 +1,13 @@
 import { create } from 'zustand'
-import type { LayerVisibility } from '../components/features/layers/WindLayerControls'
-import type { Algorithm, Checkpoint, Coordinate, RouteConstraints, RouteResult } from '../types/routing'
+import type {
+  Algorithm,
+  Checkpoint,
+  Coordinate,
+  LayerVisibility,
+  RouteConstraints,
+  RouteResult,
+} from '../types/routing'
+import { useSettingsStore } from './useSettingsStore'
 
 interface RouteState {
   origin: Coordinate | null
@@ -18,6 +25,7 @@ interface RouteState {
   setDestination: (c: Coordinate | null) => void
   addCheckpoint: (c: Coordinate) => void
   removeCheckpoint: (index: number) => void
+  setCheckpointCoord: (index: number, coord: Coordinate) => void
   moveCheckpoint: (index: number, direction: -1 | 1) => void
   setAlgorithm: (a: Algorithm) => void
   setConstraints: (c: RouteConstraints) => void
@@ -33,16 +41,26 @@ interface RouteState {
  * داده باید هنگام جابه‌جایی بین صفحات Map2D/Map3D (دو route جدا، طبق
  * mockup) حفظ شود، نه صرفاً حالت موقتی یک کامپوننت.
  *
- * رفتار بازگشت: گامِ عقب داده را پاک **نمی‌کند** — انتخاب فعلی سر جایش
- * می‌ماند و کلیک بعدی روی نقشه همان گام، آن انتخاب را «جایگزین» می‌کند.
+ * رفتار بازگشت: گامِ عقب انتخابِ همان گام را پاک می‌کند (مقصد در گام ۲،
+ * نتیجه در گام ۳) — تا کاربر مجبور شود دوباره انتخاب کند و «بعدی» تا
+ * ورودی تازه قفل بماند.
  */
 export const useRouteStore = create<RouteState>((set) => ({
   origin: null,
   destination: null,
   checkpoints: [],
-  algorithm: 'a_star',
-  constraints: { criterion: 'time', max_wind_speed_mps: 20 },
-  layerVisibility: { surface: true, mid: true, high: true },
+  // همگام‌سازی با ترجیحات کاربر — الگوریتم/معیارِ انتخابی در صفحهٔ
+  // Settings (استور پایدار) حالا نقطهٔ شروع مسیریابی هم هستند؛ قبلاً دو
+  // منبع مستقل بودند و تنظیمات صفحهٔ Settings هرگز اعمال نمی‌شد.
+  algorithm: useSettingsStore.getState().defaultAlgorithm,
+  constraints: {
+    criterion: useSettingsStore.getState().defaultCriterion,
+    // ``max_wind_speed_mps`` تا وقتی موتور مسیریابی آن را اعمال نکند فرستاده
+    // نمی‌شود: مقدار جعلی یعنی «قیدی که هست ولی نیست». بک‌اند درخواستی که
+    // این قید را داشته باشد را صریحاً با ۴۰۰ رد می‌کند.
+    max_wind_speed_mps: null,
+  },
+  layerVisibility: { surface: true, mid: true, high: true, top: true },
   result: null,
   alternatives: [],
   wizardStep: 1,
@@ -55,6 +73,11 @@ export const useRouteStore = create<RouteState>((set) => ({
   removeCheckpoint: (index) =>
     set((s) => ({
       checkpoints: s.checkpoints.filter((_, i) => i !== index).map((cp, i) => ({ ...cp, order: i })),
+    })),
+  // جابه‌جایی مکان چک‌پوینت (گیمبال سه‌بعدی یا ویرایش ۲بعدی) — ترتیب دست‌نخورده
+  setCheckpointCoord: (index, coord) =>
+    set((s) => ({
+      checkpoints: s.checkpoints.map((cp, i) => (i === index ? { ...cp, ...coord } : cp)),
     })),
   moveCheckpoint: (index, direction) =>
     set((s) => {

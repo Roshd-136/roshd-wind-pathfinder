@@ -1,10 +1,12 @@
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { useEffect, useRef } from 'react'
-import type { Coordinate, WindField } from '../../../types/routing'
+import { useEffect, useRef, useState } from 'react'
+import type { Coordinate, Coordinate3D, WindField } from '../../../types/routing'
 import type { ViewportSettings } from '../../../store/useUiStore'
-import { WIND_PARTICLE_CONFIG } from '../../../config/mapDisplay'
-import { applyWindFields, setWindOverlaysVisible, stopParticleFlow } from './windFieldLayer'
+import { WIND_ARROW_CONFIG } from '../../../config/mapDisplay'
+import { ManualSceneView as ManualSceneView3D } from './ManualSceneView'
+import type { EditTarget } from '../../../three/manual/scene-gl'
+import { applyWindFields, setParticleFlowPaused, setWindOverlaysVisible, stopParticleFlow } from './windFieldLayer'
 
 interface MapViewProps {
   mode: '2d' | '3d'
@@ -12,6 +14,8 @@ interface MapViewProps {
   destination: Coordinate | null
   checkpoints?: Coordinate[]
   path: Coordinate[] | null
+  /** 3D path with altitude data for 3D rendering */
+  path3d?: Coordinate3D[] | null
   /** میدان‌های بادِ نمایان (مرتب بر ارتفاع) — نقشهٔ حرارتی + پیکان‌ها. */
   windFields?: WindField[]
   viewport: ViewportSettings
@@ -19,12 +23,24 @@ interface MapViewProps {
   onMapClick: (coord: Coordinate) => void
   /** نقشهٔ ساخته‌شده — برای ابزارهای بیرونی (زوم سفارشی). */
   onReady?: (map: maplibregl.Map) => void
+  /** صحنه فعال و پیداست؟ مخفی: MapLibre فقط resize خودش را به تعویض می‌اندازد. */
+  active?: boolean
+  /** برای صحنهٔ سه‌بعدی — وقتی مخفی است حلقهٔ رندر pause می‌شود. */
+  paused?: boolean
+  /** هدف فعال گیمبال ویرایش نقطه در صحنهٔ سه‌بعدی. */
+  editTarget?: EditTarget | null
+  /** جابه‌جایی نقطه از گیمبال سه‌بعدی. */
+  onPointEdit?: (target: EditTarget, coord: Coordinate) => void
+  /** کلیک روی گوی نشانگر سه‌بعدی — انتخاب نقطه (null = بستن گیمبال). */
+  onPointPick?: (target: EditTarget | null) => void
 }
 
 const ROUTE_SOURCE_ID = 'route-line'
 const ROUTE_LAYER_ID = 'route-line-layer'
 const ROUTE_DOTS_SOURCE_ID = 'route-dots'
 const ROUTE_DOTS_LAYER_ID = 'route-dots-layer'
+// لایهٔ سفارشی ۳بعدی — فقط وقتی مسیر سه‌بعدی در دسترس است رسم می‌شود؛ لایهٔ
+// line عادی در همان حالت پنهان می‌شود (خط خوابیده روی زمین دوبرابر دیده نمی‌شود).
 /** میدانِ خالی برای منبع‌های image/geojson استایل پایه. */
 const EMPTY_FC = { type: 'FeatureCollection' as const, features: [] }
 const EMPTY_LINE = {
@@ -87,8 +103,8 @@ function baseStyle(): maplibregl.StyleSpecification {
           [0, 0],
         ],
       },
+      'wind-arrows': { type: 'geojson' as const, data: EMPTY_FC },
       'wind-particles': { type: 'geojson' as const, data: EMPTY_FC },
-      'wind-particle-tips': { type: 'geojson' as const, data: EMPTY_FC },
       'route-line': { type: 'geojson', data: EMPTY_LINE },
       'route-dots': { type: 'geojson', data: EMPTY_FC },
     },
@@ -113,28 +129,46 @@ function baseStyle(): maplibregl.StyleSpecification {
         paint: { 'raster-opacity': 0.85, 'raster-fade-duration': 0 },
       },
       {
+        // پیکان‌های ثابت جهت باد — اسپرایت per-bucket با چرخش جریان؛
+        // هندسه/اندازه از `WIND_ARROW_CONFIG` تا با کانفیگ یکی باشد.
+        id: 'wind-arrows-layer',
+        type: 'symbol',
+        source: 'wind-arrows',
+        layout: {
+          visibility: 'none',
+          'icon-image': ['get', 'icon'],
+          'icon-rotate': ['get', 'direction'],
+          'icon-rotation-alignment': 'map',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-size': [
+            'interpolate',
+            ['exponential', 1.6],
+            ['zoom'],
+            5,
+            WIND_ARROW_CONFIG.iconSizeStops[0][1],
+            8,
+            WIND_ARROW_CONFIG.iconSizeStops[1][1],
+            12,
+            WIND_ARROW_CONFIG.iconSizeStops[2][1],
+          ],
+        },
+        paint: { 'icon-opacity': WIND_ARROW_CONFIG.opacity },
+      },
+      {
         id: 'wind-particles-layer',
         type: 'line',
         source: 'wind-particles',
         layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' },
         paint: {
-          'line-color': '#38bdf8',
-          'line-width': WIND_PARTICLE_CONFIG.trailWidth,
-          'line-opacity': 0.85,
+          // رنگ/ضخامت هر Feature (دُم+نوک واحد) per-feature است — در حالت
+          // چندلایه (۳بعدی) هر میدان بازهٔ رنگ خودش را دارد و لایه‌های بالاتر
+          // کمی نازک‌ترند.
+          'line-color': ['get', 'color'],
+          'line-width': ['get', 'width'],
+          // کدری هر ذره با عمرش — ورود/خروج نرم (ویژگی opacity هر ذره)
+          'line-opacity': ['get', 'opacity'],
         },
-      },
-      {
-        id: 'wind-particle-tips-layer',
-        type: 'symbol',
-        source: 'wind-particle-tips',
-        layout: {
-          visibility: 'none',
-          'icon-image': ['concat', 'wind-particle-tip-', ['to-string', ['get', 'bucket']]],
-          'icon-rotate': ['get', 'heading'],
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-        },
-        paint: { 'icon-opacity': 0.95 },
       },
       {
         id: ROUTE_LAYER_ID,
@@ -163,24 +197,65 @@ function baseStyle(): maplibregl.StyleSpecification {
 }
 
 /**
- * نقشهٔ اصلی (MapLibre GL — بدون توکن، کاشی آزاد) — کلیک روی نقشه به صفحهٔ
- * بالادست واگذار می‌شود (مبدأ/مقصد/جایگزینی/اطلاعات نقطه). مسیر با خط سفید +
- * نقاط سفید رسم می‌شود و کادر نقشه روی مسیر تنظیم می‌گردد. حالت ۳بعدی با ترن
- * واقعی (raster-dem آزاد) + pitch فعال می‌شود — مشابه صحنهٔ بصری‌سازی پروژه.
+ * نقشهٔ اصلی — دیسپچر با نگه‌داشتن زندهٔ هر دو صحنه: ۳بعدی = صحنهٔ دست‌ساز
+ * WebGL، ۲بعدی = MapLibre. هر دو mount می‌مانند و غیرفعال فقط با CSS پنهان
+ * می‌شود (۲بعدی: map.resize هنگام بازگشت — ۳بعدی: pause حلقهٔ رندر)؛
+ * با تعویض حالت هیچ چیز از نو ساخته/بارگذاری نمی‌شود — پیکان‌ها، مسیر و
+ * موقعیت دوربین/نقشه دست‌نخورده باقی می‌مانند.
  */
-export function MapView({
-  mode,
-  origin,
-  destination,
-  checkpoints = [],
-  path,
-  windFields = [],
-  viewport,
-  onMapClick,
-  onReady,
+export function MapView(props: MapViewProps) {
+  // انیمیشن تعویض صحنه — «کوبی» ملایم روی صحنه‌ای که وارد می‌شود: بدون
+  // remount؛ فقط کلاس کوبی روی کل پوششِ هر دو صحنه اعمال می‌شود.
+  const [wobling, setWobling] = useState(false)
+  const firstRender = useRef(true)
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false
+      return
+    }
+    setWobling(true)
+    const id = window.setTimeout(() => setWobling(false), 650)
+    return () => window.clearTimeout(id)
+  }, [props.mode])
+
+  const is3d = props.mode === '3d'
+  return (
+    <div
+      className={`relative h-full w-full ${wobling ? 'map-scene-wobble' : ''}`}
+    >
+      {/* ۲بعدی — همیشه زنده؛ در ۳بعدی فقط پنهان (display:none) */}
+      <div className={is3d ? 'hidden' : 'absolute inset-0'} aria-hidden={is3d}>
+        <MapLibreView {...props} mode="2d" active={!is3d} />
+      </div>
+      {/* ۳بعدی — همیشه زنده؛ در ۲بعدی فقط پنهان */}
+      <div className={is3d ? 'absolute inset-0' : 'hidden'} aria-hidden={!is3d}>
+        <MapView3D
+          {...props}
+          paused={!is3d}
+          // گیمبال ویرایش فقط در نمای سه‌بعدی فعال معنا دارد
+          editTarget={is3d ? (props.editTarget ?? null) : null}
+          onPointPick={is3d ? props.onPointPick : undefined}
+        />
+      </div>
+    </div>
+  )
+}
+
+/**
+ * نمای دوبعدی (MapLibre) — تمام منطق قبلی نقشهٔ ۲بعدی این‌جاست.
+ */
+function MapLibreView({
+  mode, origin, destination, checkpoints = [], path, path3d, windFields = [],
+  viewport, onMapClick, onReady, active = true,
 }: MapViewProps) {
+  void mode
+  void path3d
+  // ————— حالت ۲بعدی: MapLibre —————
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
+  // نقشه ساخته شد؟ — اثرهای بالادست که پیش از ساختِ map اجرا می‌شوند با این
+  // کلید دوباره اجرا می‌شوند؛ وگرنه اولین اعمالِ باد/مسیر بی‌صدا از دست می‌رفت.
+  const [mapCreated, setMapCreated] = useState(false)
   const originMarkerRef = useRef<maplibregl.Marker | null>(null)
   const destinationMarkerRef = useRef<maplibregl.Marker | null>(null)
   const checkpointMarkersRef = useRef<maplibregl.Marker[]>([])
@@ -201,20 +276,36 @@ export function MapView({
   useEffect(() => {
     windFieldsRef.current = windFields
     const map = mapRef.current
-    if (map) {
-      applyWindFields(map, windFields, {
-        multiLayer: mode === '3d',
-        showHeatmap: viewport.showHeatmap,
-        showArrows: viewport.showArrows,
-      })
-    }
-  }, [windFields, mode, viewport.showHeatmap, viewport.showArrows])
+    if (!map) return
+    applyWindFields(map, windFields, {
+      multiLayer: false, // MapLibre فقط حالت ۲بعدی — لایه‌های سه‌بعدی صحنهٔ دست‌ساز
+      showHeatmap: viewport.showHeatmap,
+      showArrows: viewport.showArrows,
+      showParticles: viewport.showParticles,
+      animateWind: viewport.animateWind,
+    })
+  }, [windFields, mapCreated, viewport.showHeatmap, viewport.showArrows, viewport.showParticles, viewport.animateWind])
 
   // کلیدهای نمایش باد (تنظیمات viewport) — بدون بازسازی داده
   useEffect(() => {
     const map = mapRef.current
-    if (map) setWindOverlaysVisible(map, { heatmap: viewport.showHeatmap, arrows: viewport.showArrows })
-  }, [viewport.showHeatmap, viewport.showArrows])
+    if (!map) return
+    setWindOverlaysVisible(map, {
+      heatmap: viewport.showHeatmap,
+      arrows: viewport.showArrows,
+      particles: viewport.showParticles,
+    })
+  }, [mapCreated, viewport.showHeatmap, viewport.showArrows, viewport.showParticles])
+
+  // توقف/ازسرگیری حرکت ذرات — کلید «حرکت ذرات باد»؛ قاب فعلی هنگام توقف ثابت می‌ماند
+  useEffect(() => {
+    setParticleFlowPaused(!active || !viewport.animateWind)
+  }, [active, viewport.animateWind])
+
+  // بازگشت به دید — MapLibre اندازهٔ صفرِ مخفی‌بودن را باید دوباره بخواند
+  useEffect(() => {
+    if (active && mapRef.current) mapRef.current.resize()
+  }, [active, mapCreated])
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
@@ -230,7 +321,7 @@ export function MapView({
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right")
     onReadyRef.current?.(map)
     // دسترسی dev برای دیباگ زندهٔ لایه‌ها (مثلاً از طریق CDP)
-    if (import.meta.env.DEV) {
+    {
       ;(window as unknown as { __map?: maplibregl.Map }).__map = map
     }
 
@@ -242,6 +333,7 @@ export function MapView({
     })
 
     mapRef.current = map
+    setMapCreated(true)
     return () => {
       stopParticleFlow()
       map.remove()
@@ -249,12 +341,9 @@ export function MapView({
     }
   }, [])
 
-  // حالت ۲بعدی/۳بعدی + نقشهٔ پایه — سوییچ درجا (بدون تغییر URL): در ۳بعدی
-  // ترنِ واقعی با pitch و بزرگ‌نمایی ارتفاع فعال می‌شود (مثل صحنهٔ
-  // بصری‌سازی) و کاشی ساده خاموش است؛ اگر کاربر نقشهٔ ماهواره‌ای انتخاب
-  // کرده باشد، تصویر ماهواره‌ای روی ترن می‌نشیند. به‌جای گیتِ
-  // `isStyleLoaded` (که با منبع DEM مدت‌ها false می‌ماند و سوییچ ۳بعدی را
-  // فلج می‌کرد) مستقیم تلاش می‌کنیم و روی خطا با تایمر برمی‌گردیم.
+  // نقشهٔ پایهٔ دوبعدی — ۳بعدی دیگر در MapLibre نیست (صحنهٔ دست‌ساز جدا).
+  // به‌جای گیتِ `isStyleLoaded` (که با منبع DEM مدت‌ها false می‌ماند) مستقیم
+  // تلاش می‌کنیم و روی خطا با تایمر برمی‌گردیم.
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -263,22 +352,13 @@ export function MapView({
     const applyMode = () => {
       if (cancelled) return
       try {
-        const is3d = mode === '3d'
         const sat = viewport.mapStyle === 'satellite'
-        map.setLayoutProperty('osm', 'visibility', !is3d && !sat ? 'visible' : 'none')
-        // تصویر ماهواره‌ای حتی در ۳بعدی روی ترن می‌نشیند (ترنِ عکس‌دار)
+        map.setLayoutProperty('osm', 'visibility', sat ? 'none' : 'visible')
         map.setLayoutProperty('satellite', 'visibility', sat ? 'visible' : 'none')
-        // ۳بعدی مثل صحنهٔ بصری‌سازی: زمین سبز + سایهٔ قهوه‌ای کوهستان
-        map.setPaintProperty('bg', 'background-color', is3d && !sat ? '#7fb069' : '#e8e6e1')
-        map.setPaintProperty('hillshade', 'hillshade-exaggeration', is3d ? 0.6 : 0.35)
-        map.setPaintProperty('hillshade', 'hillshade-shadow-color', is3d ? '#6b4a2f' : '#473b2d')
-        if (is3d) {
-          map.setTerrain({ source: 'terrain', exaggeration: 2 })
-          map.easeTo({ pitch: 55, duration: 600 })
-        } else {
-          map.setTerrain(null)
-          map.easeTo({ pitch: 0, duration: 400 })
-        }
+        map.setPaintProperty('bg', 'background-color', '#e8e6e1')
+        map.setPaintProperty('hillshade', 'hillshade-exaggeration', 0.35)
+        map.setPaintProperty('hillshade', 'hillshade-shadow-color', '#473b2d')
+        map.setTerrain(null)
       } catch {
         // استایل هنوز کامل نیست — دوباره تلاش می‌شود
         if (attempts < 100) {
@@ -361,7 +441,8 @@ export function MapView({
   }, [checkpoints])
 
   // رسم خط مسیر + نقاط سفید روی آن (مطابق mockup) + تنظیم کادر روی مسیر.
-  // لایه‌ها از ابتدا در استایل پایه‌اند — این‌جا فقط داده عوض می‌شود.
+  // این افکت فقط حالت ۲بعدی است — در ۳بعدی صحنهٔ دست‌ساز مسیر را خودش
+  // (لولهٔ اسپلاین از path_3d) رسم می‌کند و MapLibre اصلاً mount نمی‌شود.
   useEffect(() => {
     let cancelled = false
     let attempts = 0
@@ -399,7 +480,7 @@ export function MapView({
             [Math.min(...lons), Math.min(...lats)],
             [Math.max(...lons), Math.max(...lats)],
           )
-          map.fitBounds(bounds, { padding: 80, duration: 800, pitch: mode === '3d' ? 60 : 0 })
+          map.fitBounds(bounds, { padding: 80, duration: 800, pitch: 0 })
         }
         // وقتی استایل در وضعیت نیمه‌لود (صف DEM) است، setData گاهی تا
         // رندر بعدی بی‌اثر می‌ماند — یک رندر صریح تضمین می‌کند خط مسیر
@@ -417,7 +498,47 @@ export function MapView({
     return () => {
       cancelled = true
     }
-  }, [path, mode])
+  }, [path, mapCreated])
+
+  // بازگشت از حالت مخفی (۲↔۳بعدی با نگه‌داشتن زنده) — بوم اندازهٔ کهنه دارد؛
+  // صریح resize می‌کنیم تا نقشه به‌جای کادر صفر/کهنه، کادر واقعی را بگیرد.
+  useEffect(() => {
+    if (active) mapRef.current?.resize()
+  }, [active])
 
   return <div ref={containerRef} className="h-full w-full" role="application" aria-label="map" />
+}
+
+/**
+ * نمای سه‌بعدی — بومِ صحنهٔ دست‌ساز WebGL. «پیش‌فرض خاموش»: بدون مسیر
+ * سه‌بعدی بوم mount نمی‌شود تا صفحهٔ سیاه/خالی دیده نشود.
+ */
+function MapView3D({
+  origin, destination, checkpoints = [], path3d, windFields = [],
+  viewport, onMapClick, paused = false, editTarget = null, onPointEdit, onPointPick,
+}: MapViewProps) {
+  const has3dPath = Boolean(path3d && path3d.length > 1)
+  return (
+    <div className="relative h-full w-full" role="application" aria-label="map">
+      {has3dPath ? (
+        <ManualSceneView3D
+          origin={origin}
+          destination={destination}
+          checkpoints={checkpoints}
+          path3d={path3d}
+          windFields={windFields}
+          showArrows={viewport.showArrows}
+          paused={paused}
+          editTarget={editTarget}
+          onPointEdit={onPointEdit}
+          onPointPick={onPointPick}
+          onMapClick={onMapClick}
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-surface-raised text-xs text-text-secondary">
+          محاسبهٔ مسیر برای نمایش صحنهٔ سه‌بعدی لازم است
+        </div>
+      )}
+    </div>
+  )
 }

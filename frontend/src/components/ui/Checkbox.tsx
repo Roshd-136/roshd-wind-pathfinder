@@ -5,7 +5,7 @@ interface CheckboxProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 /**
- * چک‌باکس پایه — برای WindLayerControls (هر لایه ارتفاعی یک ردیف).
+ * چک‌باکس پایه — یک ردیف انتخاب با برچسب.
  * برچسب با دربرگرفتنِ input ارتباط برقرار می‌کند؛ «htmlFor + id» همزمان
  * با دربرگرفتن، باعث نام دسترس‌پذیری تکراری می‌شود (نقض WCAG).
  */

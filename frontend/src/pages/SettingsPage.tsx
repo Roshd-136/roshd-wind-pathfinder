@@ -3,7 +3,17 @@ import { Card } from '../components/ui/Card'
 import { Select } from '../components/ui/Select'
 import { useSettingsStore } from '../store/useSettingsStore'
 
-/** صفحه تنظیمات — تم، زبان، واحد، الگوریتم/معیار پیش‌فرض (Preferences در OpenAPI). */
+/** پیش‌فرض‌های هواپیما/وسیلهٔ نقلیه — معادل VIZ_AIRCRAFT و تنوع‌های routing_scene. */
+const VESSEL_CONFIGS = [
+  { value: 'default', label: 'Default (20 m/s)', airspeed_mps: 20.0, induced_drag_coeff: 0.3, headwind_penalty_coeff: 0.25 },
+  { value: 'cargo_5000dwt', label: 'Cargo 5000 DWT (15 m/s)', airspeed_mps: 15.0, induced_drag_coeff: 0.35, headwind_penalty_coeff: 0.3 },
+  { value: 'tanker_10000dwt', label: 'Tanker 10000 DWT (12 m/s)', airspeed_mps: 12.0, induced_drag_coeff: 0.4, headwind_penalty_coeff: 0.35 },
+  { value: 'container_20000dwt', label: 'Container 20000 DWT (18 m/s)', airspeed_mps: 18.0, induced_drag_coeff: 0.3, headwind_penalty_coeff: 0.25 },
+  { value: 'bulk_15000dwt', label: 'Bulk 15000 DWT (14 m/s)', airspeed_mps: 14.0, induced_drag_coeff: 0.38, headwind_penalty_coeff: 0.32 },
+  { value: 'ferry_2000dwt', label: 'Ferry 2000 DWT (22 m/s)', airspeed_mps: 22.0, induced_drag_coeff: 0.25, headwind_penalty_coeff: 0.2 },
+]
+
+/** صفحه تنظیمات — تم، زبان، واحد، الگوریتم/معیار پیش‌فرض، و هواپیما (Preferences در OpenAPI). */
 export function SettingsPage() {
   const { t } = useTranslation()
   const {
@@ -12,11 +22,13 @@ export function SettingsPage() {
     units,
     defaultAlgorithm,
     defaultCriterion,
+    defaultVessel,
     setTheme,
     setLanguage,
     setUnits,
     setDefaultAlgorithm,
     setDefaultCriterion,
+    setDefaultVessel,
   } = useSettingsStore()
 
   return (
@@ -59,6 +71,8 @@ export function SettingsPage() {
           options={[
             { value: 'a_star', label: `A* (Wind Aware) — ${t('routing.algorithmDefault')}` },
             { value: 'dijkstra', label: `Dijkstra — ${t('routing.algorithmFallback')}` },
+            { value: 'smooth', label: `Smoothed A* — ${t('routing.algorithmFallback')}` },
+            { value: 'wind_riding', label: `Wind Riding — ${t('routing.algorithmFallback')}` },
           ]}
         />
         <Select
@@ -69,7 +83,15 @@ export function SettingsPage() {
             { value: 'time', label: t('routing.criterionTime') },
             { value: 'energy', label: t('routing.criterionEnergy') },
             { value: 'balanced', label: t('routing.criterionBalanced') },
+            { value: 'distance', label: t('routing.criterionDistance') },
+            { value: 'safety', label: t('routing.criterionSafety') },
           ]}
+        />
+        <Select
+          label={t('settings.vessel')}
+          value={defaultVessel}
+          onChange={(v) => setDefaultVessel(v as typeof defaultVessel)}
+          options={VESSEL_CONFIGS.map((v) => ({ value: v.value, label: v.label }))}
         />
       </Card>
     </div>

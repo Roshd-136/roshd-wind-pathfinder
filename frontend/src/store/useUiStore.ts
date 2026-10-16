@@ -4,9 +4,14 @@ import { create } from 'zustand'
 export interface ViewportSettings {
   /** نقشهٔ پایه: ساده (OSM) یا ماهواره‌ای (Esri World Imagery آزاد). */
   mapStyle: 'simple' | 'satellite'
+  /** پیکان‌های ثابت جهت باد — شبکهٔ اسپرایت روی سلول‌های میدان. */
   showArrows: boolean
+  /** ذرات جریان باد (سبک windy) — ردّ متحرک در امتداد بردار باد. */
+  showParticles: boolean
   showHeatmap: boolean
   showHillshade: boolean
+  /** حرکت ذرات باد — false: ذرات دیده می‌شوند ولی قاب ثابت می‌ماند (بدون جابه‌جایی). */
+  animateWind: boolean
 }
 
 interface UiState {
@@ -32,7 +37,14 @@ export const useUiStore = create<UiState>((set) => ({
   isSidebarOpen: false,
   mapMode: '2d',
   isViewportSettingsOpen: false,
-  viewport: { mapStyle: 'simple', showArrows: true, showHeatmap: true, showHillshade: true },
+  viewport: {
+    mapStyle: 'simple',
+    showArrows: true,
+    showParticles: true,
+    showHeatmap: true,
+    showHillshade: true,
+    animateWind: true,
+  },
   toggleControlPanel: () => set((s) => ({ isControlPanelOpen: !s.isControlPanelOpen })),
   toggleSidebar: () => set((s) => ({ isSidebarOpen: !s.isSidebarOpen })),
   openMobileSheet: () => set({ isMobileSheetOpen: true }),

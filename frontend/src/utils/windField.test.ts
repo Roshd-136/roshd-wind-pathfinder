@@ -72,6 +72,22 @@ describe('sampleWindAtPoint', () => {
     const s = sampleWindAtPoint(FIELD, 40, 60)
     expect(s.speed_mps).toBe(10) // نزدیک‌ترین گوشه شمال‌شرقی
   })
+
+  it('interpolates direction across the 0/360 wrap through the shortest arc', () => {
+    // بین ۳۵۰° و ۱۰° میانه باید ۰° باشد — درون‌یابی خطی قبلی ۱۸۰° می‌داد و
+    // ذرات/پیکان‌ها روی خط پیچش به عقب می‌رفتند.
+    const wrapField: WindField = {
+      altitude_m: 100,
+      vectors: [
+        { lat: 35.9, lon: 58.0, speed_mps: 5, direction_deg: 350 },
+        { lat: 35.9, lon: 58.1, speed_mps: 5, direction_deg: 10 },
+        { lat: 36.0, lon: 58.0, speed_mps: 5, direction_deg: 350 },
+        { lat: 36.0, lon: 58.1, speed_mps: 5, direction_deg: 10 },
+      ],
+    }
+    const mid = sampleWindAtPoint(wrapField, 35.95, 58.05)
+    expect(mid.direction_deg).toBeCloseTo(0, 1)
+  })
 })
 
 describe('arrowFeatures', () => {

@@ -32,6 +32,8 @@ interface StepsWizardProps {
   onCalculate: () => void
   canCalculate: boolean
   isCalculating: boolean
+  /** انتخاب‌ها بعد از آخرین محاسبه عوض شده‌اند — دکمه «محاسبه مجدد!» می‌شود. */
+  isStale?: boolean
 }
 
 /**
@@ -51,6 +53,7 @@ export function StepsWizard({
   onCalculate,
   canCalculate,
   isCalculating,
+  isStale = false,
 }: StepsWizardProps) {
   const { t } = useTranslation()
   const isRtl = document.documentElement.dir === 'rtl'
@@ -162,11 +165,15 @@ export function StepsWizard({
       </div>
       <div className="-mx-px -mb-px overflow-hidden rounded-b-2xl">
         <Button
-          className="!w-full !rounded-none !border-0 !shadow-none"
+          className={`!w-full !rounded-none !border-0 !shadow-none ${isStale ? '!bg-warning !text-black hover:!bg-warning/90' : ''}`}
           onClick={onCalculate}
           disabled={!canCalculate || isCalculating}
         >
-          {isCalculating ? t('common.loading') : t('routing.calculatePath')}
+          {isCalculating
+            ? t('common.loading')
+            : isStale
+              ? t('routing.recalculatePath', 'محاسبه مجدد!')
+              : t('routing.calculatePath')}
         </Button>
       </div>
     </div>
