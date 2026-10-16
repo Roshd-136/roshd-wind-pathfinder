@@ -26,6 +26,17 @@ _terrain_model = None
 # باعث می‌شود لایه‌های درخواستی کاربر و کف زمین همیشه با خودِ گراف هم‌خوان باشند.
 _flight_levels_msl: tuple[float, ...] = ()
 _min_clearance_m = 0.0
+# مواد اولیهٔ لایهٔ تازه: ایستگاه‌ها و شبکهٔ گراف و ارتفاع زمینِ همان شبکه.
+# با نمایهٔ پیوستهٔ باد می‌شود سطح پرواز در *هر* ارتفاعی ساخت — نه فقط
+# چهار سطح استاندارد؛ پس چک‌پوینت می‌تواند واردِ دل لایه‌ها قرار بگیرد.
+_stations_df = None
+_lattice_lats = None
+_lattice_lons = None
+_lattice_ground = None
+# کش غلافِ محدودِ لایه‌های سر-الاکلپی (کلید = ارتفاع گردشده) — ساخت گراف یک
+# لایه کوتاه است اما بی‌جهت تکرارش گران می‌شود؛ آستانه را می‌چرخانیم.
+_adhoc_field_cache: dict[float, object] = {}
+_ADHOC_CACHE_MAX = 24
 _pathfinding_initialized = False
 _BAND_EPS = 1e-6
 
@@ -137,6 +148,7 @@ def _init_pathfinding() -> None:
     """Initialize the WindRouter with real data from Khorasan stations."""
     global _pathfinding_initialized, _multi_graph, _terrain_model, _wind_fields
     global _flight_levels_msl, _min_clearance_m
+    global _stations_df, _lattice_lats, _lattice_lons, _lattice_ground
 
     if _pathfinding_initialized:
         return
@@ -216,6 +228,12 @@ def _init_pathfinding() -> None:
     global _wind_fields
     _wind_fields = fields
 
+    # مواد لایه‌های سر-الاکلپی: ایستگاه‌ها، شبکهٔ گراف و زمینِ همان شبکه.
+    _stations_df = station_winds
+    _lattice_lats = lats
+    _lattice_lons = lons
+    _lattice_ground = ground
+
     # نگه‌داشتن مدل زمین و پارامترهای گراف برای تزریق به مسیریاب. پیش‌تر این‌جا
     # یک ``IDWInterpolator`` ساخته می‌شد که هیچ‌وقت fit نمی‌شد (کد مرده)؛ زمین
     # واقعی همان ``terrain_model`` است که چند خط بالاتر بارگذاری شده.
@@ -236,6 +254,103 @@ def _ground_elevation_at(lat: float, lon: float) -> float:
     if _terrain_model is None:
         return 0.0
     return float(_terrain_model.elevation_at(lat, lon))
+
+
+def _level_field_for(altitude_m: float):
+    """میدان باد در ارتفاع دلخواه MSL — با همان مدلِ نمایهٔ پیوستهٔ باد.
+
+    سطوح ۱۵۰۰/۲۲۰۰/۲۹۰۰/۳۶۰۰ «استاندارد» گراف‌اند، ولی نمایهٔ باد
+    (``profile_at``) پیوسته است: باد هر گره در ارتفاع واقعی خودش بالای زمین
+    نمونه‌برداری می‌شود. پس برای چک‌پوینتی که کاربر آن را وسطِ دل لایه‌ها
+    گذاشته (مثلاً ۱۸۰۰ متر)، با همان مدلِ بقیهٔ لایه‌ها یک لایهٔ واقعی
+    می‌سازیم — نه نزدیک‌ترین سطح و نه درون‌یابی سادهٔ بین دو لایه.
+    کش بر اساس ارتفاع گردشده است و اندازه‌اش چرخان محدود می‌ماند.
+    """
+    from viz.wind_field import interpolate_level_field
+
+    key = float(round(altitude_m, 1))
+    cached = _adhoc_field_cache.get(key)
+    if cached is not None:
+        return cached
+    if len(_adhoc_field_cache) >= _ADHOC_CACHE_MAX:
+        _adhoc_field_cache.pop(next(iter(_adhoc_field_cache)))
+    field = interpolate_level_field(
+        _stations_df, key, _lattice_lats, _lattice_lons, _lattice_ground
+    )
+    _adhoc_field_cache[key] = field
+    return field
+
+
+def _is_standard_level(altitude_m: float) -> bool:
+    """آیا این ارتفاع یکی از سطوح استاندارد گراف است (خطای ممیز tolerated)?"""
+    return any(
+        abs(level - altitude_m) <= _BAND_EPS for level in _flight_levels_msl
+    )
+
+
+def _sampler_for_level(altitude_m: float):
+    """نمونه‌بردار باد «(lat, lon) → (سرعت، جهت)» در ارتفاع دلخواه MSL.
+
+    همان قرارداد ``_layer_samplers`` صحنه را رعایت می‌کند تا بادسواری با
+    بادِ ارتفاع قفل واقعاً نمونه‌برداری کند (نه بادِ پله‌ایِ لایهٔ پایین‌تر).
+    """
+    from viz.scene3d import _layer_samplers
+
+    samplers = _layer_samplers([_level_field_for(altitude_m)])
+    return samplers[0][1]
+
+
+def _check_lock_within_band(locked_alt: float, band_levels) -> None:
+    """تعارض قفل چک‌پوینت با باند ارتفاعی انتخابی را صریحاً رد می‌کند.
+
+    باند یعنی «فقط در همین سطوح پرواز کن». اگر قفل چک‌پوینت بیرون باند
+    باشد و مسیر بی‌سروصدا در سطح دیگری (نزدیک‌ترین باند) بگذرد، نتیجه
+    از خواستهٔ کاربر خیلی دور می‌شود؛ به‌جای آن خطای گویا می‌دهیم تا
+    کاربر یکی را عوض کند: یا باند را گشادتر، یا ارتفاع چک‌پوینت را
+    هم‌تراز باند.
+    """
+    if band_levels is None:
+        return
+    inside = any(
+        abs(level - locked_alt) <= _BAND_EPS for level in band_levels
+    )
+    if not inside:
+        band_text = "، ".join(f"{level:.0f} متر" for level in band_levels)
+        raise ValueError(
+            f"ارتفاع قفل‌شدهٔ چک‌پوینت ({locked_alt:.0f} متر) بیرون از باند "
+            f"ارتفاعی انتخابی ({band_text}) است؛ باند را گشادتر کنید یا "
+            "ارتفاع چک‌پوینت را هم‌تراز باند کنید."
+        )
+
+
+def _router_for_locked_level(altitude_m: float, criterion: str, algorithm: str, aircraft_config=None):
+    """روتری که مسیر را **دقیقاً در ارتفاع قفل** می‌سازد.
+
+    برای سطح استاندارد همین گراف اصلی کار می‌کند؛ برای ارتفاع میانیِ دل
+    لایه‌ها یک گراف تک‌لایهٔ واقعی با همان پارامترهای گراف اصلی (کف ایمنی،
+    پیمانه‌گیری زمینِ یال‌ها، طول بیشینهٔ یال) ساخته می‌شود تا «عبور در
+    ۱۸۰۰ متر» یعنی همان چیزی که کاربر خواسته، نه کنارکشی به نزدیک‌ترین سطح.
+    """
+    from viz.wind_field import build_multi_layer_graph
+
+    if _is_standard_level(altitude_m):
+        return _get_router(criterion, algorithm, aircraft_config=aircraft_config)
+
+    field = _level_field_for(altitude_m)
+    single = build_multi_layer_graph(
+        fields=[field],
+        config=None,
+        criterion="balanced",
+        max_edge_distance_km=20.0,
+        min_clearance_m=_min_clearance_m,
+        edge_terrain_sampler=_terrain_model.elevation_at,
+    )
+    return _get_router(
+        criterion,
+        algorithm,
+        multi_graph=single,
+        aircraft_config=aircraft_config,
+    )
 
 
 def _resolve_altitude_band(request: RouteRequest) -> list[float] | None:
@@ -282,8 +397,14 @@ def _route_on_band(router, origin, destination, band_levels):
         ) from exc
 
 
-def _get_router(criterion: str, algorithm: str):
-    """Create a WindRouter with the given criterion and algorithm."""
+def _get_router(criterion: str, algorithm: str, multi_graph=None, aircraft_config=None):
+    """Create a WindRouter with the given criterion and algorithm.
+
+    ``multi_graph``/``aircraft_config`` پیش‌فرض به گراف اصلی و پیکان‌های
+    خط‌مشی می‌خورند؛ لایهٔ سر-الاکلپی قفل چک‌پوینت همین سازنده را با گراف
+    تک‌لایهٔ خودش و همان پیکان‌های درخواست صدا می‌زند — تا «مسیر گراف» و
+    «مسیر قفل» با یک‌دست مدل هزینه ساخته شوند.
+    """
     from pathfinding.cost import CostModelConfig
     from pathfinding.routing import WindRouter
 
@@ -298,11 +419,13 @@ def _get_router(criterion: str, algorithm: str):
     }
     backend_algorithm = algorithm_map.get(algorithm, "astar")
 
-    aircraft_config = CostModelConfig(
-        airspeed_mps=20.0,
-        induced_drag_coeff=0.3,
-        headwind_penalty_coeff=0.25,
-    )
+    # پیکان‌های خط‌مشی — مگر درخواست پیکان خودش را داده باشد (کشتی/پهپاد).
+    if aircraft_config is None:
+        aircraft_config = CostModelConfig(
+            airspeed_mps=20.0,
+            induced_drag_coeff=0.3,
+            headwind_penalty_coeff=0.25,
+        )
 
     # Wind riding is planned outside ``WindRouter``; the router is still built
     # (with graph A* semantics, which is the fallback when no wind-riding plan
@@ -311,7 +434,7 @@ def _get_router(criterion: str, algorithm: str):
         backend_algorithm = "astar"
 
     return WindRouter(
-        multi_graph=_multi_graph,
+        multi_graph=multi_graph if multi_graph is not None else _multi_graph,
         config=aircraft_config,
         criterion=criterion,
         algorithm=backend_algorithm,
@@ -403,9 +526,9 @@ def compute_route_sync(request: RouteRequest) -> RouteResult:
         origin = (waypoints[i].lat, waypoints[i].lon)
         destination = (waypoints[i + 1].lat, waypoints[i + 1].lon)
 
-        # قفل ارتفاع چک‌پوینت (کشیدن محور «ارتفاع» گیمبال در ۳بعدی): نقاط
-        # سوار حدودی (چک‌پوینت‌ها) می‌توانند ارتفاعِ عبور داشته باشند؛
-        # مبدأ/مقصد همیشه روی زمین‌اند و قفل ندارند. mبدأ/مقصدِ هر قطعه از
+        # قفل ارتفاع چک‌پوینت (کشیدن محور «ارتفاع» گیمبال در ۳بعدی): نقطه‌های
+        # میانی (چک‌پوینت‌ها) می‌توانند ارتفاعِ عبور داشته باشند؛
+        # مبدأ/مقصد همیشه روی زمین‌اند و قفل ندارند. مبدأ/مقصدِ هر قطعه از
         # چک‌پوینت‌ها می‌آید، پس این دو قفل صرفاً روی مرزهای چک‌پوینتی
         # غیر از None می‌شوند.
         start_lock = getattr(waypoints[i], "alt", None)
@@ -494,7 +617,7 @@ def compute_route_sync(request: RouteRequest) -> RouteResult:
                 # * قطعه‌ای که به چک‌پوینت قفل‌شده می‌رسد دقیقاً در همان سطح
                 #   کروز می‌کند و **فرود نمی‌گیرد** (حالت عبوری)؛ کاربر مسئله
                 #   را همین می‌دید: «چک‌پوینت را بالا بردم، مسیر همان‌جا روی
-                #   زمین بود» — عاملِ، کروزِ قفل‌شده *به‌همراه* فرودِ مجاز
+                #   زمین بود» — عاملِ اصلی، کروزِ قفل‌شده *به‌همراه* فرودِ مجاز
                 #   بود که خط را در انتهای قطعه به زمین می‌پیچاند.
                 # * قطعه‌ای که *از* چک‌پوینت قفل‌شده آغاز می‌شود از همان ارتفاع
                 #   در-هوا آغاز می‌شود تا مسیر پیوسته باشد، ولی کروزش آزاد است:
@@ -502,9 +625,23 @@ def compute_route_sync(request: RouteRequest) -> RouteResult:
                 #   همان سطح به مقصد برسد» می‌جست و اغلب واقعاً هم چنین
                 #   برنامه‌ای بادسواری‌پذیر نیست — درحالی‌که گذار بعدی
                 #   (صعود/فرود به سطح منتخب باند) کاملاً فیزیکی است.
+                #
+                # باد در ارتفاع قفل هم واقعی است: اگر قفل وسطِ دل لایه‌ها باشد
+                # (مثلاً ۱۸۰۰)، با نمایهٔ پیوستهٔ باد یک لایهٔ واقعی همان ارتفاع
+                # به فهرست لایه‌ها اضافه می‌شود — نمونه‌بردار بادسواری بادِ
+                # همان ارتفاع را می‌خواند، نه بادِ «نزدیک‌ترین لایه» را.
                 land_at_end = end_lock is None
                 start_altitude_m = start_lock
                 if end_lock is not None:
+                    _check_lock_within_band(locked_alt, band_levels)
+                    exact_lock_layer = any(
+                        abs(level_altitude - locked_alt) <= _BAND_EPS
+                        for level_altitude, _ in layers
+                    )
+                    if not exact_lock_layer:
+                        layers = layers + [
+                            (float(locked_alt), _sampler_for_level(locked_alt))
+                        ]
                     cruise_altitudes: list[float] | None = [end_lock]
                 elif band_levels:
                     cruise_altitudes = list(band_levels)
@@ -556,30 +693,30 @@ def compute_route_sync(request: RouteRequest) -> RouteResult:
                 result = router.route_on_single_layer(origin, destination, altitude)
             else:
                 # Auto layer selection mode — با باند انتخابی محدود به همان سطوح.
-                # قفل ارتفاع چک‌پوینت در گراف: نزدیک‌ترین سطح به قفلِ «رسیدن» +
-                # **لنگر هوایی** روی سرِ قفل‌شدهٔ قطعه: مسیر به‌جای گره زمین از
-                # گرهٔ هوایی همان مختصات/همان سطح شروع یا ختم می‌شود — یعنی
-                # هنگام عبور از چک‌پوینت، همان‌جا در ارتفاع قفل است و به زمین
-                # نمی‌خورد. پیش‌تر گره زمینِ همیشگیِ سرِ قطعه، خط را دقیقاً روی
-                # زمین می‌برد و قفل را بی‌اثر می‌کرد؛ حتی انتخاب نزدیک‌ترین
-                # سطح بدون لنگر هوایی هم این مشکل را حل نمی‌کرد.
-                if locked_alt is not None and router.available_layers:
-                    nearest_level = min(
-                        router.available_layers,
-                        key=lambda level: abs(level - locked_alt),
+                # قفل ارتفاع چک‌پوینت در گراف: مسیر **دقیقاً در همان ارتفاع قفل**
+                # می‌گذرد. برای سطح استاندارد لایه‌های موجود؛ برای ارتفاع میانیِ
+                # دل لایه‌ها (مثلاً ۱۸۰۰) یک لایهٔ واقعی با همان مدل نمایهٔ باد
+                # ساخته می‌شود — کاربر دیگر مجبور نیست چک-پوینتش به «نزدیک‌ترین
+                # سطح» بچسبد. لنگر هوایی سرِ قفل‌شده هم (ساختار گراف) پا برجاست:
+                # مسیر به‌جای گره زمین از گره هوایی همان مختصات/همان ارتفاع
+                # می‌گذرد، یعنی هنگام عبور از چک-پوینت، همان‌جا در ارتفاع قفل است
+                # و به زمین نمی‌خورد.
+                if locked_alt is not None:
+                    _check_lock_within_band(locked_alt, band_levels)
+                    locked_router = _router_for_locked_level(
+                        locked_alt, criterion, backend_algorithm, aircraft_config
                     )
                     try:
-                        result = router.find_optimal_path(
+                        result = locked_router.find_optimal_path(
                             origin,
                             destination,
-                            layers=[nearest_level],
+                            layers=[locked_alt],
                             endpoint_altitudes=(start_lock, end_lock),
                         )
                     except ValueError as exc:
                         raise ValueError(
-                            f"پرواز در سطح قفل‌شدهٔ چک‌پوینت "
-                            f"({nearest_level:.0f} متر، نزدیک‌ترین سطح به "
-                            f"{locked_alt:.0f} متری) مسیر پروازپذیری ندارد "
+                            f"پرواز در ارتفاع قفل‌شدهٔ چک‌پوینت "
+                            f"({locked_alt:.0f} متر) مسیر پروازپذیری ندارد "
                             "(زمین مانع است)؛ ارتفاع چک‌پوینت را تغییر دهید یا "
                             "باند دیگری را انتخاب کنید."
                         ) from exc
