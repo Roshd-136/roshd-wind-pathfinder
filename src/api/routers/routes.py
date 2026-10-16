@@ -403,6 +403,25 @@ def compute_route_sync(request: RouteRequest) -> RouteResult:
         origin = (waypoints[i].lat, waypoints[i].lon)
         destination = (waypoints[i + 1].lat, waypoints[i + 1].lon)
 
+        # قفل ارتفاع چک‌پوینت (کشیدن محور «ارتفاع» گیمبال در ۳بعدی): نقاط
+        # سوار حدودی (چک‌پوینت‌ها) می‌توانند ارتفاعِ عبور داشته باشند؛
+        # مبدأ/مقصد همیشه روی زمین‌اند و قفل ندارند. mبدأ/مقصدِ هر قطعه از
+        # چک‌پوینت‌ها می‌آید، پس این دو قفل صرفاً روی مرزهای چک‌پوینتی
+        # غیر از None می‌شوند.
+        start_lock = getattr(waypoints[i], "alt", None)
+        end_lock = getattr(waypoints[i + 1], "alt", None)
+        locked_alt = end_lock if end_lock is not None else start_lock
+        if (
+            start_lock is not None
+            and end_lock is not None
+            and abs(start_lock - end_lock) > 1e-6
+        ):
+            raise ValueError(
+                f"ارتفاع قفل‌شدهٔ چک‌پوینت‌های دو سر این قطعه یکی نیست "
+                f"({start_lock:.0f} و {end_lock:.0f} متر)؛ تغییر ارتفاع در میانهٔ "
+                "یک قطعه هنوز پشتیبانی نمی‌شود — ارتفاع هر دو چک‌پوینت را هم‌سطح کنید."
+            )
+
         # Skip if waypoints are too close (same H3 cell)
         dist_km = math.hypot(
             (origin[0] - destination[0]) * 111.0,
@@ -470,15 +489,27 @@ def compute_route_sync(request: RouteRequest) -> RouteResult:
                             corridor_override=r7_spec.wind_corridor_fraction,
                         )
 
-                # چک‌پوینت با ارتفاع اجباری (کشیدن محور «ارتفاع» گیمبال):
-                # قطعه‌ای که به آن می‌رسد دقیقاً در همان سطح کروز می‌کند.
-                forced_alt = getattr(waypoints[i + 1], "alt", None)
-                # سطوح کروز: چک‌پوینت اجباری > باند انتخابی > همه (None).
-                cruise_altitudes = (
-                    [forced_alt]
-                    if forced_alt
-                    else (band_levels if band_levels else None)
-                )
+                # چک‌پوینت با ارتفاع اجباری (کشیدن محور «ارتفاع» گیمبال).
+                # قرارداد قفل: فقط «رسیدن» سخت است —
+                # * قطعه‌ای که به چک‌پوینت قفل‌شده می‌رسد دقیقاً در همان سطح
+                #   کروز می‌کند و **فرود نمی‌گیرد** (حالت عبوری)؛ کاربر مسئله
+                #   را همین می‌دید: «چک‌پوینت را بالا بردم، مسیر همان‌جا روی
+                #   زمین بود» — عاملِ، کروزِ قفل‌شده *به‌همراه* فرودِ مجاز
+                #   بود که خط را در انتهای قطعه به زمین می‌پیچاند.
+                # * قطعه‌ای که *از* چک‌پوینت قفل‌شده آغاز می‌شود از همان ارتفاع
+                #   در-هوا آغاز می‌شود تا مسیر پیوسته باشد، ولی کروزش آزاد است:
+                #   اجبارِ کروزِ آن قطعه به همان سطح، برنامه‌ای که «دقیقاً در
+                #   همان سطح به مقصد برسد» می‌جست و اغلب واقعاً هم چنین
+                #   برنامه‌ای بادسواری‌پذیر نیست — درحالی‌که گذار بعدی
+                #   (صعود/فرود به سطح منتخب باند) کاملاً فیزیکی است.
+                land_at_end = end_lock is None
+                start_altitude_m = start_lock
+                if end_lock is not None:
+                    cruise_altitudes: list[float] | None = [end_lock]
+                elif band_levels:
+                    cruise_altitudes = list(band_levels)
+                else:
+                    cruise_altitudes = None
                 plan = plan_wind_riding_route(
                     origin, destination, layers,
                     aircraft=aircraft_config,
@@ -491,12 +522,23 @@ def compute_route_sync(request: RouteRequest) -> RouteResult:
                     ground_elevation_at=_ground_elevation_at,
                     min_clearance_m=_min_clearance_m,
                     cruise_altitudes=cruise_altitudes,
+                    land_at_end=land_at_end,
+                    start_altitude_m=start_altitude_m,
                 )
                 if plan is None:
                     # هیچ برنامهٔ بادسواری در باند انتخابی جا نمی‌شود (کوه سر راه
                     # است). مسیریابی گراف روی *همان* باند مسیر را دور کوه می‌برد،
                     # پس همان جای‌گزین می‌شود؛ در حالت «همهٔ لایه‌ها» نبودِ برنامه
                     # یعنی هیچ مسیری برای این باد/سرعت نیست.
+                    # با قفل ارتفاع، جای‌گزینِ گراف قفل را بی‌احترامی نقض می‌کند
+                    # (مسیر دور کوه در سطح دیگر می‌گذرد، نه در ارتفاع چک‌پوینت)
+                    # — پس به‌جای سکوت، رد صریح با پیام گویا.
+                    if locked_alt is not None:
+                        raise ValueError(
+                            f"سطح قفل‌شدهٔ چک‌پوینت ({locked_alt:.0f} متر) در این زمینه "
+                            "قابل پرواز نیست (زمین سر راه است)؛ ارتفاع چک‌پوینت را "
+                            "کمی تغییر دهید یا باند بالاتر را امتحان کنید."
+                        )
                     if band_levels is None:
                         raise ValueError("Wind riding route could not be planned")
                     result = _route_on_band(router, origin, destination, band_levels)
@@ -514,7 +556,35 @@ def compute_route_sync(request: RouteRequest) -> RouteResult:
                 result = router.route_on_single_layer(origin, destination, altitude)
             else:
                 # Auto layer selection mode — با باند انتخابی محدود به همان سطوح.
-                result = _route_on_band(router, origin, destination, band_levels)
+                # قفل ارتفاع چک‌پوینت در گراف: نزدیک‌ترین سطح به قفلِ «رسیدن» +
+                # **لنگر هوایی** روی سرِ قفل‌شدهٔ قطعه: مسیر به‌جای گره زمین از
+                # گرهٔ هوایی همان مختصات/همان سطح شروع یا ختم می‌شود — یعنی
+                # هنگام عبور از چک‌پوینت، همان‌جا در ارتفاع قفل است و به زمین
+                # نمی‌خورد. پیش‌تر گره زمینِ همیشگیِ سرِ قطعه، خط را دقیقاً روی
+                # زمین می‌برد و قفل را بی‌اثر می‌کرد؛ حتی انتخاب نزدیک‌ترین
+                # سطح بدون لنگر هوایی هم این مشکل را حل نمی‌کرد.
+                if locked_alt is not None and router.available_layers:
+                    nearest_level = min(
+                        router.available_layers,
+                        key=lambda level: abs(level - locked_alt),
+                    )
+                    try:
+                        result = router.find_optimal_path(
+                            origin,
+                            destination,
+                            layers=[nearest_level],
+                            endpoint_altitudes=(start_lock, end_lock),
+                        )
+                    except ValueError as exc:
+                        raise ValueError(
+                            f"پرواز در سطح قفل‌شدهٔ چک‌پوینت "
+                            f"({nearest_level:.0f} متر، نزدیک‌ترین سطح به "
+                            f"{locked_alt:.0f} متری) مسیر پروازپذیری ندارد "
+                            "(زمین مانع است)؛ ارتفاع چک‌پوینت را تغییر دهید یا "
+                            "باند دیگری را انتخاب کنید."
+                        ) from exc
+                else:
+                    result = _route_on_band(router, origin, destination, band_levels)
         except ValueError as e:
             if "same ground node" in str(e):
                 # Waypoints too close, skip this segment
