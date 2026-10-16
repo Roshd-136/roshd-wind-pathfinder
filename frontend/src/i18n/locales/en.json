@@ -158,7 +158,7 @@
     "mapStyle": "Base map",
     "styleSimple": "Simple",
     "styleSatellite": "Satellite",
-    "showArrows": "Wind arrows",
+    "showArrows": "Wind arrows (3D)",
     "showParticles": "Wind particle flow",
     "animateWind": "Wind particle motion",
     "showHeatmap": "Wind color map",

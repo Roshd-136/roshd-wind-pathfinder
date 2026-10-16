@@ -348,14 +348,26 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
         />
       </div>
 
-      {/* پنل شناور روی نقشه (دسکتاپ) — با دکمهٔ نوار ابزار تا لبه جمع می‌شود */}
+      {/* پنل شناور روی نقشه (دسکتاپ) — باز/جمع‌شدن با لغزش نرم به بیرون +
+          محو؛ عرض ثابت می‌ماند تا محتوا هنگام انیمیشن له نشود (قبلاً با
+          فشردن عرض، سریع «می‌پرید»). لغزش به سمت لبهٔ end — در RTL چپ و
+          در LTR راست؛ در حالت بسته pointer-events خاموش می‌شود تا غلافِ
+          پنل، نقشهٔ زیرش را برای کلیک/جابه‌جایی مسدود نکند. */}
       <div
-        className={`absolute top-4 z-10 hidden max-h-[calc(100%-2rem)] overflow-hidden transition-all duration-300 md:block end-4 ${
-          isControlPanelOpen ? 'w-[19.5rem] opacity-100' : 'w-0 opacity-0'
+        className={`absolute top-4 end-4 z-10 hidden max-h-[calc(100%-2rem)] w-[19.5rem] overflow-hidden md:block ${
+          isControlPanelOpen ? 'pointer-events-auto' : 'pointer-events-none'
         }`}
-        aria-hidden={!isControlPanelOpen}
       >
-        {panel}
+        <div
+          className={`h-full transition-[translate,opacity,visibility] duration-300 ease-out will-change-transform ${
+            isControlPanelOpen
+              ? 'visible translate-x-0 opacity-100'
+              : 'invisible opacity-0 ltr:translate-x-[110%] rtl:-translate-x-[110%]'
+          }`}
+          aria-hidden={!isControlPanelOpen}
+        >
+          {panel}
+        </div>
       </div>
       <MapTools
         panelOpen={isControlPanelOpen}

@@ -1,44 +1,37 @@
 import type { GeoJSONSource, ImageSource, Map as MapLibreMap } from 'maplibre-gl'
 import type { WindField } from '../../../types/routing'
-import { WIND_ARROW_CONFIG, WIND_PARTICLE_CONFIG } from '../../../config/mapDisplay'
+import { WIND_PARTICLE_CONFIG } from '../../../config/mapDisplay'
 import {
-  arrowFeatures,
   colorForFieldSpeed,
   fieldSpeedRange,
   gridMeta,
   sampleWindAtPoint,
-  WIND_SPEED_STOPS,
 } from '../../../utils/windField'
 
 /**
  * رندر میدان باد روی MapLibre GL — **همهٔ لایه‌ها از ابتدا در استایل پایه
- * تعریف شده‌اند** (نقشهٔ رنگی، پیکان‌های جهت باد، ذرات جریان باد) و این‌جا
- * فقط دادهٔ آن‌ها به‌روز می‌شود؛ افزودن لایه در زمان اجرا وقتی استایل در
- * وضعیت نیمه‌لود (صف DEM) است گاهی بی‌اثر می‌ماند و لایه هرگز رسم نمی‌شد —
- * با درخت لایهٔ ایستا این دسته باگ کلاً حذف شده است.
+ * تعریف شده‌اند** (نقشهٔ رنگی، ذرات جریان باد) و این‌جا فقط دادهٔ آن‌ها
+ * به‌روز می‌شود؛ افزودن لایه در زمان اجرا وقتی استایل در وضعیت نیمه‌لود
+ * (صف DEM) است گاهی بی‌اثر می‌ماند و لایه هرگز رسم نمی‌شد — با درخت لایهٔ
+ * ایستا این دسته باگ کلاً حذف شده است.
  *
  *  ۱) نقشهٔ حرارتی «نرم» — تصویر canvas با **درون‌یابی دوخطی واقعی** روی
  *     شبکه (نه نزدیک‌ترین سلول) و رنگ نسبت به بازهٔ خود میدان — بدون لبهٔ
  *     کاشی‌مانند بین سلول‌ها؛
- *  ۲) **پیکان‌های جهت باد** — شبکهٔ ثابت اسپرایت (هر `stride` سلول یکی) که
- *     جهت لحظه‌ای باد را در هر سلول نشان می‌دهند؛ رنگ هر پیکان سطلِ نسبی
- *     سرعت روی بازهٔ خود میدان است (هماهنگ با طیف راهنما) و چرخش با جهت
- *     جریان. برخلاف ذرات، این پیکان‌ها همیشه دیده می‌شوند — مرجع پایدار
- *     «باد از کجا به کجا»؛
- *  ۳) **ذرات جریان باد** (سبک windy) — ذرات ریز که پیوسته در امتداد بردار
+ *  ۲) **ذرات جریان باد** (سبک windy) — ذرات ریز که پیوسته در امتداد بردار
  *     محلی باد حرکت می‌کنند و ردّ کوتاه می‌گذارند. هر ذره یک شیء `Arrow`
- *     است که دُم و نوک را **در یک هندسهٔ واحد** (MultiLineString) می‌سازد؛
- *     باگ «نوک جداشده از دُم» از جنس دو-منبع-دو-setData بود و با اتحاد
- *     هندسی کلاً حذف شده — نوک و دُم همیشه در یک قاب اعمال می‌شوند.
- *     در حالت چندلایه (۳بعدی) **هر میدانِ نمایان مجموعه ذرات خودش را دارد**.
- *     قرارداد هواشناسی: `direction_deg` از کجا می‌وزد؛ پیکان/حرکت به سمت
- *     جریان (جهت + ۱۸۰).
+ *     است که دُم و نوک فلش را **در یک هندسهٔ واحد** (MultiLineString)
+ *     می‌سازد؛ باگ «نوک جداشده از دُم» از جنس دو-منبع-دو-setData بود و با
+ *     اتحاد هندسی کلاً حذف شده — نوک و دُم همیشه در یک قاب اعمال می‌شوند.
+ *     ذره‌های متحرک، «پیکان‌های جهت باد» نقشه‌اند (قبلاً یک شبکهٔ اسپرایتِ
+ *     ساکن هم زیر آن‌ها رسم می‌شد که با استایلی متفاوت زیر ذرات می‌نشست و
+ *     نمایش را دوگانه می‌کرد — حذف شد). در حالت چندلایه (۳بعدی) **هر میدانِ
+ *     نمایان مجموعه ذرات خودش را دارد**. قرارداد هواشناسی:
+ *     `direction_deg` از کجا می‌وزد؛ پیکان/حرکت به سمت جریان (جهت + ۱۸۰).
  */
 
 const FIELD_SOURCE = 'wind-field-raster'
 const FIELD_LAYER = 'wind-field-layer'
-const ARROW_SOURCE = 'wind-arrows'
-const ARROW_LAYER = 'wind-arrows-layer'
 const PARTICLE_SOURCE = 'wind-particles'
 const PARTICLE_LAYER = 'wind-particles-layer'
 
@@ -118,99 +111,6 @@ function updateFieldImage(map: MapLibreMap, field: WindField): void {
     [lonMin, latMin],
   ])
   imageSource.updateImage({ url: buildFieldImage(field) })
-}
-
-// ---------------------------------------------------------------------------
-// پیکان‌های ثابت جهت باد — شبکهٔ اسپرایت روی سلول‌های میدان. هر اسپرایت رو به
-// شمال رسم می‌شود و چرخش نماد با جهت جریان (جهت هواشناسی + ۱۸۰) اعمال می‌شود؛
-// رنگ هر پیکان سطل نسبی سرعت روی بازهٔ خود میدان است تا با نقشهٔ رنگی و طیف
-// راهنما هم‌خوان بماند.
-// ---------------------------------------------------------------------------
-
-const ARROW_IMAGE_PREFIX = 'wind-arrow-'
-
-/** رسم پیکان رو به شمال روی ctx — بر پایهٔ هندسهٔ `WIND_ARROW_CONFIG`. */
-function drawArrow(
-  ctx: CanvasRenderingContext2D,
-  size: number,
-  color: [number, number, number],
-): void {
-  const [r, g, b] = color
-  const cx = size / 2
-  const geo = WIND_ARROW_CONFIG.geometry
-  const span = (geo.baseY - geo.tipY) * size
-  const top = (size - span) / 2
-  const tipY = top
-  const headBaseY = top + (geo.headBaseY - geo.tipY) * size
-  const shaftTopY = top + (geo.shaftTopY - geo.tipY) * size
-  const baseY = top + (geo.baseY - geo.tipY) * size
-  const headHalf = geo.headHalfWidth * size
-  const shaftHalf = WIND_ARROW_CONFIG.shaftWidth / 2
-  // ساقه: مستطیل دقیق (بدون خطای lineCap در طول)
-  ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.98)`
-  ctx.fillRect(cx - shaftHalf, shaftTopY, shaftHalf * 2, baseY - shaftTopY)
-  // سرِ پیکان: مثلث توپر
-  ctx.beginPath()
-  ctx.moveTo(cx, tipY)
-  ctx.lineTo(cx - headHalf, headBaseY)
-  ctx.lineTo(cx + headHalf, headBaseY)
-  ctx.closePath()
-  ctx.fill()
-}
-
-let arrowSpritesCache: Record<string, ImageData> | null = null
-
-/** اسپرایت‌های پیکان به رنگ سطل‌های رمپ سرعت — یک‌بار ساخته و کش می‌شود. */
-function buildArrowSprites(): Record<string, ImageData> {
-  if (arrowSpritesCache) return arrowSpritesCache
-  const size = WIND_ARROW_CONFIG.spriteSize
-  const sprites: Record<string, ImageData> = {}
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return sprites
-  for (const [index, stop] of WIND_SPEED_STOPS.entries()) {
-    ctx.clearRect(0, 0, size, size)
-    drawArrow(ctx, size, stop.color)
-    sprites[`${ARROW_IMAGE_PREFIX}${index}`] = ctx.getImageData(0, 0, size, size)
-  }
-  arrowSpritesCache = sprites
-  return sprites
-}
-
-/** ثبت اسپرایت‌ها روی نقشه — بازگشت‌پذیر؛ هر کدام فقط اگر نبود اضافه می‌شود. */
-function ensureArrowImages(map: MapLibreMap): void {
-  for (const [name, image] of Object.entries(buildArrowSprites())) {
-    if (!map.hasImage(name)) {
-      map.addImage(name, image, { pixelRatio: 2 })
-    }
-  }
-}
-
-/** سطل رنگ نسبی یک سرعت روی بازهٔ خود میدان (اندیس رمپ ۰ تا ۴). */
-function relativeBucket(speed: number, range: [number, number]): number {
-  const [min, max] = range
-  const t = Math.min(Math.max((speed - min) / Math.max(max - min, 1e-6), 0), 1)
-  return Math.min(Math.floor(t * WIND_SPEED_STOPS.length), WIND_SPEED_STOPS.length - 1)
-}
-
-/** به‌روزرسانی شبکهٔ پیکان‌های جهت باد برای میدان فعال — منبع در استایل است. */
-function updateArrowLayer(map: MapLibreMap, field: WindField): void {
-  ensureArrowImages(map)
-  const source = map.getSource(ARROW_SOURCE) as GeoJSONSource | undefined
-  if (!source) return
-  const range = fieldSpeedRange(field)
-  const features = arrowFeatures(field, WIND_ARROW_CONFIG.stride).map((arrow) => ({
-    type: 'Feature' as const,
-    properties: {
-      // چرخش نماد = جهت جریان (هواشناسی + ۱۸۰) — اسپرایت رو به شمال است
-      direction: Number(((arrow.direction_deg + 180) % 360).toFixed(1)),
-      icon: `${ARROW_IMAGE_PREFIX}${relativeBucket(arrow.speed_mps, range)}`,
-    },
-    geometry: { type: 'Point' as const, coordinates: [arrow.lon, arrow.lat] },
-  }))
-  source.setData({ type: 'FeatureCollection', features })
 }
 
 // ---------------------------------------------------------------------------
@@ -517,16 +417,13 @@ export function stopParticleFlow(): void {
   }
 }
 
-/** نمایش/پنهان‌سازی گروهی باد (نقشهٔ رنگی + پیکان‌های جهت + ذرات جریان). */
+/** نمایش/پنهان‌سازی گروهی باد (نقشهٔ رنگی + ذرات جریان باد). */
 export function setWindOverlaysVisible(
   map: MapLibreMap,
-  visible: { heatmap: boolean; arrows: boolean; particles: boolean },
+  visible: { heatmap: boolean; particles: boolean },
 ): void {
   if (map.getLayer(FIELD_LAYER)) {
     map.setLayoutProperty(FIELD_LAYER, 'visibility', visible.heatmap ? 'visible' : 'none')
-  }
-  if (map.getLayer(ARROW_LAYER)) {
-    map.setLayoutProperty(ARROW_LAYER, 'visibility', visible.arrows ? 'visible' : 'none')
   }
   if (map.getLayer(PARTICLE_LAYER)) {
     map.setLayoutProperty(PARTICLE_LAYER, 'visibility', visible.particles ? 'visible' : 'none')
@@ -572,8 +469,8 @@ function tickFlow(): void {
 }
 
 /**
- * اعمال میدان‌های نمایان — نقشهٔ رنگی روی لایهٔ فعال، پیکان‌های جهت باد روی
- * میدان فعال و جریان ذرات روی میدان‌های نمایان. در حالت چندلایه (۳بعدی)
+ * اعمال میدان‌های نمایان — نقشهٔ رنگی روی لایهٔ فعال و جریان ذرات روی
+ * میدان‌های نمایان. در حالت چندلایه (۳بعدی)
  * **هر میدان مجموعه ذرات خودش** را دارد (رنگ/سطل نسبت به بازهٔ همان میدان)؛
  * در ۲بعدی فقط پایین‌ترین. هیچ لایه‌ای add نمی‌شود — لایه‌ها از ابتدا در
  * استایل‌اند و این‌جا فقط داده و دید هرکدام تنظیم می‌شود؛ روی خطا با تایمر
@@ -585,15 +482,13 @@ export function applyWindFields(
   opts: {
     multiLayer: boolean
     showHeatmap: boolean
-    /** پیکان‌های ثابت جهت باد */
-    showArrows: boolean
     /** ذرات جریان باد */
     showParticles: boolean
     /** حرکت ذرات — false: قاب ثابت (کلید «حرکت ذرات باد» در تنظیمات نما) */
     animateWind?: boolean
     particleCount?: number
     attempt?: number
-  } = { multiLayer: false, showHeatmap: true, showArrows: true, showParticles: true },
+  } = { multiLayer: false, showHeatmap: true, showParticles: true },
 ): void {
   const attempt = opts.attempt ?? 0
   // ترجیح حرکت از تنظیمات نما — ساخت/بازسازی جریان آن را رعایت می‌کند
@@ -608,17 +503,9 @@ export function applyWindFields(
       const heatmapVisible = Boolean(active) && opts.showHeatmap
       map.setLayoutProperty(FIELD_LAYER, 'visibility', heatmapVisible ? 'visible' : 'none')
     }
-    // پیکان‌های جهت باد: در ۲بعدی روی میدان فعال (پایین‌ترین نمایان)؛ دادهٔ
-    // شبکه فقط وقتی لایه دیده می‌شود ساخته می‌شود.
-    if (map.getLayer(ARROW_LAYER)) {
-      const arrowsVisible = Boolean(active) && opts.showArrows
-      map.setLayoutProperty(ARROW_LAYER, 'visibility', arrowsVisible ? 'visible' : 'none')
-      if (arrowsVisible && active) {
-        updateArrowLayer(map, active)
-      }
-    }
-    // ذرات جریان: در ۳بعدی همهٔ میدان‌های نمایان، در ۲بعدی فقط پایین‌ترین؛
-    // رنگ/ضخامت per-feature است (ویژگی color/width هر Feature واحد دُم+نوک).
+    // ذرات جریان (پیکان‌های متحرک جهت): در ۳بعدی همهٔ میدان‌های نمایان،
+    // در ۲بعدی فقط پایین‌ترین؛ رنگ/ضخامت per-feature است (ویژگی color/width
+    // هر Feature واحد دُم+نوک).
     if (map.getLayer(PARTICLE_LAYER)) {
       const particleFields = opts.multiLayer ? ordered : active ? [active] : []
       const particlesVisible = particleFields.length > 0 && opts.showParticles

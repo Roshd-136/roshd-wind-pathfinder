@@ -3,7 +3,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEffect, useRef, useState } from 'react'
 import type { Coordinate, Coordinate3D, WindField } from '../../../types/routing'
 import type { ViewportSettings } from '../../../store/useUiStore'
-import { WIND_ARROW_CONFIG } from '../../../config/mapDisplay'
+import { chaikinSmoothLine } from '../../../utils/geometry'
 import { ManualSceneView as ManualSceneView3D } from './ManualSceneView'
 import type { EditTarget } from '../../../three/manual/scene-gl'
 import { applyWindFields, setParticleFlowPaused, setWindOverlaysVisible, stopParticleFlow } from './windFieldLayer'
@@ -105,7 +105,6 @@ function baseStyle(): maplibregl.StyleSpecification {
           [0, 0],
         ],
       },
-      'wind-arrows': { type: 'geojson' as const, data: EMPTY_FC },
       'wind-particles': { type: 'geojson' as const, data: EMPTY_FC },
       'route-line': { type: 'geojson', data: EMPTY_LINE },
       'route-dots': { type: 'geojson', data: EMPTY_FC },
@@ -129,33 +128,6 @@ function baseStyle(): maplibregl.StyleSpecification {
         source: 'wind-field-raster',
         layout: { visibility: 'none' },
         paint: { 'raster-opacity': 0.85, 'raster-fade-duration': 0 },
-      },
-      {
-        // پیکان‌های ثابت جهت باد — اسپرایت per-bucket با چرخش جریان؛
-        // هندسه/اندازه از `WIND_ARROW_CONFIG` تا با کانفیگ یکی باشد.
-        id: 'wind-arrows-layer',
-        type: 'symbol',
-        source: 'wind-arrows',
-        layout: {
-          visibility: 'none',
-          'icon-image': ['get', 'icon'],
-          'icon-rotate': ['get', 'direction'],
-          'icon-rotation-alignment': 'map',
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-          'icon-size': [
-            'interpolate',
-            ['exponential', 1.6],
-            ['zoom'],
-            5,
-            WIND_ARROW_CONFIG.iconSizeStops[0][1],
-            8,
-            WIND_ARROW_CONFIG.iconSizeStops[1][1],
-            12,
-            WIND_ARROW_CONFIG.iconSizeStops[2][1],
-          ],
-        },
-        paint: { 'icon-opacity': WIND_ARROW_CONFIG.opacity },
       },
       {
         id: 'wind-particles-layer',
@@ -282,11 +254,10 @@ function MapLibreView({
     applyWindFields(map, windFields, {
       multiLayer: false, // MapLibre فقط حالت ۲بعدی — لایه‌های سه‌بعدی صحنهٔ دست‌ساز
       showHeatmap: viewport.showHeatmap,
-      showArrows: viewport.showArrows,
       showParticles: viewport.showParticles,
       animateWind: viewport.animateWind,
     })
-  }, [windFields, mapCreated, viewport.showHeatmap, viewport.showArrows, viewport.showParticles, viewport.animateWind])
+  }, [windFields, mapCreated, viewport.showHeatmap, viewport.showParticles, viewport.animateWind])
 
   // کلیدهای نمایش باد (تنظیمات viewport) — بدون بازسازی داده
   useEffect(() => {
@@ -294,10 +265,9 @@ function MapLibreView({
     if (!map) return
     setWindOverlaysVisible(map, {
       heatmap: viewport.showHeatmap,
-      arrows: viewport.showArrows,
       particles: viewport.showParticles,
     })
-  }, [mapCreated, viewport.showHeatmap, viewport.showArrows, viewport.showParticles])
+  }, [mapCreated, viewport.showHeatmap, viewport.showParticles])
 
   // توقف/ازسرگیری حرکت ذرات — کلید «حرکت ذرات باد»؛ قاب فعلی هنگام توقف ثابت می‌ماند
   useEffect(() => {
@@ -454,12 +424,17 @@ function MapLibreView({
       if (!map) return
       try {
         const source = map.getSource(ROUTE_SOURCE_ID) as maplibregl.GeoJSONSource
+        // نرم‌سازی نمایشی گوشه‌ها (چایکین) — چرخش مسیر در چک‌پوینت‌ها به‌جای
+        // گردنِ تیز، ملایم دیده شود؛ سر و تهِ مسیر دقیق حفظ می‌شود و هیچ
+        // دادهٔ موتوری عوض نمی‌شود (فقط رسم خط).
         source.setData({
           type: 'Feature',
           properties: {},
           geometry: {
             type: 'LineString',
-            coordinates: (path ?? []).map((c) => [c.lon, c.lat]),
+            coordinates: chaikinSmoothLine(
+              (path ?? []).map((c) => [c.lon, c.lat] as [number, number]),
+            ),
           },
         })
         const dots = map.getSource(ROUTE_DOTS_SOURCE_ID) as maplibregl.GeoJSONSource

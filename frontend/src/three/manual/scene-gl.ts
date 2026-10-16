@@ -30,6 +30,7 @@ import {
   type TerrainData,
 } from './scene'
 import type { Coordinate, Coordinate3D, WindField } from '../../types/routing'
+import { chaikinSmoothXYZ } from '../../utils/geometry'
 
 // ————— شیدرها — GLSL ES 1.00 —————
 
@@ -315,6 +316,8 @@ export class Manual3DScene {
   private terrain: GpuMesh | null = null
   private terrainTiles: TerrainTileRange[] = []
   private arrowMeshes: GpuMesh[] = []
+  /** محدودهٔ مجاز برداشت کلیک زمین (km) — زمین ∪ مسیر ∪ نشانگرها + ۸ km */
+  private pickBoundsKm: { minX: number; minY: number; maxX: number; maxY: number } | null = null
   private markerMeshes: GpuMesh[] = []
   private routeMesh: GpuMesh | null = null
   private rafId = 0
@@ -455,7 +458,11 @@ export class Manual3DScene {
         const altM = Math.max(p.alt, groundM + 200)
         return { x, y, z: (altM / 1000) * VERTICAL_EXAGGERATION }
       })
-      const spline = smoothRoute(pts, SPLINE_SAMPLES)
+      // برش گوشهٔ چایکین پیش از اسپلاین — در چک‌پوینت‌ها به‌جای گردنِ تیزِ
+      // تغییر جهت، چرخش ملایم دیده شود؛ سر و ته مسیر دقیق می‌ماند تا
+      // سنجاق‌های مبدأ/مقصد سر جایشان بمانند.
+      const rounded = chaikinSmoothXYZ(pts, 2)
+      const spline = smoothRoute(rounded, SPLINE_SAMPLES)
       const tube = buildRouteTube(spline, ROUTE_TUBE_RADIUS_KM)
       this.routeMesh = uploadIndexed(gl, tube.positions, tube.colors, tube.indices, gl.TRIANGLES)
 
@@ -504,6 +511,28 @@ export class Manual3DScene {
         posKm: [x, y, (altM / 1000) * VERTICAL_EXAGGERATION],
       })
     }
+    // محدودهٔ برداشت کلیک (پیکان‌گیری زمین) — کادر زمین ∪ مسیر ∪ نشانگرها،
+    // با حاشیهٔ ۸ کیلومتر. قبلاً فقط پوشش CSV زمین قبول می‌شد؛ مسیر و
+    // چک‌پوینت‌ها می‌توانستند تا جنوبِ آن کادر امتداد داشته باشند و کلیکِ
+    // کاربر روی همان دشتِ دیدنی (بیرون کادر ولی نزدیک مسیر) بی‌صدا null
+    // می‌شد — «نمی‌توانم چک‌پوینت در ۳بعدی اضافه کنم». حالا هر نقطهٔ نزدیک
+    // مسیر/نشانگرها هم پذیرفته می‌شود و نقاط دور و بی‌ربط مردود می‌مانند.
+    let minX = 0
+    let minY = 0
+    let maxX = frame.widthKm
+    let maxY = frame.heightKm
+    const widen = (x: number, y: number): void => {
+      if (x < minX) minX = x
+      if (y < minY) minY = y
+      if (x > maxX) maxX = x
+      if (y > maxY) maxY = y
+    }
+    for (const m of this.markerDots) widen(m.posKm[0], m.posKm[1])
+    if (options.path3d && options.path3d.length > 1) {
+      for (const p of options.path3d) widen(...(lonLatToKm(frame, p.lon, p.lat) as [number, number]))
+    }
+    const pad = 8
+    this.pickBoundsKm = { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad }
   }
 
   dispose(): void {
@@ -875,6 +904,7 @@ export class Manual3DScene {
     this.pointerDown = true
     this.lastX = e.clientX
     this.lastY = e.clientY
+    this.dragStartScreen = { x: e.clientX, y: e.clientY }
     this.dragMoved = false
     this.panMode = e.shiftKey || e.button === 1
   }
@@ -919,7 +949,11 @@ export class Manual3DScene {
     if (!this.pointerDown) return
     const dx = e.clientX - this.lastX
     const dy = e.clientY - this.lastY
-    if (Math.abs(dx) + Math.abs(dy) > 3) this.dragMoved = true
+    // کشیدنِ واقعی با جابه‌جایی انباشته از نقطهٔ نشست تشخیص داده می‌شود —
+    // پیشتر هر لرزشِ تک‌رویدادِ بیش از ۳px کلیک را دور می‌ریخت و کلیکِ
+    // واقعی کاربر با لرزش دست (تا‌چ‌پد/موس) بی‌صدا ناموفق می‌شد.
+    const down = this.dragStartScreen
+    if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) this.dragMoved = true
     this.lastX = e.clientX
     this.lastY = e.clientY
     if (this.dragAxis) {
@@ -1002,8 +1036,7 @@ export class Manual3DScene {
     }
   }
 
-  private onWheel = (e: WheelEvent): void => {
-    e.preventDefault()
+  private onWheel = (e: WheelEvent): void => {    e.preventDefault()
     const factor = Math.exp(e.deltaY * 0.0012)
     this.camDist = Math.min(Math.max(this.camDist * factor, 15), 900)
     this.userMoved = true
@@ -1035,16 +1068,12 @@ export class Manual3DScene {
     const far = unproj(1)
     const fr = this.frame
     const accept = (x: number, y: number): { lat: number; lon: number } | null => {
+      // پذیرش فقط داخل محدودهٔ مجاز (زمین ∪ مسیر ∪ نشانگرها + حاشیهٔ ۸ km)
+      // تا کلیک روی افق/نقطهٔ خیلی دور، بی‌صدا نقطهٔ غیرواقعی نسازد.
+      const b = this.pickBoundsKm
+      if (!b) return null
+      if (x < b.minX || x > b.maxX || y < b.minY || y > b.maxY) return null
       const [lon, lat] = kmToLonLat(fr, x, y)
-      // خارج از کادر زمین — انتخاب نامعتبر
-      if (
-        lon < fr.lon0 - 0.01 ||
-        lat < fr.lat0 - 0.01 ||
-        lon > fr.lon0 + fr.widthKm / fr.kmPerLon + 0.01 ||
-        lat > fr.lat0 + fr.heightKm / fr.kmPerLat + 0.01
-      ) {
-        return null
-      }
       return { lat, lon }
     }
     // — برخورد پرتو با سطح زمین —
@@ -1087,7 +1116,10 @@ export class Manual3DScene {
     const dz = far[2] - near[2]
     if (Math.abs(dz) < 1e-9) return null
     const t = -near[2] / dz
-    if (t < 0 || t > 1) return null
+    // فقط پرتوِ رو به بالا (افق به بالا) مردود است — پرتویی که دشتِ بیرونِ
+    // صفحهٔ دور را نشانه می‌رود هم رسا است: قبلاً t>1 مردود می‌شد و کلیکِ
+    // کاربر روی همان پیش‌زمینِ دشتِ دیدنی بی‌صدا از دست می‌رفت.
+    if (t < 0) return null
     const x = near[0] + t * (far[0] - near[0])
     const y = near[1] + t * (far[1] - near[1])
     return accept(x, y)
