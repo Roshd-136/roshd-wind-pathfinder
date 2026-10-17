@@ -32,6 +32,14 @@ import {
 import type { Coordinate, Coordinate3D, WindField } from '../../types/routing'
 import { chaikinSmoothXYZ } from '../../utils/geometry'
 
+/** حاشیهٔ پذیرش برخوردِ واقعی با سطح زمین (ک.م) — کلیک روی خودِ نوار. */
+const MARCH_PICK_PAD_KM = 8
+/** کفِ حاشیهٔ پذیرش «صفحهٔ تخت» (ک.م) — واقعیِ پذیرش با مقیاسِ دوربین
+ * (camDist×۱٫۱) بزرگ می‌شود تا دشتِ اطرافِ زمینِ دیده‌شده در هر زوم
+ * قابل گذاشتنِ چک‌پوینت باشد؛ فراتر از آن، افقِ واقعا دور صادقانه
+ * «بیرون از کادر داده» می‌گوید. */
+const PLANE_PICK_PAD_KM = 150
+
 // ————— شیدرها — GLSL ES 1.00 —————
 
 const VS_MAIN = `
@@ -1076,12 +1084,18 @@ export class Manual3DScene {
     const near = unproj(-1)
     const far = unproj(1)
     const fr = this.frame
-    const accept = (x: number, y: number): { lat: number; lon: number } | null => {
-      // پذیرش فقط داخل محدودهٔ مجاز (زمین ∪ مسیر ∪ نشانگرها + حاشیهٔ ۸ km)
-      // تا کلیک روی افق/نقطهٔ خیلی دور، بی‌صدا نقطهٔ غیرواقعی نسازد.
+    const accept = (x: number, y: number, kind: 'march' | 'plane' = 'march'): { lat: number; lon: number } | null => {
+      // پذیرش: کادرِ مجاز (زمین ∪ مسیر ∪ نشانگرها + حاشیه). برای برخوردِ
+      // واقعی با سطح زمین حاشیهٔ ثابتِ کوچک (۸ ک.م) کافی است؛ ولی «صفحهٔ
+      // تخت» با مقیاسِ دیدِ کاربر باید پذیرفته شود — با زومِ دورتر همان
+      // پیکسلِ دشتِ اطراف به نقطهٔ دورتری می‌افتد (در camDist=۶۰۰ تا
+      // ~۵۴۰ ک.م اندازه‌گیری شد)، پس حاشیهٔ آن با فاصلهٔ دوربین مقیاس
+      // می‌گیرد و سقفِ مضحکِ افق (بسیار دورتر از دید) همچنان صادقانه
+      // با «بیرون از کادر داده» رد می‌شود.
       const b = this.pickBoundsKm
       if (!b) return null
-      if (x < b.minX || x > b.maxX || y < b.minY || y > b.maxY) {
+      const pad = kind === 'plane' ? Math.max(PLANE_PICK_PAD_KM, this.camDist * 1.1) : MARCH_PICK_PAD_KM
+      if (x < b.minX - pad || x > b.maxX + pad || y < b.minY - pad || y > b.maxY + pad) {
         this.lastPickMiss = 'outside'
         return null
       }
@@ -1139,6 +1153,6 @@ export class Manual3DScene {
     }
     const x = near[0] + t * (far[0] - near[0])
     const y = near[1] + t * (far[1] - near[1])
-    return accept(x, y)
+    return accept(x, y, 'plane')
   }
 }
