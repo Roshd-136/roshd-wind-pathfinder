@@ -280,6 +280,9 @@ export interface EditTarget {
 
 export type GizmoAxis = 'ew' | 'ns' | 'up'
 
+/** دلیل نل‌شدن برداشت کلیک — برای پیامِ روشن به کاربر. */
+export type PickMissKind = 'outside' | 'sky'
+
 interface AxisSpec {
   axis: GizmoAxis
   dir: Vec3
@@ -333,8 +336,11 @@ export class Manual3DScene {
   private lastRouteKey = ''
   /** کلیک بدون کشیدن — به صفحهٔ بالادست (مبدأ/مقصد/اطلاعات نقطه). */
   onMapClick: ((lat: number, lon: number) => void) | null = null
-  /** کلیک برداشتنیِ «افزودن چک‌پوینت» که مختصات نداد — برای بازخوردِ بی‌سکوت. */
-  onPickMiss: (() => void) | null = null
+  /** کلیک برداشتنیِ «افزودن چک‌پوینت» که مختصات نداد — برای بازخوردِ بی‌سکوت.
+   *  kind: 'outside' = بیرون کادر داده، 'sky' = پرتو به آسمان. */
+  onPickMiss: ((kind: PickMissKind) => void) | null = null
+  /** دلیل آخرین ردِ برداشت — گزارش به صفحه در حالت «افزودن چک‌پوینت». */
+  private lastPickMiss: PickMissKind | null = null
 
   // ————— ویرایشگر نقطه (گیمبال) —————
   /** هدف فعال ویرایش؛ null = گیمبال پنهان. */
@@ -1035,7 +1041,7 @@ export class Manual3DScene {
     if (!this.dragMoved && this.onMapClick) {
       const hit = this.pickLatLon(e.clientX, e.clientY)
       if (hit) this.onMapClick(hit.lat, hit.lon)
-      else if (this.placingPoint) this.onPickMiss?.()
+      else if (this.placingPoint) this.onPickMiss?.(this.lastPickMiss ?? 'outside')
     }
   }
 
@@ -1075,15 +1081,17 @@ export class Manual3DScene {
       // تا کلیک روی افق/نقطهٔ خیلی دور، بی‌صدا نقطهٔ غیرواقعی نسازد.
       const b = this.pickBoundsKm
       if (!b) return null
-      if (x < b.minX || x > b.maxX || y < b.minY || y > b.maxY) return null
+      if (x < b.minX || x > b.maxX || y < b.minY || y > b.maxY) {
+        this.lastPickMiss = 'outside'
+        return null
+      }
       const [lon, lat] = kmToLonLat(fr, x, y)
       return { lat, lon }
     }
     // — برخورد پرتو با سطح زمین —
     const terrain = this.terrainData
     if (terrain) {
-      const at = (t: number): Vec3 => [
-        near[0] + t * (far[0] - near[0]),
+      const at = (t: number): Vec3 => [        near[0] + t * (far[0] - near[0]),
         near[1] + t * (far[1] - near[1]),
         near[2] + t * (far[2] - near[2]),
       ]
@@ -1117,12 +1125,18 @@ export class Manual3DScene {
     }
     // — جایگزین: صفحهٔ تخت z=0 (بیرون زمین یا پیش از بارگذاری DEM) —
     const dz = far[2] - near[2]
-    if (Math.abs(dz) < 1e-9) return null
+    if (Math.abs(dz) < 1e-9) {
+      this.lastPickMiss = 'outside'
+      return null
+    }
     const t = -near[2] / dz
     // فقط پرتوِ رو به بالا (افق به بالا) مردود است — پرتویی که دشتِ بیرونِ
     // صفحهٔ دور را نشانه می‌رود هم رسا است: قبلاً t>1 مردود می‌شد و کلیکِ
     // کاربر روی همان پیش‌زمینِ دشتِ دیدنی بی‌صدا از دست می‌رفت.
-    if (t < 0) return null
+    if (t < 0) {
+      this.lastPickMiss = 'sky'
+      return null
+    }
     const x = near[0] + t * (far[0] - near[0])
     const y = near[1] + t * (far[1] - near[1])
     return accept(x, y)

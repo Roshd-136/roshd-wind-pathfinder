@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { Coordinate, Coordinate3D, WindField } from '../../../types/routing'
-import { Manual3DScene, type EditTarget } from '../../../three/manual/scene-gl'
+import { Manual3DScene, type EditTarget, type PickMissKind } from '../../../three/manual/scene-gl'
 
 interface ManualSceneViewProps {
   origin: Coordinate | null
@@ -22,7 +22,7 @@ interface ManualSceneViewProps {
   /** کلیک روی گوی نشانگر (انتخاب نقطه) — null = کلیک خالی (بستن گیمبال). */
   onPointPick?: (target: EditTarget | null) => void
   /** کلیک برداشتنیِ «افزودن چک‌پوینت» که مختصات نداد — بازخورد به کاربر. */
-  onPickMiss?: () => void
+  onPickMiss?: (kind: PickMissKind) => void
   onMapClick: (coord: Coordinate) => void
 }
 
@@ -83,7 +83,7 @@ export function ManualSceneView({
     const scene = new Manual3DScene(canvas)
     sceneRef.current = scene
     scene.onMapClick = (lat, lon) => handlersRef.current.onMapClick({ lat, lon })
-    scene.onPickMiss = () => handlersRef.current.onPickMiss?.()
+    scene.onPickMiss = (kind) => handlersRef.current.onPickMiss?.(kind)
     scene.onPointEdit = (target, coord) => handlersRef.current.onPointEdit?.(target, coord)
     scene.onPointPick = (target) => handlersRef.current.onPointPick?.(target)
     const boot = async (): Promise<void> => {

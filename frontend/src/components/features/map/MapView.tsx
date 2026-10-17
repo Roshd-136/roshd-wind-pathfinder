@@ -5,7 +5,7 @@ import type { Coordinate, Coordinate3D, WindField } from '../../../types/routing
 import type { ViewportSettings } from '../../../store/useUiStore'
 import { chaikinSmoothLine } from '../../../utils/geometry'
 import { ManualSceneView as ManualSceneView3D } from './ManualSceneView'
-import type { EditTarget } from '../../../three/manual/scene-gl'
+import type { EditTarget, PickMissKind } from '../../../three/manual/scene-gl'
 import { applyWindFields, setParticleFlowPaused, setWindOverlaysVisible, stopParticleFlow } from './windFieldLayer'
 
 interface MapViewProps {
@@ -36,7 +36,7 @@ interface MapViewProps {
   /** کلیک روی گوی نشانگر سه‌بعدی — انتخاب نقطه (null = بستن گیمبال). */
   onPointPick?: (target: EditTarget | null) => void
   /** کلیک برداشتنیِ «افزودن چک‌پوینت» در ۳بعدی که مختصات نداد — بازخورد. */
-  onPickMiss?: () => void
+  onPickMiss?: (kind: PickMissKind) => void
 }
 
 const ROUTE_SOURCE_ID = 'route-line'

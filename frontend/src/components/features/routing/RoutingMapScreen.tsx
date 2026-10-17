@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type maplibregl from 'maplibre-gl'
 import { MapView } from '../map/MapView'
-import type { EditTarget } from '../../../three/manual/scene-gl'
+import type { EditTarget, PickMissKind } from '../../../three/manual/scene-gl'
 import { WindSpeedLegend } from '../layers/WindSpeedLegend'
 import { MobileBottomSheet } from '../../layout/MobileBottomSheet'
 import { usePathfinding } from '../../../hooks/usePathfinding'
@@ -160,7 +160,7 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
   // را برای کاربر و دیباگ می‌شکند؛ ثبت: «#n ثبت شد»، شکست برداشت:
   // «اینجا قابل برداشت نیست».
   const [cpFlash, setCpFlash] = useState<
-    { kind: 'ok'; n: number } | { kind: 'miss' } | null
+    { kind: 'ok'; n: number } | { kind: 'miss'; reason: PickMissKind } | null
   >(null)
   const cpFlashTimerRef = useRef<number | null>(null)
   const scheduleCpFlashClear = (ms: number): void => {
@@ -185,8 +185,8 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
 
   // کلیک برداشتنیِ «افزودن چک‌پوینت» در ۳بعدی که مختصات نداد (بیرون باندِ
   // پذیرش/پرتو به دشت نرسید) — بازخورد صریح، نه بی‌صدایی.
-  function handlePlacingMiss() {
-    setCpFlash({ kind: 'miss' })
+  function handlePlacingMiss(kind: PickMissKind) {
+    setCpFlash({ kind: 'miss', reason: kind })
     scheduleCpFlashClear(2400)
   }
 
@@ -335,18 +335,18 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
           // کافی نبود؛ کاربر نمی‌فهمید باید روی خودِ نقشه کلیک کند.
           <div
             role="status"
-            className="absolute top-28 left-1/2 z-20 w-max max-w-[94vw] -translate-x-1/2 rounded-xl border border-accent/50 bg-accent/15 px-3 py-2 text-xs font-medium text-accent shadow-[var(--shadow-card)] backdrop-blur-sm"
+            className="absolute bottom-24 left-1/2 z-20 w-max max-w-[94vw] -translate-x-1/2 rounded-xl border border-accent/50 bg-accent/15 px-3 py-2 text-xs font-medium text-accent shadow-[var(--shadow-card)] backdrop-blur-sm"
           >
             {t('routing.checkpointPlacingHint')}
           </div>
         )}
         {cpFlash && (
-          // بازخورد لحظه‌ای ثبت/شکست چک‌پوینت — زیرِ راهنمای «کلیک کنید»
-          // (اگر مسلح است) یا در همان جای آن (ثبت شده — حالت از ریکرد) —
-          // هر دو حالت با اختلاف کم نشسته‌اند تا بی‌سکوت نباشد.
+          // بازخورد لحظه‌ای ثبت/شکست چک‌پوینت — پایینِ وسط (بالای راهنمای
+          // مسلح؛ زیرِ بنر ویزارد نمی‌نشیند) — «هیچ‌چیز نشد» بی‌سکوت
+          // را برای کاربر و دیباگ می‌شکند.
           <div
             role="status"
-            className={`absolute ${placingCheckpoint ? 'top-40' : 'top-28'} left-1/2 z-20 w-max max-w-[94vw] -translate-x-1/2 rounded-xl border px-3 py-2 text-xs font-medium shadow-[var(--shadow-card)] backdrop-blur-sm ${
+            className={`absolute ${placingCheckpoint ? 'bottom-36' : 'bottom-24'} left-1/2 z-20 w-max max-w-[94vw] -translate-x-1/2 rounded-xl border px-3 py-2 text-xs font-medium shadow-[var(--shadow-card)] backdrop-blur-sm ${
               cpFlash.kind === 'ok'
                 ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
                 : 'border-amber-500/60 bg-amber-500/15 text-amber-300'
@@ -354,7 +354,9 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
           >
             {cpFlash.kind === 'ok'
               ? t('routing.checkpointPlaced', { n: cpFlash.n })
-              : t('routing.checkpointPickMiss')}
+              : cpFlash.reason === 'sky'
+                ? t('routing.checkpointPickMissSky')
+                : t('routing.checkpointPickMissOutside')}
           </div>
         )}
         {routeError && (
