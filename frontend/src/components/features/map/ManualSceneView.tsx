@@ -21,6 +21,8 @@ interface ManualSceneViewProps {
   onPointEdit?: (target: EditTarget, coord: Coordinate) => void
   /** کلیک روی گوی نشانگر (انتخاب نقطه) — null = کلیک خالی (بستن گیمبال). */
   onPointPick?: (target: EditTarget | null) => void
+  /** کلیک برداشتنیِ «افزودن چک‌پوینت» که مختصات نداد — بازخورد به کاربر. */
+  onPickMiss?: () => void
   onMapClick: (coord: Coordinate) => void
 }
 
@@ -44,16 +46,17 @@ export function ManualSceneView({
   onPointEdit,
   onPointPick,
   onMapClick,
+  onPickMiss,
 }: ManualSceneViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sceneRef = useRef<Manual3DScene | null>(null)
   // آخرین داده‌ها در ref — boot ناهمگام پس از initTerrain آخرین وضعیت را
   // می‌گیرد و اثر داده هم هر تغییر را به صحنهٔ آماده اعمال می‌کند.
   const dataRef = useRef({ origin, destination, checkpoints, path3d, windFields, showArrows, paused })
-  const handlersRef = useRef({ onMapClick, onPointEdit, onPointPick, editTarget })
+  const handlersRef = useRef({ onMapClick, onPointEdit, onPointPick, onPickMiss, editTarget })
   useEffect(() => {
     dataRef.current = { origin, destination, checkpoints, path3d, windFields, showArrows, paused }
-    handlersRef.current = { onMapClick, onPointEdit, onPointPick, editTarget }
+    handlersRef.current = { onMapClick, onPointEdit, onPointPick, onPickMiss, editTarget }
   })
 
   const applyData = (): void => {
@@ -80,6 +83,7 @@ export function ManualSceneView({
     const scene = new Manual3DScene(canvas)
     sceneRef.current = scene
     scene.onMapClick = (lat, lon) => handlersRef.current.onMapClick({ lat, lon })
+    scene.onPickMiss = () => handlersRef.current.onPickMiss?.()
     scene.onPointEdit = (target, coord) => handlersRef.current.onPointEdit?.(target, coord)
     scene.onPointPick = (target) => handlersRef.current.onPointPick?.(target)
     const boot = async (): Promise<void> => {

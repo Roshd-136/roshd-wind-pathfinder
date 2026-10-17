@@ -333,6 +333,8 @@ export class Manual3DScene {
   private lastRouteKey = ''
   /** کلیک بدون کشیدن — به صفحهٔ بالادست (مبدأ/مقصد/اطلاعات نقطه). */
   onMapClick: ((lat: number, lon: number) => void) | null = null
+  /** کلیک برداشتنیِ «افزودن چک‌پوینت» که مختصات نداد — برای بازخوردِ بی‌سکوت. */
+  onPickMiss: (() => void) | null = null
 
   // ————— ویرایشگر نقطه (گیمبال) —————
   /** هدف فعال ویرایش؛ null = گیمبال پنهان. */
@@ -1033,6 +1035,7 @@ export class Manual3DScene {
     if (!this.dragMoved && this.onMapClick) {
       const hit = this.pickLatLon(e.clientX, e.clientY)
       if (hit) this.onMapClick(hit.lat, hit.lon)
+      else if (this.placingPoint) this.onPickMiss?.()
     }
   }
 

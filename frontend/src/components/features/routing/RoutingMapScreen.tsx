@@ -156,6 +156,20 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
   // چک‌پوینتِ بی‌ارتفاع همان‌جا روی زمین می‌نشیند؛ ارتفاع عبور را اگر
   // خواست، بعداً با گیمبالِ همان نقطه بالا می‌کشد.
   const [placingCheckpoint, setPlacingCheckpoint] = useState(false)
+  // بازخورد لحظه‌ای ثبت/شکست چک‌پوینت — «هیچ اتفاقی نیفتاد» بی‌سکوت
+  // را برای کاربر و دیباگ می‌شکند؛ ثبت: «#n ثبت شد»، شکست برداشت:
+  // «اینجا قابل برداشت نیست».
+  const [cpFlash, setCpFlash] = useState<
+    { kind: 'ok'; n: number } | { kind: 'miss' } | null
+  >(null)
+  const cpFlashTimerRef = useRef<number | null>(null)
+  const scheduleCpFlashClear = (ms: number): void => {
+    if (cpFlashTimerRef.current) window.clearTimeout(cpFlashTimerRef.current)
+    cpFlashTimerRef.current = window.setTimeout(
+      () => setCpFlash(null),
+      ms,
+    )
+  }
 
   // نشانگر متقاطع روی بوم نقشه در حالت افزودن چک‌پوینت — کاربر باید بفهمد
   // کلیک بعدی «یک حالت خاص» را ثبت می‌کند. (بوم ۳بعدی افق جدید را از
@@ -167,6 +181,23 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
     return () => {
       canvas.style.cursor = ''
     }
+  }, [placingCheckpoint])
+
+  // کلیک برداشتنیِ «افزودن چک‌پوینت» در ۳بعدی که مختصات نداد (بیرون باندِ
+  // پذیرش/پرتو به دشت نرسید) — بازخورد صریح، نه بی‌صدایی.
+  function handlePlacingMiss() {
+    setCpFlash({ kind: 'miss' })
+    scheduleCpFlashClear(2400)
+  }
+
+  // خروج از حالت افزودن با Esc — مثل همهٔ حالت‌های «کلیک بعدی»
+  useEffect(() => {
+    if (!placingCheckpoint) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setPlacingCheckpoint(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [placingCheckpoint])
 
   // ————— ویرایشگر نقطه در صحنهٔ سه‌بعدی (گیمبال سه‌محوره) —————
@@ -198,6 +229,8 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
   function handleMapClick(coord: Coordinate) {
     if (placingCheckpoint) {
       addCheckpoint(coord)
+      setCpFlash({ kind: 'ok', n: checkpoints.length + 1 })
+      scheduleCpFlashClear(1600)
       setPlacingCheckpoint(false)
       return
     }
@@ -275,6 +308,7 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
           placingPoint={placingCheckpoint}
           onPointEdit={handlePointEdit}
           onPointPick={handlePointPick}
+          onPickMiss={handlePlacingMiss}
         />
         {visibleFields.length > 0 && (
           // راهنمای سرعت باد — وسط پایین و پهن، دور از زوم و انتساب.
@@ -304,6 +338,23 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
             className="absolute top-28 left-1/2 z-20 w-max max-w-[94vw] -translate-x-1/2 rounded-xl border border-accent/50 bg-accent/15 px-3 py-2 text-xs font-medium text-accent shadow-[var(--shadow-card)] backdrop-blur-sm"
           >
             {t('routing.checkpointPlacingHint')}
+          </div>
+        )}
+        {cpFlash && (
+          // بازخورد لحظه‌ای ثبت/شکست چک‌پوینت — زیرِ راهنمای «کلیک کنید»
+          // (اگر مسلح است) یا در همان جای آن (ثبت شده — حالت از ریکرد) —
+          // هر دو حالت با اختلاف کم نشسته‌اند تا بی‌سکوت نباشد.
+          <div
+            role="status"
+            className={`absolute ${placingCheckpoint ? 'top-40' : 'top-28'} left-1/2 z-20 w-max max-w-[94vw] -translate-x-1/2 rounded-xl border px-3 py-2 text-xs font-medium shadow-[var(--shadow-card)] backdrop-blur-sm ${
+              cpFlash.kind === 'ok'
+                ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
+                : 'border-amber-500/60 bg-amber-500/15 text-amber-300'
+            }`}
+          >
+            {cpFlash.kind === 'ok'
+              ? t('routing.checkpointPlaced', { n: cpFlash.n })
+              : t('routing.checkpointPickMiss')}
           </div>
         )}
         {routeError && (

@@ -35,6 +35,8 @@ interface MapViewProps {
   onPointEdit?: (target: EditTarget, coord: Coordinate) => void
   /** کلیک روی گوی نشانگر سه‌بعدی — انتخاب نقطه (null = بستن گیمبال). */
   onPointPick?: (target: EditTarget | null) => void
+  /** کلیک برداشتنیِ «افزودن چک‌پوینت» در ۳بعدی که مختصات نداد — بازخورد. */
+  onPickMiss?: () => void
 }
 
 const ROUTE_SOURCE_ID = 'route-line'
@@ -492,7 +494,7 @@ function MapLibreView({
  */
 function MapView3D({
   origin, destination, checkpoints = [], path3d, windFields = [],
-  viewport, onMapClick, paused = false, editTarget = null, placingPoint, onPointEdit, onPointPick,
+  viewport, onMapClick, paused = false, editTarget = null, placingPoint, onPointEdit, onPointPick, onPickMiss,
 }: MapViewProps) {
   const has3dPath = Boolean(path3d && path3d.length > 1)
   return (
@@ -510,6 +512,7 @@ function MapView3D({
           placingPoint={placingPoint}
           onPointEdit={onPointEdit}
           onPointPick={onPointPick}
+          onPickMiss={onPickMiss}
           onMapClick={onMapClick}
         />
       ) : (
