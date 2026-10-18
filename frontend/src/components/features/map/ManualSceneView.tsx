@@ -50,6 +50,7 @@ export function ManualSceneView({
 }: ManualSceneViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sceneRef = useRef<Manual3DScene | null>(null)
+  const labelsRef = useRef<HTMLDivElement>(null)
   // آخرین داده‌ها در ref — boot ناهمگام پس از initTerrain آخرین وضعیت را
   // می‌گیرد و اثر داده هم هر تغییر را به صحنهٔ آماده اعمال می‌کند.
   const dataRef = useRef({ origin, destination, checkpoints, path3d, windFields, showArrows, paused })
@@ -86,6 +87,7 @@ export function ManualSceneView({
     scene.onPickMiss = (kind) => handlersRef.current.onPickMiss?.(kind)
     scene.onPointEdit = (target, coord) => handlersRef.current.onPointEdit?.(target, coord)
     scene.onPointPick = (target) => handlersRef.current.onPointPick?.(target)
+    scene.onMarkerScreens = (dots) => syncMarkerLabels(labelsRef.current, dots)
     const boot = async (): Promise<void> => {
       try {
         await scene.initTerrain()
@@ -139,7 +141,53 @@ export function ManualSceneView({
     scene.placingPoint = placingPoint
   }, [placingPoint])
 
-  return <canvas ref={canvasRef} className="h-full w-full touch-none" aria-label="3d scene" role="application" />
+  return (
+    <div className="relative h-full w-full">
+      <canvas ref={canvasRef} className="h-full w-full touch-none" aria-label="3d scene" role="application" />
+      {/* برچسب‌های عددیِ چک‌پوینت — همگامِ هر فریم با گوی‌های صحنه */}
+      <div ref={labelsRef} className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true" />
+    </div>
+  )
+}
+
+/** موقعیتِ صفحه‌ایِ یک گوی نشانگر — از کال‌بکِ هرفریمِ صحنه. */
+type MarkerScreenDot = { target: EditTarget; x: number; y: number; behind: boolean; rPx: number }
+
+/** همگام‌سازیِ دستورالعملیِ برچسب‌های عددیِ چک‌پوینت روی لایهٔ DOM.
+ * هر فریم صدا می‌شود؛ عمداً بدون setState تا رندرِ React در حلقهٔ ۶۰fps
+ * نیفتد. برچسب کمی بالای گوی می‌نشیند و پشتِ دوربین/بیرونِ کادر پنهان است. */
+function syncMarkerLabels(layer: HTMLElement | null, dots: MarkerScreenDot[]): void {
+  if (!layer) return
+  const wanted = new Map<string, MarkerScreenDot>()
+  for (const d of dots) {
+    if (d.target.kind !== 'checkpoint') continue
+    wanted.set(`cp-${d.target.index}`, d)
+  }
+  for (const el of Array.from(layer.children) as HTMLElement[]) {
+    const key = el.dataset.key
+    if (!key || !wanted.has(key)) el.remove()
+  }
+  for (const [key, d] of wanted) {
+    let el = layer.querySelector<HTMLElement>(`[data-key="${key}"]`)
+    if (!el) {
+      el = document.createElement('div')
+      el.dataset.key = key
+      el.textContent = `#${d.target.index + 1}`
+      el.className =
+        'absolute rounded-full border border-amber-400/70 bg-slate-900/85 px-1.5 text-[10px] font-bold leading-4 text-amber-200'
+      layer.appendChild(el)
+    }
+    const off = d.behind || d.x < -30 || d.x > layer.clientWidth + 30 || d.y < -30 || d.y > layer.clientHeight + 30
+    if (off) {
+      el.style.display = 'none'
+      continue
+    }
+    el.style.display = 'block'
+    el.style.left = `${d.x}px`
+    // کمی بالاتر از گوی — rPx شعاعِ صفحه‌ایِ گوی است
+    el.style.top = `${Math.max(0, d.y - d.rPx - 6)}px`
+    el.style.transform = 'translate(-50%, -100%)'
+  }
 }
 
 /** مختصات (و ارتفاع ذخیره‌شده) هدف گیمبال از دادهٔ فعلی صفحه. */

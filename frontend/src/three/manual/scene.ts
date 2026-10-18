@@ -640,84 +640,58 @@ export function buildMarkerDot(
   const cz = (altM / 1000) * VERTICAL_EXAGGERATION + radiusKm * 0.8
   const [r, g, b] = hexToRgb(colorHex)
 
-  // رأس‌های ایکوزاهدرون — دو حلقهٔ پنج‌ضلعی + دو قطب
-  const t = (1 + Math.sqrt(5)) / 2
-  const raw: Array<[number, number, number]> = [
-    [-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0],
-    [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t],
-    [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1],
-  ]
-  const vertexCount = raw.length
-  const positions = new Float32Array(vertexCount * 3)
-  const colors = new Float32Array(vertexCount * 3)
-  for (let v = 0; v < vertexCount; v += 1) {
-    const [vx, vy, vz] = raw[v]
-    const norm = Math.hypot(vx, vy, vz)
-    positions[v * 3] = cx + (vx / norm) * radiusKm
-    positions[v * 3 + 1] = cy + (vy / norm) * radiusKm
-    positions[v * 3 + 2] = cz + (vz / norm) * radiusKm
-    // روشن‌تر رو به بالا — حجم گوی خوانده شود
-    const shade = 0.75 + 0.35 * (vz / norm)
-    colors[v * 3] = Math.min(r * shade, 1)
-    colors[v * 3 + 1] = Math.min(g * shade, 1)
-    colors[v * 3 + 2] = Math.min(b * shade, 1)
-  }
-
-  // هر رأس به دو نزدیک‌ترین وصل می‌شود — مثلث‌بندی سادهٔ محدب کافی است
-  const edges: Array<[number, number]> = []
-  const seen = new Set<string>()
-  for (let a = 0; a < vertexCount; a += 1) {
-    const dists: Array<{ b: number; d: number }> = []
-    for (let bv = 0; bv < vertexCount; bv += 1) {
-      if (bv === a) continue
-      const dx = positions[a * 3] - positions[bv * 3]
-      const dy = positions[a * 3 + 1] - positions[bv * 3 + 1]
-      const dz = positions[a * 3 + 2] - positions[bv * 3 + 2]
-      dists.push({ b: bv, d: dx * dx + dy * dy + dz * dz })
-    }
-    dists.sort((p, q) => p.d - q.d)
-    for (const { b } of dists.slice(0, 2)) {
-      const key = a < b ? `${a}:${b}` : `${b}:${a}`
-      if (!seen.has(key)) {
-        seen.add(key)
-        edges.push(a < b ? [a, b] : [b, a])
-      }
-    }
-  }
-
-  // مثلث‌بندی: هر یال + نزدیک‌ترین رأس سوم — مجموعهٔ مثلث‌های یکتا
-  const triKeys = new Set<string>()
+  // کرهٔ کاملِ UV (حلقه‌های عرضی × قطعات طولی) با سایه‌پردازیِ جهت‌دار —
+  // نسخهٔ قبلی ۱۲ رأسِ ایکوزاهدرون با «اتصال به دو نزدیک‌ترین» بود که شکلِ
+  // له‌شده و نامنظم می‌ساخت («نقاط کرهٔ درست نیستند»).
+  const segments = 16
+  const rings = 10
+  const positions: number[] = []
+  const colors: number[] = []
   const indices: number[] = []
-  for (const [a, b] of edges) {
-    const dx = positions[a * 3] - positions[b * 3]
-    const dy = positions[a * 3 + 1] - positions[b * 3 + 1]
-    const dz = positions[a * 3 + 2] - positions[b * 3 + 2]
-    const edgeLen2 = dx * dx + dy * dy + dz * dz
-    let bestC = -1
-    let bestD = Infinity
-    for (let cv = 0; cv < vertexCount; cv += 1) {
-      if (cv === a || cv === b) continue
-      const dxa = positions[cv * 3] - positions[a * 3]
-      const dya = positions[cv * 3 + 1] - positions[a * 3 + 1]
-      const dza = positions[cv * 3 + 2] - positions[a * 3 + 2]
-      const dxb = positions[cv * 3] - positions[b * 3]
-      const dyb = positions[cv * 3 + 1] - positions[b * 3 + 1]
-      const dzb = positions[cv * 3 + 2] - positions[b * 3 + 2]
-      const da = dxa * dxa + dya * dya + dza * dza
-      const db = dxb * dxb + dyb * dyb + dzb * dzb
-      const d = da + db
-      if (d < bestD && d < edgeLen2 * 2.2) {
-        bestD = d
-        bestC = cv
-      }
+  // نورِ ثابت از جنوبِ شرقیِ بالا — حجمِ کره از هر زاویه خوانده شود
+  const lightLen = Math.hypot(0.45, -0.35, 0.82)
+  const lx = 0.45 / lightLen
+  const ly = -0.35 / lightLen
+  const lz = 0.82 / lightLen
+  for (let ring = 0; ring <= rings; ring += 1) {
+    const phi = (Math.PI * ring) / rings
+    const nz = Math.cos(phi)
+    const rxy = Math.sin(phi)
+    for (let s = 0; s <= segments; s += 1) {
+      const th = (2 * Math.PI * s) / segments
+      const nx = rxy * Math.cos(th)
+      const ny = rxy * Math.sin(th)
+      positions.push(cx + nx * radiusKm, cy + ny * radiusKm, cz + nz * radiusKm)
+      const lambert = Math.max(0, nx * lx + ny * ly + nz * lz)
+      const shade = 0.45 + 0.62 * lambert
+      colors.push(Math.min(r * shade, 1), Math.min(g * shade, 1), Math.min(b * shade, 1))
     }
-    if (bestC < 0) continue
-    const lo = Math.min(a, b, bestC)
-    const mid = [a, b, bestC].filter((v) => v !== lo).sort((p, q) => p - q)
-    const key = `${lo}:${mid[0]}:${mid[1]}`
-    if (triKeys.has(key)) continue
-    triKeys.add(key)
-    indices.push(lo, mid[0], mid[1])
   }
-  return { positions, colors, indices: new Uint32Array(indices) }
+  for (let ring = 0; ring < rings; ring += 1) {
+    for (let s = 0; s < segments; s += 1) {
+      const a = ring * (segments + 1) + s
+      const bRow = a + segments + 1
+      indices.push(a, bRow, a + 1, bRow, bRow + 1, a + 1)
+    }
+  }
+
+  // ساقهٔ باریکِ متقاطع از سطحِ لنگر تا مرکز گوی — گویِ تنها در نمای دور
+  // گم می‌شد؛ ساقه راهنمای دیداری «این نقطه کجا لنگر افتاده» می‌دهد.
+  const stemW = radiusKm * 0.22
+  const zBase = cz - radiusKm * 0.8
+  const stemColor = [r * 0.85, g * 0.85, b * 0.85]
+  const stemQuad = (ax: 'x' | 'y'): void => {
+    const base = positions.length / 3
+    if (ax === 'x') {
+      positions.push(cx - stemW, cy, zBase, cx + stemW, cy, zBase, cx - stemW, cy, cz, cx + stemW, cy, cz)
+    } else {
+      positions.push(cx, cy - stemW, zBase, cx, cy + stemW, zBase, cx, cy - stemW, cz, cx, cy + stemW, cz)
+    }
+    for (let v = 0; v < 4; v += 1) colors.push(stemColor[0], stemColor[1], stemColor[2])
+    // CULL_FACE در این رندرر فعال نیست — یک winding برای هر دو سو کافی است
+    indices.push(base, base + 1, base + 2, base + 1, base + 3, base + 2)
+  }
+  stemQuad('x')
+  stemQuad('y')
+  return { positions: new Float32Array(positions), colors: new Float32Array(colors), indices: new Uint32Array(indices) }
 }

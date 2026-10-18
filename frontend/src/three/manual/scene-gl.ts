@@ -380,6 +380,13 @@ export class Manual3DScene {
   /** کلیک روی گوی نشانگر — صفحه باید گیمبال را روی همان نقطه بنشاند. */
   onPointPick: ((target: EditTarget | null) => void) | null = null
 
+  /** موقعیتِ صفحه‌ایِ گوی‌های نشانگر در پایان هر فریم — لایهٔ DOMِ برچسبِ
+   * اعدادِ چک‌پوینت را همگام می‌کند (بدون رندرِ مجددِ React؛ همگام‌سازیِ
+   * دستورالعملی). `behind` یعنی پشتِ دوربین است و برچسب باید پنهان شود. */
+  onMarkerScreens:
+    | ((dots: Array<{ target: EditTarget; x: number; y: number; behind: boolean; rPx: number }>) => void)
+    | null = null
+
   /**
    * حالت «افزودن چک‌پوینت» — رابط کاربری روشنش می‌کند و کلیک بعدیِ خالیِ
    * دشت از `onMapClick` به‌عنوان نقطهٔ چک‌پوینت ثبت می‌شود. در این حالت
@@ -517,7 +524,7 @@ export class Manual3DScene {
     this.markerMeshes = []
     this.markerDots = []
     // شعاع گوی متناسب با فاصلهٔ دوربین (≈ ۱٪ پوشش دید) — کف ۰٫۹ ک.م برای نزدیک
-    this.markerDotRadiusKm = Math.max(MARKER_DOT_RADIUS_KM, this.camDist * 0.012)
+    this.markerDotRadiusKm = Math.max(MARKER_DOT_RADIUS_KM, this.camDist * 0.018)
     const markers: Array<{ lat: number; lon: number; color: string; alt?: number; target: EditTarget }> = []
     if (options.origin) markers.push({ ...options.origin, color: '#22c55e', target: { kind: 'origin', index: -1 } })
     if (options.destination) markers.push({ ...options.destination, color: '#ef4444', target: { kind: 'destination', index: -1 } })
@@ -720,6 +727,29 @@ export class Manual3DScene {
       }
       gl.enable(gl.DEPTH_TEST)
       gl.uniform1f(this.uOpacity, 1)
+    }
+    // — برچسب‌های DOMِ اعدادِ چک‌پوینت — موقعیتِ صفحه‌ایِ هر گوی در این فریم
+    if (this.onMarkerScreens) {
+      const refDot = this.markerDots[0]
+      const rPx = refDot
+        ? this.screenLenPx(refDot.posKm, [
+            refDot.posKm[0] + this.markerDotRadiusKm,
+            refDot.posKm[1],
+            refDot.posKm[2],
+          ])
+        : 0
+      this.onMarkerScreens(
+        this.markerDots.map((dot) => {
+          const sp = this.projectToScreen(dot.posKm)
+          return {
+            target: dot.target,
+            x: sp?.x ?? 0,
+            y: sp?.y ?? 0,
+            behind: !sp || sp.behind,
+            rPx,
+          }
+        }),
+      )
     }
   }
 
