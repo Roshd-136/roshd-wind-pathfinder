@@ -32,6 +32,10 @@ import {
 } from './scene'
 import type { Coordinate, Coordinate3D, WindField } from '../../types/routing'
 import { chaikinSmoothXYZ } from '../../utils/geometry'
+// سقفِ ارتفاعِ پرواز — همان مرزِ بالاترین باندِ لایهٔ باد؛ موتور مسیر در
+// قفل‌های بالاتر از این «مسیر عبوری ندارد» (زمین ناهوار) رد می‌کند، پس
+// کشیدنِ محور ارتفاع را همین‌جا به قلمروِ معتبر محدود می‌کنیم.
+import { WIND_ALTITUDE_MAX } from '../../config/routing'
 
 /** حاشیهٔ پذیرش برخوردِ واقعی با سطح زمین (ک.م) — کلیک روی خودِ نوار. */
 const MARCH_PICK_PAD_KM = 8
@@ -358,8 +362,14 @@ export class Manual3DScene {
   private editPosKm: Vec3 | null = null
   /** آخرین گزارش drop — برای شناختن «اکوی» همان جابه‌جایی در setEditTarget. */
   private lastEditReport: { target: EditTarget; lat: number; lon: number } | null = null
+  /** ارتفاعِ سفارشیِ هدفِ ویرایش (از آخرین setEditTarget) — درگِ افقی نباید
+   * سطحِ پروازی که کاربر با محورِ «ارتفاع» گذاشته بود را پاک کند؛ قبلاً
+   * میرفت و گوی بی‌بهانه به زمین می‌چسبید. */
+  private editPriorAltM: number | undefined = undefined
   /** محور در حال کشیدن. */
   private dragAxis: GizmoAxis | null = null
+  /** فاصلهٔ دوربین هنگام آخرین بازسازیِ گیمبال — برای گاززدنِ بازسازیِ wheel. */
+  private lastGizmoDist = 0
   /** پیکان زیر نشانگر — برای هایلایت هاور. */
   private hoverAxis: GizmoAxis | null = null
   /** مش‌های گیمبال — هر تغییر بازسازی می‌شوند (سبک‌اند). */
@@ -512,8 +522,18 @@ export class Manual3DScene {
         const spanKm = Math.max(maxX - minX, maxY - minY, 8)
         // کمی فاصلهٔ اضافه تا مسیر کامل با حاشیه در کادر بنشیند
         const dist = Math.min(Math.max(spanKm * 1.15, 25), 600)
-        this.camTarget = [cx, cy, this.camTarget[2]]
-        this.camDist = dist
+        // دوربینِ دست‌کاری‌شده فقط با اجبارِ واقعی تکان می‌خورد: مرکزِ مسیر
+        // تازه خیلی بیرونِ دید رفته یا مسیر خیلی بزرگ‌تر از دید است.
+        // قبلاً هر recalc دوربین را یکجا yank می‌کرد و حسِ گسست می‌داد؛
+        // recalcِ کوچک (CP نزدیک) صحنه را سرِ جایش نگه می‌دارد.
+        const halfView = Math.tan(FOV_RAD / 2) * this.camDist * 1.5
+        const farFromView =
+          Math.hypot(cx - this.camTarget[0], cy - this.camTarget[1]) > halfView ||
+          spanKm > halfView * 2.4
+        if (!this.userMoved || (routeChanged && farFromView)) {
+          this.camTarget = [cx, cy, this.camTarget[2]]
+          this.camDist = dist
+        }
       }
     }
     // گوی‌های نشانگر — مبدأ/مقصد/چک‌پوینت مثل «نقطه» (نه ستون/خط)
@@ -623,6 +643,10 @@ export class Manual3DScene {
     this.camDist = Math.max(this.frame.widthKm, this.frame.heightKm) * 0.95
     this.camYaw = -Math.PI / 4
     this.camPitch = 0.95
+    // کاربر نمای «کادر» را با دکمهٔ صریح خواسته — دیگر «دست‌کاری‌شده» نیست
+    // تا recalcهای بعدی بتوانند دوربین را سرِ جا بگذارند (قبلاً یک‌بار
+    // userMoved می‌رفت و دیگر هیچگاه reset نمی‌شد)
+    this.userMoved = false
   }
 
   private cameraEye(): Vec3 {
@@ -634,10 +658,47 @@ export class Manual3DScene {
     ]
   }
 
+  /** کشِ MVP — دوربین/نسبتِ دید تغییر نکرده باشد بازمحاسبه نمی‌شود.
+   * قبلاً هر `projectToScreen` یک MVP کامل می‌ساخت؛ در یک فریم دهها بار
+   * (برچسب‌ها + hit-test گوی + hover شیپوری) — روی دستگاهِ ضعیف لرزش
+   * می‌داد. کال‌ها فقط می‌خوانند، پس برگرداندنِ همان آبجکت امن است. */
+  private mvpCache:
+    | { mvp: Mat4; aspect: number; yaw: number; pitch: number; dist: number; tx: number; ty: number; tz: number }
+    | null = null
+
+  /** کشِ جایگاهِ بوم روی صفحه — یکبار در هر قاب نوسازی می‌شود؛
+   * `getBoundingClientRect` هر بار فراخوانی، layout را می‌شکند (هر
+   * فریم ده‌ها بار). کهنگیِ حداکثر یک فریم (~۱۶ms) نامحسوس است. */
+  private viewRect: { left: number; top: number; width: number; height: number } | null = null
+
   private computeMVP(aspect: number): Mat4 {
+    const c = this.mvpCache
+    if (
+      c &&
+      c.aspect === aspect &&
+      c.yaw === this.camYaw &&
+      c.pitch === this.camPitch &&
+      c.dist === this.camDist &&
+      c.tx === this.camTarget[0] &&
+      c.ty === this.camTarget[1] &&
+      c.tz === this.camTarget[2]
+    ) {
+      return c.mvp
+    }
     const proj = mat4Perspective(FOV_RAD, aspect, 0.5, Math.max(this.camDist * 6, 200))
     const view = mat4LookAt(this.cameraEye(), this.camTarget, [0, 0, 1])
-    return mat4Multiply(proj, view)
+    const mvp = mat4Multiply(proj, view)
+    this.mvpCache = {
+      mvp,
+      aspect,
+      yaw: this.camYaw,
+      pitch: this.camPitch,
+      dist: this.camDist,
+      tx: this.camTarget[0],
+      ty: this.camTarget[1],
+      tz: this.camTarget[2],
+    }
+    return mvp
   }
 
   // ————— حلقهٔ رندر —————
@@ -667,6 +728,8 @@ export class Manual3DScene {
     if (!this.program || !this.terrain) return
     const gl = this.gl
     const canvas = this.canvas
+    // کشِ جایگاهِ بوم — یکبار در قاب (projectToScreen/pick همه از این می‌خوانند)
+    this.viewRect = canvas.getBoundingClientRect()
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
     const w = Math.max(1, Math.floor(canvas.clientWidth * dpr))
     const h = Math.max(1, Math.floor(canvas.clientHeight * dpr))
@@ -730,17 +793,19 @@ export class Manual3DScene {
     }
     // — برچسب‌های DOMِ اعدادِ چک‌پوینت — موقعیتِ صفحه‌ایِ هر گوی در این فریم
     if (this.onMarkerScreens) {
-      const refDot = this.markerDots[0]
-      const rPx = refDot
-        ? this.screenLenPx(refDot.posKm, [
-            refDot.posKm[0] + this.markerDotRadiusKm,
-            refDot.posKm[1],
-            refDot.posKm[2],
-          ])
-        : 0
       this.onMarkerScreens(
         this.markerDots.map((dot) => {
           const sp = this.projectToScreen(dot.posKm)
+          // شعاعِ صفحه برای هر گوی خودش — گویِ دور در نمای نزدیک عمقِ
+          // متفاوتی دارد؛ قبلاً از گویِ اول (مبدأ) وام می‌گرفت
+          const rPx =
+            sp && !sp.behind
+              ? this.screenLenPx(dot.posKm, [
+                  dot.posKm[0] + this.markerDotRadiusKm,
+                  dot.posKm[1],
+                  dot.posKm[2],
+                ])
+              : 0
           return {
             target: dot.target,
             x: sp?.x ?? 0,
@@ -794,11 +859,16 @@ export class Manual3DScene {
     this.editTarget = target
     if (!target || !coord || !this.frame || !this.terrainData) {
       this.editPosKm = null
+      this.editPriorAltM = undefined
       this.dragAxis = null
       this.hoverAxis = null
       this.rebuildGizmo()
       return
     }
+    // ارتفاعِ سفارشیِ معتبر — فقط وقتی صفحه حقیقتاً alt ذخیره‌شده دارد
+    // (نکته: صحنهٔ خودش altM از z می‌سازد و نباید اینجا قاطی شود؛ همانی
+    // که صفحه فرستاده مرجع است)
+    this.editPriorAltM = coord.alt
     const [x, y] = lonLatToKm(this.frame, coord.lon, coord.lat)
     const groundM = terrainElevationAt(this.terrainData, coord.lat, coord.lon)
     // ارتفاع هدف: مقدار ذخیره‌شده (کشیدن قبلی محور «ارتفاع») یا سطح زمین؛
@@ -819,6 +889,7 @@ export class Manual3DScene {
       gl.deleteBuffer(m.mesh.ibo)
     }
     this.gizmoMeshes = []
+    this.lastGizmoDist = this.camDist
     if (!this.editPosKm || !this.editTarget) return
     const len = Math.max(this.camDist * 0.16, GIZMO_ARROW_KM * 0.35)
     for (const spec of GIZMO_AXES) {
@@ -830,7 +901,9 @@ export class Manual3DScene {
   /** فاصلهٔ صفحه‌ای نقطهٔ صحنه تا مختصات صفحه — برای hit-test پیکان‌ها. */
   private projectToScreen(p: Vec3): { x: number; y: number; behind: boolean } | null {
     if (!this.frame) return null
-    const rect = this.canvas.getBoundingClientRect()
+    // کشِ rect — از هر فریم؛ اگر حلقه نایستاده رزرو برای اولین فراخوانی
+    // پیش از اولین رندر، یک خواندنِ مستقیم.
+    const rect = this.viewRect ?? (this.viewRect = this.canvas.getBoundingClientRect())
     if (rect.width === 0 || rect.height === 0) return null
     const mvp = this.computeMVP(rect.width / rect.height)
     const cx = mvp[0] * p[0] + mvp[4] * p[1] + mvp[8] * p[2] + mvp[12]
@@ -857,27 +930,62 @@ export class Manual3DScene {
       this.editPosKm[2],
     ])
     const hitPx = Math.max(14, lenPx * 0.22)
+    // فشار درستِ روی مبدأِ گیمبال: «کشیدنِ محور» بی‌معناست — قبلاً هر سه
+    // محور از t=0 (مبدأ مشترک) نمونه می‌گرفتند و فشارِ مرکز همیشه «شرق–غرب»
+    // را می‌گرفت و نقطه به کنار می‌پرید. مرکز = گوی/جای‌ایستادن.
+    const originSp = this.projectToScreen(this.editPosKm)
+    if (
+      originSp &&
+      !originSp.behind &&
+      Math.hypot(px - originSp.x, py - originSp.y) < Math.max(8, hitPx * 0.22)
+    ) {
+      return null
+    }
     let best: GizmoAxis | null = null
-    let bestDist = Infinity
+    let bestScore = Infinity
     for (const spec of GIZMO_AXES) {
-      const len = arrowLen
-      // نمونه‌گیری چند نقطه روی محور — نزدیک‌ترین فاصله ملاک است
-      for (let s = 0; s <= 6; s += 1) {
+      // نمونه‌گیری در طول بدنهٔ فلش — از ۱/۶ تا نوک؛ مبدأ مشترک حذف شد
+      let axisBest = Infinity
+      for (let s = 1; s <= 6; s += 1) {
         const t = s / 6
         const sp = this.projectToScreen([
-          this.editPosKm[0] + spec.dir[0] * len * t,
-          this.editPosKm[1] + spec.dir[1] * len * t,
-          this.editPosKm[2] + spec.dir[2] * len * t,
+          this.editPosKm[0] + spec.dir[0] * arrowLen * t,
+          this.editPosKm[1] + spec.dir[1] * arrowLen * t,
+          this.editPosKm[2] + spec.dir[2] * arrowLen * t,
         ])
         if (!sp || sp.behind) continue
         const d = Math.hypot(sp.x - px, sp.y - py)
-        if (d < bestDist) {
-          bestDist = d
-          best = spec.axis
+        if (d < axisBest) axisBest = d
+      }
+      if (axisBest === Infinity) continue
+      // جریمهٔ جهتنایی — فلشِ روبه‌جلوِ محورِ دیگر نباید فشارهای مایل را
+      // قاپ بدهد: جهتِ محور روی صفحه با جهتِ فشار مقایسه و امتیاز منفی
+      // هم‌جهتی نزدیک صفر بدتر رتبه‌بندی می‌شود.
+      if (originSp && !originSp.behind) {
+        const tipSp = this.projectToScreen([
+          this.editPosKm[0] + spec.dir[0] * arrowLen,
+          this.editPosKm[1] + spec.dir[1] * arrowLen,
+          this.editPosKm[2] + spec.dir[2] * arrowLen,
+        ])
+        if (tipSp && !tipSp.behind) {
+          const vx = tipSp.x - originSp.x
+          const vy = tipSp.y - originSp.y
+          const vl = Math.hypot(vx, vy)
+          const pvx = px - originSp.x
+          const pvy = py - originSp.y
+          const pl = Math.hypot(pvx, pvy)
+          if (vl > 1e-3 && pl > 1e-3) {
+            const dot = (vx / vl) * (pvx / pl) + (vy / vl) * (pvy / pl)
+            axisBest += (1 - Math.max(0, dot)) * hitPx
+          }
         }
       }
+      if (axisBest < bestScore) {
+        bestScore = axisBest
+        best = spec.axis
+      }
     }
-    return bestDist <= hitPx ? best : null
+    return bestScore <= hitPx ? best : null
   }
 
   /** طول صفحه‌ای (پیکسل) بردار صحنه‌ای — برای شعاع گرفتن مستقل از زوم. */
@@ -919,18 +1027,12 @@ export class Manual3DScene {
     this.editPosKm = [
       this.dragStartPosKm[0] + spec.dir[0] * moveKm,
       this.dragStartPosKm[1] + spec.dir[1] * moveKm,
-      Math.max(0, this.dragStartPosKm[2] + spec.dir[2] * moveKm),
+      Math.min(
+        Math.max(0, this.dragStartPosKm[2] + spec.dir[2] * moveKm),
+        (WIND_ALTITUDE_MAX / 1000) * VERTICAL_EXAGGERATION,
+      ),
     ]
     this.rebuildGizmo()
-  }
-
-  /** lat/lon (و ارتفاع، اگر روی محور «ارتفاع» کشیده شده) نهایی هدف. */
-  private editPosLatLon(): { lat: number; lon: number; altM?: number } | null {
-    if (!this.editPosKm || !this.frame) return null
-    const [lon, lat] = kmToLonLat(this.frame, this.editPosKm[0], this.editPosKm[1])
-    // ارتفاع گزارش‌شده: z اغراق‌شدهٔ صحنه → متر MSL
-    const altM = (this.editPosKm[2] / VERTICAL_EXAGGERATION) * 1000
-    return { lat, lon, altM }
   }
 
   // ————— تعامل —————
@@ -1046,33 +1148,39 @@ export class Manual3DScene {
       this.dragStartScreen = null
       this.dragStartPosKm = null
       const target = this.editTarget
-      const coord = this.editPosLatLon()
-      if (target && coord && this.onPointEdit) {
-        // اکو: این گزارش را نگه می‌داریم تا setEditTarget بعدی (همان
-        // lat/lon) موقعیت صحنه‌ای — و z کشیده‌شده — را بازننویسی کند.
-        this.lastEditReport = { target, lat: coord.lat, lon: coord.lon }
-        // محور «ارتفاع»: ارتفاع نهایی هم گزارش می‌شود؛ بقیه محورها ارتفاع
-        // هدف را تغییر نمی‌دهند (تنها جابه‌جایی افقی است). پیش‌تر گزارشِ
-        // ارتفاع به «نزدیک‌ترین سطح پرواز» اسنپ می‌شد و کاربر عملاً نمی‌
-        // توانست چک‌پوینت را وسطِ دل لایه‌ها (مثلاً ۱۸۰۰<N<۲۲۰۰) بگذارد.
-        // حالا ارتفاع آزاد است: موتور در همان ارتفاعِ دلخواه لایهٔ باد
-        // واقعی می‌سازد و مسیر دقیقاً از همان‌جا می‌گذرد. کف = زمین + ۲۰۰
-        // متر (معادل همان قید رسم صحنه) تا نشانگر زیر خارج‌نرود.
-        if (axis === 'up' && coord.altM !== undefined) {
-          // کفِ کشیدن: بیرونِ کادرِ زمین سطحِ دیدِ کاربر صفحهٔ تراز است
-          // (ارتفاعِ چسبیدهٔ لبهٔ کادر اینجا معنا ندارد)؛ کف ۲۰۰ متر.
-          const groundM =
-            this.terrainData && isInTerrainFrame(this.terrainData, coord.lat, coord.lon)
-              ? terrainElevationAt(this.terrainData, coord.lat, coord.lon)
-              : 0
-          const editTarget: EditTarget = {
-            ...target,
-            altM: Math.round(Math.max(coord.altM, groundM + 200)),
-          }
-          this.onPointEdit(editTarget, { lat: coord.lat, lon: coord.lon })
-        } else {
-          this.onPointEdit(target, { lat: coord.lat, lon: coord.lon })
+      if (target && this.editPosKm && this.frame && this.onPointEdit) {
+        // مختصاتِ خالص — بدون altM. قبلاً editPosLatLon همیشه altMِ محاسبه‌
+        // شده از z را داخل آبجکتِ coord می‌فرستاد و به آبجکتِ چک‌پوینتِ استور
+        // نشت می‌کرد؛ ارتفاعِ معنی‌دارِ صریح فقط پایین (محور ارتفاع / حفظِ
+        // ارتفاعِ سفارشی) به گزارش گره می‌خورد.
+        const [lon, lat] = kmToLonLat(this.frame, this.editPosKm[0], this.editPosKm[1])
+        const coord = { lat, lon }
+        let reportTarget: EditTarget = target
+        const groundM =
+          this.terrainData && isInTerrainFrame(this.terrainData, lat, lon)
+            ? terrainElevationAt(this.terrainData, lat, lon)
+            : 0
+        if (axis === 'up') {
+          // محور «ارتفاع»: ارتفاع نهایی = z اغراق‌شدهٔ صحنه → متر MSL؛
+          // کف = زمین + ۲۰۰ متر (معادل قید رسم صحنه) تا نشانگر زیرِ زمین نرود.
+          // پیشتر گزارشِ ارتفاع به «نزدیک‌ترین سطح پرواز» اسنپ می‌شد و کاربر
+          // عملاً نمی‌توانست چک‌پوینت را وسطِ دل لایه‌ها بگذارد — ارتفاع آزاد
+          // است؛ موتور در همان ارتفاع لایهٔ باد واقعی می‌سازد.
+          const altM = Math.round(
+            Math.max((this.editPosKm[2] / VERTICAL_EXAGGERATION) * 1000, groundM + 200),
+          )
+          reportTarget = { ...target, altM }
+        } else if (this.editPriorAltM !== undefined) {
+          // درگِ افقیِ نقطه‌ای که کاربر ارتفاعِ پروازش را تنظیم کرده — سطحِ
+          // پرواز باید بماند (فقط کفِ زمینِ مکانِ تازه رعایت شود)؛ قبلاً
+          // ارتفاع پاک می‌شد و CP بی‌صدا به زمین می‌چسبید.
+          const heldAltM = Math.round(Math.max(this.editPriorAltM, groundM + 200))
+          reportTarget = { ...target, altM: heldAltM }
         }
+        // اکو: این گزارش نگه داشته می‌شود تا setEditTarget بعدی (همان
+        // lat/lon) موقعیت صحنه‌ای — و z کشیده‌شده — را بازننویسی نکند.
+        this.lastEditReport = { target, lat: coord.lat, lon: coord.lon }
+        this.onPointEdit(reportTarget, coord)
       }
       this.canvas.style.cursor = ''
       return
@@ -1091,7 +1199,9 @@ export class Manual3DScene {
       this.onPointPick?.(null)
     }
     if (!this.dragMoved && this.onMapClick) {
-      const hit = this.pickLatLon(e.clientX, e.clientY)
+      // نقشِ پذیرش: «افزودن چک‌پوینت» دشتِ دورِ مقیاس‌شده را هم می‌گیرد؛
+      // مبدأ/مقصد با سقفِ سرانگیزِ کمتر (مبدأِ دور مسیرِ بنجل می‌سازد)
+      const hit = this.pickLatLon(e.clientX, e.clientY, this.placingPoint ? 'checkpoint' : 'anchor')
       if (hit) this.onMapClick(hit.lat, hit.lon)
       else if (this.placingPoint) this.onPickMiss?.(this.lastPickMiss ?? 'outside')
     }
@@ -1101,8 +1211,16 @@ export class Manual3DScene {
     const factor = Math.exp(e.deltaY * 0.0012)
     this.camDist = Math.min(Math.max(this.camDist * factor, 15), 900)
     this.userMoved = true
-    // گیمبال با مقیاس دوربین — فلش‌ها همیشه در اندازهٔ قابل‌گرفتن
-    if (this.editTarget) this.rebuildGizmo()
+    // بازسازی فلش‌های گیمبال فقط با تغییرِ محسوسِ فاصله (٪۳) — قبلاً هر
+    // رویدادِ wheel سه مش را از صفر می‌ساخت و دوباره در GPU می‌کاشت.
+    if (
+      this.editTarget &&
+      (this.gizmoMeshes.length === 0 ||
+        this.lastGizmoDist === 0 ||
+        Math.abs(this.camDist - this.lastGizmoDist) > this.lastGizmoDist * 0.03)
+    ) {
+      this.rebuildGizmo()
+    }
   }
 
   /**
@@ -1110,9 +1228,9 @@ export class Manual3DScene {
    * نه صفحهٔ تخت z=0؛ وگرنه کلیک روی پهنهٔ مرتفع، نقطهٔ جابه‌جاشده می‌داد.
    * ray-march + دوبخشی؛ اگر پرتو به زمین نخورد (بیرون کادر) صفحهٔ z=0.
    */
-  pickLatLon(px: number, py: number): { lat: number; lon: number } | null {
+  pickLatLon(px: number, py: number, role: 'checkpoint' | 'anchor' = 'anchor'): { lat: number; lon: number } | null {
     if (!this.frame) return null
-    const rect = this.canvas.getBoundingClientRect()
+    const rect = this.viewRect ?? (this.viewRect = this.canvas.getBoundingClientRect())
     if (rect.width === 0 || rect.height === 0) return null
     const nx = ((px - rect.left) / rect.width) * 2 - 1
     const ny = 1 - ((py - rect.top) / rect.height) * 2
@@ -1138,7 +1256,21 @@ export class Manual3DScene {
       // با «بیرون از کادر داده» رد می‌شود.
       const b = this.pickBoundsKm
       if (!b) return null
-      const pad = kind === 'plane' ? Math.max(PLANE_PICK_PAD_KM, this.camDist * 1.1) : MARCH_PICK_PAD_KM
+      // گاردِ NaN/بی‌نهایت: ماتریسِ degenerate یا پرتوِ افقیِ سرحدی
+      // قبلاً می‌توانست مختصاتِ بیمعنا بسازد که همهٔ مقایسه‌های کادر را
+      // «false» رد می‌کرد و از گیت می‌گذشت؛ حالا صریحاً مردود.
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        this.lastPickMiss = 'outside'
+        return null
+      }
+      const pad =
+        kind === 'plane'
+          ? role === 'checkpoint'
+            ? Math.max(PLANE_PICK_PAD_KM, this.camDist * 1.1)
+            // مبدأ/مقصد: دشتِ نزدیک آزاد است ولی سقفِ سرانگیزِ کمتر —
+            // مبدأِ صدها ک.م دور مسیرِ بنجلِ بلند می‌سازد و شگفتزده می‌کند
+            : Math.max(60, this.camDist * 0.4)
+          : MARCH_PICK_PAD_KM
       if (x < b.minX - pad || x > b.maxX + pad || y < b.minY - pad || y > b.maxY + pad) {
         this.lastPickMiss = 'outside'
         return null
@@ -1163,13 +1295,41 @@ export class Manual3DScene {
         if (!isInTerrainFrame(terrain, lat, lon)) return null
         return (terrainElevationAt(terrain, lat, lon) / 1000) * VERTICAL_EXAGGERATION
       }
-      const steps = 220
+      // کادرِ مطلقِ زمین (ک.م، + حاشیهٔ ۲۰ ک.م برای گذرِ دوبخشی از لبه) —
+      // پرتو مستقیم است و در هر محور یکنوا؛ اگر از کادر گذشت، دیگر هرگز
+      // برنمی‌گردد → مارش زودهنگام تمام (قبلاً تا صفحهٔ دورِ ۵۴۰۰ ک.م
+      // مارشِ بی‌ثمر می‌رفت).
+      const [ax, ay] = lonLatToKm(fr, terrain.lons[0], terrain.lats[0])
+      const [bx, by] = lonLatToKm(fr, terrain.lons[terrain.cols - 1], terrain.lats[terrain.rows - 1])
+      const gb = {
+        minX: Math.min(ax, bx) - 20, minY: Math.min(ay, by) - 20,
+        maxX: Math.max(ax, bx) + 20, maxY: Math.max(ay, by) + 20,
+      }
+      const dxRay = far[0] - near[0]
+      const dyRay = far[1] - near[1]
+      // گامِ تطبیقی ~۱ ک.م — گامِ ثابتِ ۲۲۰تایی در زومِ دور تا ~۲۴ ک.م
+      // باز می‌شد و کوهِ باریک از بینِ نمونه‌ها رد می‌شد (tunneling: کلیکِ
+      // کوه به پشتِ کوه می‌افتاد). مقیاس تا صفحهٔ z=0 — آنجا صفحهٔ تخت
+      // جایگزین مارش می‌شود و دورترش بی‌معنا.
+      let spanKm = Math.hypot(far[0] - near[0], far[1] - near[1], far[2] - near[2])
+      const dzRay = far[2] - near[2]
+      if (dzRay < -1e-9) {
+        const t0 = -near[2] / dzRay
+        if (t0 < 1) spanKm *= t0
+      }
+      const steps = Math.min(Math.max(Math.ceil(spanKm), 240), 1600)
       let tPrev = 0
       let dPrev = groundZ(at(tPrev))
       if (dPrev !== null) dPrev = at(tPrev)[2] - dPrev
       for (let i = 1; i <= steps; i += 1) {
         const t = i / steps
         const p = at(t)
+        if (
+          (p[0] < gb.minX && dxRay <= 0) || (p[0] > gb.maxX && dxRay >= 0) ||
+          (p[1] < gb.minY && dyRay <= 0) || (p[1] > gb.maxY && dyRay >= 0)
+        ) {
+          break
+        }
         const g = groundZ(p)
         const d = g === null ? null : p[2] - g
         if (dPrev !== null && d !== null && dPrev > 0 && d <= 0) {

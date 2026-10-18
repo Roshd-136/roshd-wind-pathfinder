@@ -142,7 +142,12 @@ export function isInTerrainFrame(t: TerrainData, lat: number, lon: number): bool
   )
 }
 
-/** ارتفاع زمین (متر) با درون‌یابی دوخطی — بیرون کادر لبه‌ای کلیپ می‌شود. */
+/** ارتفاع زمین (متر) داخلِ کادر با درون‌یابی دوخطی.
+ * ⚠️ بیرونِ کادر، مقدارِ **لبه‌چسبانده** برمی‌گرداند — این «فلاتِ خیالی»
+ * یک زمانی پرتوِ برداشت را به برخوردِ خیالیِ دور می‌کشید و CPِ «جایی
+ * دیگر» می‌ساخت. کدِ برداشت/لنگرِ جدید از `elevationInFrame` استفاده
+ * کند؛ این تابع فقط برای نمونه‌هایی بماند که درون‌کادری بودنشان تضمین
+ * شده (نوکِ مسیر، نقاطِ شبکهٔ باد). */
 export function terrainElevationAt(t: TerrainData, lat: number, lon: number): number {
   const { lats, lons, elev, rows, cols } = t
   const latStep = lats[1] - lats[0]
@@ -158,6 +163,13 @@ export function terrainElevationAt(t: TerrainData, lat: number, lon: number): nu
   const e01 = elev[(y0 + 1) * cols + x0]
   const e11 = elev[(y0 + 1) * cols + x0 + 1]
   return e00 * (1 - tx) * (1 - ty) + e10 * tx * (1 - ty) + e01 * (1 - tx) * ty + e11 * tx * ty
+}
+
+/** ارتفاع زمین بدون دروغِ لبه‌چسبانده: بیرونِ کادرِ داده `null` می‌دهد
+ * (کدِ لنگرِ نشانگر و برخوردِ پرتو از همین استفاده می‌کند). */
+export function elevationInFrame(t: TerrainData, lat: number, lon: number): number | null {
+  if (!isInTerrainFrame(t, lat, lon)) return null
+  return terrainElevationAt(t, lat, lon)
 }
 
 /** رنگ رمپ زمین از نرمال‌شدهٔ ارتفاع. */
@@ -541,68 +553,6 @@ export function layerLabel(altitudeM: number): string {
 }
 
 // ————— ستون نشانگر مبدأ/مقصد — پین عمودیِ صحنهٔ مسیریابی —————
-
-export interface PillarMesh {
-  positions: Float32Array
-  colors: Float32Array
-  indices: Uint32Array
-}
-
-const PILLAR_RADIUS_KM = 0.55
-const PILLAR_HEIGHT_KM = 6
-
-/**
- * ستون عمودی ۸ضلعی (پین) از زمین تا بالای لایه‌های باد — مبدأ سبز، مقصد
- * قرمز، چک‌پوینت کهربایی. مثل صحنهٔ مسیریابی: نشانگرها همیشه در «هوا»
- * دیده می‌شوند، نه نقطه‌ای چسبیده به زمین.
- */
-export function buildMarkerPillar(
-  frame: SceneFrame,
-  terrain: TerrainData,
-  lat: number,
-  lon: number,
-  colorHex: string,
-): PillarMesh {
-  const [x, y] = lonLatToKm(frame, lon, lat)
-  const groundM = terrainElevationAt(terrain, lat, lon)
-  const z0 = (groundM / 1000) * VERTICAL_EXAGGERATION
-  // PILLAR_HEIGHT_KM بر حسب کیلومتر صحنه است — بدون تقسیم بر ۱۰۰۰
-  const z1 = z0 + PILLAR_HEIGHT_KM * VERTICAL_EXAGGERATION * 0.12
-  const [r, g, b] = hexToRgb(colorHex)
-  const sides = 8
-  const positions = new Float32Array((sides + 1) * 2 * 3)
-  const colors = new Float32Array((sides + 1) * 2 * 3)
-  for (let ring = 0; ring < 2; ring += 1) {
-    const z = ring === 0 ? z0 : z1
-    for (let s = 0; s <= sides; s += 1) {
-      const ang = (s / sides) * Math.PI * 2
-      const vi = (ring * (sides + 1) + s) * 3
-      positions[vi] = x + Math.cos(ang) * PILLAR_RADIUS_KM
-      positions[vi + 1] = y + Math.sin(ang) * PILLAR_RADIUS_KM
-      positions[vi + 2] = z
-      // کم‌رنگ به سمت زمین — پین نرم دیده می‌شود
-      const shade = ring === 0 ? 0.55 : 1
-      colors[vi] = r * shade
-      colors[vi + 1] = g * shade
-      colors[vi + 2] = b * shade
-    }
-  }
-  const indices = new Uint32Array(sides * 6)
-  let ptr = 0
-  for (let s = 0; s < sides; s += 1) {
-    const a = s
-    const b = s + 1
-    const c = sides + 1 + s
-    const d = sides + 1 + s + 1
-    indices[ptr++] = a
-    indices[ptr++] = c
-    indices[ptr++] = b
-    indices[ptr++] = b
-    indices[ptr++] = c
-    indices[ptr++] = d
-  }
-  return { positions, colors, indices }
-}
 
 // ————— نقطهٔ نشانگر (گوی) — مبدأ/مقصد/چک‌پوینت مثل «نقطه» دیده می‌شوند —————
 
