@@ -1,9 +1,13 @@
 /**
  * ماتریس‌های ۴×۴ و بردارهای سه‌بعدی — پیاده‌سازی دستی (بدون کتابخانه).
  *
- * قرارداد ماتریس: ردیف‌محور (row-major)، اعمال ستونیِ بردارهای ستونی —
- * یعنی m41→x وترونهٔ z معکوس (راست‌دست). همه با آرایهٔ تخت Float32Array
- * طول ۱۶ تا بارگذاری در بافر GPU بدون کپی ممکن باشد.
+ * قرارداد ماتریس: **ستون‌محور (column-major)** — مثل OpenGL/GLSL. یعنی
+ * عناصر ۱۲..۱۴ (انتقال) ستونِ چهارم‌اند و بردارِ محورِ x ماتریسِ view در
+ * عناصر ۰..۲ می‌نشیند. ضرب بردارها ستونی است: v′ = M·v با
+ * out[col*4+row]. همه با آرایهٔ تخت Float32Array طول ۱۶ تا بارگذاری
+ * مستقیم در بافر GPU ممکن باشد. (نسخهٔ قبلیِ سرصفحه به‌اشتباه
+ * «ردیف‌محور» می‌گفت — همان سردرگمی که در اولین نوشتنِ invertMat4
+ * باگِ دائمیِ پرتوِ برداشت ساخت.)
  */
 
 export type Vec3 = [number, number, number]
@@ -33,13 +37,20 @@ export function mat4LookAt(eye: Vec3, target: Vec3, up: Vec3): Mat4 {
   let zx = eye[0] - target[0]
   let zy = eye[1] - target[1]
   let zz = eye[2] - target[2]
-  let len = Math.hypot(zx, zy, zz) || 1
-  zx /= len; zy /= len; zz /= len
+  const zLen = Math.hypot(zx, zy, zz)
+  if (zLen < 1e-8) {
+    // eye == target — محورِ دید بی‌تعریف است؛ به‌جای ماتریسِ صفر/NaN
+    // (قبلاً «hypot || 1» بی‌سروصدا مبنا را صفر می‌کرد)، نگاه به بالا
+    // فرض می‌شود — خروجیِ قطعی و بدون NaN.
+    zx = 0; zy = 0; zz = 1
+  } else {
+    zx /= zLen; zy /= zLen; zz /= zLen
+  }
   // x = up × z
   let xx = up[1] * zz - up[2] * zy
   let xy = up[2] * zx - up[0] * zz
   let xz = up[0] * zy - up[1] * zx
-  len = Math.hypot(xx, xy, xz)
+  let len = Math.hypot(xx, xy, xz)
   if (len < 1e-8) {
     // up موازی z — up جایگزین
     const alt: Vec3 = Math.abs(up[2]) > 0.9 ? [1, 0, 0] : [0, 1, 0]
@@ -162,7 +173,10 @@ export function invertMat4(m: Mat4): Mat4 {
   }
   const det = m[0] * C[0] + m[4] * C[1] + m[8] * C[2] + m[12] * C[3]
   const out = new Float32Array(16)
-  if (det === 0) return out
+  // آستانهٔ نسبی نه تساویِ دقیق: ماتریسِ نزدیک به منفرد (det ~ 1e-15)
+  // وارونِ غولآسا و پر از نوفه میداد که بعداً به‌صورت مختصاتِ آشفته
+  // ظاهر می‌شد. آستانه‌ی سخنگوی واحد صحنه (کیلومتر) کافی و امن است.
+  if (Math.abs(det) < 1e-12) return out
   // وارون = ضمیمه/دترینم؛ ضمیمه در همین نگاشتِ ستون‌محور، هم‌اندیس با
   // کوفاکتورهاست (out[row=r,col=c] = C[r][c]/det) — نه جابه‌جاییِ حافظه‌ای.
   for (let i = 0; i < 16; i += 1) out[i] = C[i] / det
