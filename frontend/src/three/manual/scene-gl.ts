@@ -19,6 +19,7 @@ import {
   buildRouteTube,
   buildTerrainTiles,
   buildWindArrows,
+  isInTerrainFrame,
   kmToLonLat,
   lonLatToKm,
   makeFrame,
@@ -372,6 +373,10 @@ export class Manual3DScene {
   // ————— انتخاب نقطه با کلیک (روی گوی نشانگر) —————
   /** مکان صحنه‌ای هر گوی نشانگر — برای hit-test کلیک. */
   private markerDots: Array<{ target: EditTarget; posKm: Vec3 }> = []
+  /** شعاع رسم گوی (ک.م) — با فاصلهٔ دوربین مقیاس می‌گیرد تا در نمای دور هم
+   * گویِ «روی چه کلیک کرده» خوانا بماند (شعاع ثابت ۰٫۹ ک.م در دوربینِ دبین
+   * ~۴ پیکسل می‌شد و نامرئیِ مؤثر بود). */
+  private markerDotRadiusKm = MARKER_DOT_RADIUS_KM
   /** کلیک روی گوی نشانگر — صفحه باید گیمبال را روی همان نقطه بنشاند. */
   onPointPick: ((target: EditTarget | null) => void) | null = null
 
@@ -511,17 +516,21 @@ export class Manual3DScene {
     }
     this.markerMeshes = []
     this.markerDots = []
+    // شعاع گوی متناسب با فاصلهٔ دوربین (≈ ۱٪ پوشش دید) — کف ۰٫۹ ک.م برای نزدیک
+    this.markerDotRadiusKm = Math.max(MARKER_DOT_RADIUS_KM, this.camDist * 0.012)
     const markers: Array<{ lat: number; lon: number; color: string; alt?: number; target: EditTarget }> = []
     if (options.origin) markers.push({ ...options.origin, color: '#22c55e', target: { kind: 'origin', index: -1 } })
     if (options.destination) markers.push({ ...options.destination, color: '#ef4444', target: { kind: 'destination', index: -1 } })
     ;(options.checkpoints ?? []).forEach((cp, i) => markers.push({ ...cp, color: '#f59e0b', target: { kind: 'checkpoint', index: i } }))
     for (const mk of markers) {
-      const dot = buildMarkerDot(frame, this.terrainData as TerrainData, mk.lat, mk.lon, mk.color, undefined, mk.alt)
+      const dot = buildMarkerDot(frame, this.terrainData as TerrainData, mk.lat, mk.lon, mk.color, this.markerDotRadiusKm, mk.alt)
       this.markerMeshes.push(uploadIndexed(gl, dot.positions, dot.colors, dot.indices, gl.TRIANGLES))
       const [x, y] = lonLatToKm(frame, mk.lon, mk.lat)
       const groundM = terrainElevationAt(this.terrainData as TerrainData, mk.lat, mk.lon)
-      // ارتفاع گوی: ذخیره‌شده (کشیدن محور «ارتفاع») یا سطح زمین
-      const altM = mk.alt ?? groundM
+      // ارتفاع گوی: ذخیره‌شده (کشیدن محور «ارتفاع») یا سطح زمین؛ بیرونِ
+      // کادرِ زمین سطحِ دیدِ کاربر همان صفحهٔ تراز است (نه ارتفاعِ چسبیدهٔ
+      // لبهٔ کادر) تا گوی دقیقاً زیرِ محلِ کلیک دیده شود.
+      const altM = mk.alt ?? (isInTerrainFrame(this.terrainData as TerrainData, mk.lat, mk.lon) ? groundM : 0)
       this.markerDots.push({
         target: mk.target,
         posKm: [x, y, (altM / 1000) * VERTICAL_EXAGGERATION],
@@ -762,8 +771,10 @@ export class Manual3DScene {
     }
     const [x, y] = lonLatToKm(this.frame, coord.lon, coord.lat)
     const groundM = terrainElevationAt(this.terrainData, coord.lat, coord.lon)
-    // ارتفاع هدف: مقدار ذخیره‌شده (کشیدن قبلی محور «ارتفاع») یا سطح زمین
-    const altM = coord.alt ?? groundM
+    // ارتفاع هدف: مقدار ذخیره‌شده (کشیدن قبلی محور «ارتفاع») یا سطح زمین؛
+    // بیرونِ کادرِ زمین سطحِ دیدِ کاربر همان صفحهٔ تراز است (نه ارتفاعِ
+    // چسبیدهٔ لبه) تا گیزمو روی خودِ گوی بنشیند نه بالای آن.
+    const altM = coord.alt ?? (isInTerrainFrame(this.terrainData, coord.lat, coord.lon) ? groundM : 0)
     this.editPosKm = [x, y, (altM / 1000) * VERTICAL_EXAGGERATION]
     this.dragAxis = null
     this.hoverAxis = null
@@ -931,7 +942,7 @@ export class Manual3DScene {
     // شعاع گرفتن = شعاع رسم گوی روی صفحه + حاشیه؛ کف ۱۸px برای نمای خیلی دور
     const refDot = this.markerDots[0]
     const dotPx = this.screenLenPx(refDot.posKm, [
-      refDot.posKm[0] + MARKER_DOT_RADIUS_KM,
+      refDot.posKm[0] + this.markerDotRadiusKm,
       refDot.posKm[1],
       refDot.posKm[2],
     ])
@@ -1018,9 +1029,12 @@ export class Manual3DScene {
         // واقعی می‌سازد و مسیر دقیقاً از همان‌جا می‌گذرد. کف = زمین + ۲۰۰
         // متر (معادل همان قید رسم صحنه) تا نشانگر زیر خارج‌نرود.
         if (axis === 'up' && coord.altM !== undefined) {
-          const groundM = this.terrainData
-            ? terrainElevationAt(this.terrainData, coord.lat, coord.lon)
-            : 0
+          // کفِ کشیدن: بیرونِ کادرِ زمین سطحِ دیدِ کاربر صفحهٔ تراز است
+          // (ارتفاعِ چسبیدهٔ لبهٔ کادر اینجا معنا ندارد)؛ کف ۲۰۰ متر.
+          const groundM =
+            this.terrainData && isInTerrainFrame(this.terrainData, coord.lat, coord.lon)
+              ? terrainElevationAt(this.terrainData, coord.lat, coord.lon)
+              : 0
           const editTarget: EditTarget = {
             ...target,
             altM: Math.round(Math.max(coord.altM, groundM + 200)),
@@ -1109,25 +1123,34 @@ export class Manual3DScene {
         near[1] + t * (far[1] - near[1]),
         near[2] + t * (far[2] - near[2]),
       ]
-      const groundZ = (p: Vec3): number => {
+      const groundZ = (p: Vec3): number | null => {
         const [lon, lat] = kmToLonLat(fr, p[0], p[1])
+        // بیرونِ کادرِ داده «بدون زمین» است — نه فلاتِ ادامه‌دارِ ارتفاعِ لبه
+        // (terrainElevationAt بیرون را به لبه می‌چسباند)؛ وگرنه پرتوِ برداشت
+        // با دشتِ بی‌انتها که در رندر اصلاً رسم نمی‌شود برخورد می‌کرد و
+        // کلیکِ دشتِ اطراف در زوم، برخوردِ خیالیِ دور و ردِ «بیرون از کادر»
+        // می‌داد. null یعنی این نمونه زمین ندارد و پرتو از آن رد می‌شود.
+        if (!isInTerrainFrame(terrain, lat, lon)) return null
         return (terrainElevationAt(terrain, lat, lon) / 1000) * VERTICAL_EXAGGERATION
       }
       const steps = 220
       let tPrev = 0
-      let dPrev = at(tPrev)[2] - groundZ(at(tPrev))
+      let dPrev = groundZ(at(tPrev))
+      if (dPrev !== null) dPrev = at(tPrev)[2] - dPrev
       for (let i = 1; i <= steps; i += 1) {
         const t = i / steps
         const p = at(t)
-        const d = p[2] - groundZ(p)
-        if (dPrev > 0 && d <= 0) {
+        const g = groundZ(p)
+        const d = g === null ? null : p[2] - g
+        if (dPrev !== null && d !== null && dPrev > 0 && d <= 0) {
           // عبور از سطح — دوبخشی بین tPrev و t
           let lo = tPrev
           let hi = t
           for (let k = 0; k < 24; k += 1) {
             const mid = (lo + hi) / 2
             const pm = at(mid)
-            if (pm[2] - groundZ(pm) > 0) lo = mid
+            const gm = groundZ(pm)
+            if (gm === null || pm[2] - gm > 0) lo = mid
             else hi = mid
           }
           const hit = at((lo + hi) / 2)

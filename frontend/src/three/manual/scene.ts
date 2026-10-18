@@ -131,6 +131,17 @@ export function parseTerrainCsv(text: string): TerrainData {
   return { lats, lons, elev, rows, cols }
 }
 
+/** آیا (lat,lon) داخل کادر دادهٔ زمین است؟ بیرون کادر، سطحِ دیدِ کاربر
+ * «صفحهٔ تراز» است (نه سطح لبهٔ کادر) و لنگرها باید روی همان بنشینند. */
+export function isInTerrainFrame(t: TerrainData, lat: number, lon: number): boolean {
+  return (
+    lat >= t.lats[0] &&
+    lat <= t.lats[t.rows - 1] &&
+    lon >= t.lons[0] &&
+    lon <= t.lons[t.cols - 1]
+  )
+}
+
 /** ارتفاع زمین (متر) با درون‌یابی دوخطی — بیرون کادر لبه‌ای کلیپ می‌شود. */
 export function terrainElevationAt(t: TerrainData, lat: number, lon: number): number {
   const { lats, lons, elev, rows, cols } = t
@@ -620,8 +631,12 @@ export function buildMarkerDot(
 ): DotMesh {
   const [cx, cy] = lonLatToKm(frame, lon, lat)
   const groundM = terrainElevationAt(terrain, lat, lon)
-  // ارتفاع گوی: مقدار صریح (ارتفاع ذخیره‌شدهٔ نقطه) یا سطح زمین
-  const altM = altOverrideM ?? groundM
+  // ارتفاع گوی: مقدار صریح (ارتفاع ذخیره‌شدهٔ نقطه) یا سطح زمین. بیرونِ
+  // کادرِ زمین، terrainElevationAt به لبه می‌چسبد و گوی روی «ستونِ خیالی»
+  // ارتفاعِ لبه می‌نشیند — با پارالاکس جایی دیگر از محل کلیک دیده می‌شد
+  // («نقطهٔ انتخاب‌شده روی چیزی که کلیک کردم نیست»). سطحِ واقعیِ آنجا
+  // برای کاربر همان صفحهٔ تراز است که کلیک رویش اتفاق افتاده.
+  const altM = altOverrideM ?? (isInTerrainFrame(terrain, lat, lon) ? groundM : 0)
   const cz = (altM / 1000) * VERTICAL_EXAGGERATION + radiusKm * 0.8
   const [r, g, b] = hexToRgb(colorHex)
 
