@@ -187,9 +187,11 @@ export function PathInfoPanel({
             <div
               className="h-2.5 w-full rounded-full ring-1 ring-border"
               style={{
+                // توقف‌های میانی همان گامای رمپ در windFight.ts — پس طیف‌نما
+                // دقیقاً همان رنگی است که خط/لوله به خود می‌گیرد.
                 background: isRtl
-                  ? 'linear-gradient(to left, #f8fafc, #dc2626)'
-                  : 'linear-gradient(to right, #f8fafc, #dc2626)',
+                  ? 'linear-gradient(to left, #ffffff, #eb8383 20%, #e66262 40%, #e24a4a 60%, #df3636 80%, #dc2626)'
+                  : 'linear-gradient(to right, #ffffff, #eb8383 20%, #e66262 40%, #e24a4a 60%, #df3636 80%, #dc2626)',
               }}
               aria-hidden
             />

@@ -111,8 +111,15 @@ export function computeFightProfile(
 export const FIGHT_RED: [number, number, number] = [220, 38, 38]
 
 /** سفید → سرخ: ۰٪ سفیدِ خالص، ۱۰۰٪ سرخ (بیرونِ بازه کلیپ می‌شود). */
+/** گامای perceptual رمپ — توزیعِ اطلاعاتِ مسیرِ همسوباد در ۰..۳۰٪ متراکم
+ * است در حالی که مسیرِ «کمینه زمان» عمداً همسوی باد می‌خزد؛ خطیِ سفید↔سرخ
+ * آن سهم‌ها را عملاً نامرئی می‌کرد (۱۰٪ = ۲۳۳ آبی). با گاما ۰٫۳۵ حتی ۳٪
+ * هم (245,191,191) می‌شود و گذرِ رنگ از همان سهم‌های کم خواناست.
+ * سر و تهِ رمپ فی می‌ماند: سفید خالص ۰٪، سرخ کامل ۱۰۰٪. */
+const FIGHT_RAMP_GAMMA = 0.35
+
 export function whiteToRed(pct: number): [number, number, number] {
-  const t = Math.min(Math.max(pct, 0), 100) / 100
+  const t = Math.pow(Math.min(Math.max(pct, 0), 100) / 100, FIGHT_RAMP_GAMMA)
   return [
     Math.round(255 + (FIGHT_RED[0] - 255) * t),
     Math.round(255 + (FIGHT_RED[1] - 255) * t),

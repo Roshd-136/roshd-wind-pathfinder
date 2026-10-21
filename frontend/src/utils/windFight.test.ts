@@ -148,8 +148,12 @@ describe('whiteToRed', () => {
     expect(whiteToRed(0)).toEqual([255, 255, 255])
     expect(whiteToRed(100)).toEqual([220, 38, 38])
   })
-  it('میانه ≈ میانگینِ خطی', () => {
-    expect(whiteToRed(50)).toEqual([238, 147, 147])
+  it('منحنی گاما — میانه به (228,85,85) می‌رسد', () => {
+    expect(whiteToRed(50)).toEqual([228, 85, 85])
+  })
+  it('سهم‌های کم هم پیدادارند (سرخیِ قابل‌دید در ۵٪)', () => {
+    expect(whiteToRed(5)[1]).toBeLessThan(190)
+    expect(whiteToRed(30)[1]).toBeLessThan(120)
   })
   it('خارج از بازه کلیپ می‌شود', () => {
     expect(whiteToRed(-5)).toEqual([255, 255, 255])
