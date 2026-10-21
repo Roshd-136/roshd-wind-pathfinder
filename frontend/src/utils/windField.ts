@@ -46,6 +46,8 @@ interface GridMeta {
   lonStep: number
 }
 
+export type { GridMeta }
+
 /** محورهای شبکهٔ میدان را از خود بردارها استخراج می‌کند (فرض: شبکهٔ منظم). */
 export function gridMeta(field: WindField): GridMeta {
   const lats = [...new Set(field.vectors.map((v) => v.lat))].sort((a, b) => a - b)
@@ -71,25 +73,26 @@ export function sampleWindAtPoint(
   field: WindField,
   lat: number,
   lon: number,
+  meta?: GridMeta,
 ): { speed_mps: number; direction_deg: number } {
-  const meta = gridMeta(field)
-  const latMin = meta.lats[0]
-  const lonMin = meta.lons[0]
-  const fx = (lon - lonMin) / meta.lonStep
-  const fy = (lat - latMin) / meta.latStep
-  const col = Math.min(Math.max(fx, 0), meta.lons.length - 1)
-  const row = Math.min(Math.max(fy, 0), meta.lats.length - 1)
+  const m = meta ?? gridMeta(field)
+  const latMin = m.lats[0]
+  const lonMin = m.lons[0]
+  const fx = (lon - lonMin) / m.lonStep
+  const fy = (lat - latMin) / m.latStep
+  const col = Math.min(Math.max(fx, 0), m.lons.length - 1)
+  const row = Math.min(Math.max(fy, 0), m.lats.length - 1)
   const c0 = Math.floor(col)
   const r0 = Math.floor(row)
-  const c1 = Math.min(c0 + 1, meta.lons.length - 1)
-  const r1 = Math.min(r0 + 1, meta.lats.length - 1)
+  const c1 = Math.min(c0 + 1, m.lons.length - 1)
+  const r1 = Math.min(r0 + 1, m.lats.length - 1)
   const tx = col - c0
   const ty = row - r0
 
-  const v00 = lookupVector(field, meta, r0, c0)
-  const v01 = lookupVector(field, meta, r0, c1)
-  const v10 = lookupVector(field, meta, r1, c0)
-  const v11 = lookupVector(field, meta, r1, c1)
+  const v00 = lookupVector(field, m, r0, c0)
+  const v01 = lookupVector(field, m, r0, c1)
+  const v10 = lookupVector(field, m, r1, c0)
+  const v11 = lookupVector(field, m, r1, c1)
 
   const lerp = (a: number, b: number, t: number) => a + t * (b - a)
   // جهت باد زاویهٔ دایره‌ای است — درون‌یابی خطی روی ۰/۳۶۰ غلط می‌دهد

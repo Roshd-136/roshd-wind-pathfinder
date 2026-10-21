@@ -79,6 +79,9 @@
     "collapsePanel": "Hide panel",
     "openPanel": "Show control panel",
     "demoRoute": "Demo route — computed on real station data (no backend)",
+    "fightLegendTitle": "Wind fight along the route",
+    "fightZero": "0% with the wind",
+    "fightHundred": "100% against the wind",
     "resetFilters": "Reset filters"
   },
   "legend": {

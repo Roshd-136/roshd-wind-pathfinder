@@ -32,6 +32,7 @@ import {
 } from './scene'
 import type { Coordinate, Coordinate3D, WindField } from '../../types/routing'
 import { chaikinSmoothXYZ } from '../../utils/geometry'
+import { cumulativeFractions, fightAtFraction, whiteToRed01 } from '../../utils/windFight'
 // سقفِ ارتفاعِ پرواز — همان مرزِ بالاترین باندِ لایهٔ باد؛ موتور مسیر در
 // قفل‌های بالاتر از این «مسیر عبوری ندارد» (زمین ناهوار) رد می‌کند، پس
 // کشیدنِ محور ارتفاع را همین‌جا به قلمروِ معتبر محدود می‌کنیم.
@@ -274,6 +275,9 @@ export interface Manual3DSceneOptions {
   destination?: Coordinate | null
   /** چک‌پوینت‌ها — ممکن است alt (ارتفاع MSL متر) داشته باشند. */
   checkpoints?: Array<Coordinate & { alt?: number }>
+  /** درصد مقابله با باد برای هر نقطهٔ مسیر (هم‌طولِ path3d) — رنگِ لوله؛
+   * null/ناموجود = رنگِ ثابت سفیدِ قبلی. */
+  fightProfile?: number[] | null
 }
 
 // ————— ویرایشگر نقطه (گیمبال سه‌محوره) —————
@@ -501,7 +505,22 @@ export class Manual3DScene {
       // سنجاق‌های مبدأ/مقصد سر جایشان بمانند.
       const rounded = chaikinSmoothXYZ(pts, 2)
       const spline = smoothRoute(rounded, SPLINE_SAMPLES)
-      const tube = buildRouteTube(spline, ROUTE_TUBE_RADIUS_KM)
+      // رنگ‌آمیزیِ مقابله با باد — هر حلقهٔ لوله از کسرِ فاصله‌اش در مسیر،
+      // درصدِ مقابله را از پروفایلِ نقاطِ اصلی می‌گیرد (سفید ۰٪ تا سرخ ۱۰۰٪).
+      // ناهم‌طولیِ پروفایل با مسیر (نتیجهٔ کهنه) بدونِ رنگ است تا مسیرِ غلط
+      // رنگی نشود.
+      const profileLen = options.path3d.length
+      const profile =
+        options.fightProfile && options.fightProfile.length === profileLen
+          ? options.fightProfile
+          : null
+      const pathFracs = profile ? cumulativeFractions(options.path3d) : null
+      const tube =
+        profile && pathFracs
+          ? buildRouteTube(spline, ROUTE_TUBE_RADIUS_KM, undefined, undefined, (f) =>
+              whiteToRed01(fightAtFraction(profile, pathFracs, f)),
+            )
+          : buildRouteTube(spline, ROUTE_TUBE_RADIUS_KM)
       this.routeMesh = uploadIndexed(gl, tube.positions, tube.colors, tube.indices, gl.TRIANGLES)
 
       // مرکزِ نما = مسیر، نه مبدأ: اگر کاربر دوربین را نسوده — یا مسیر عوض

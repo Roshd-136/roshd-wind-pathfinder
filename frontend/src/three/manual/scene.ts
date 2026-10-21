@@ -366,6 +366,9 @@ export function buildRouteTube(
   radiusKm = ROUTE_TUBE_RADIUS_KM,
   sides = ROUTE_TUBE_SIDES,
   color: [number, number, number] = ROUTE_COLOR,
+  /** رنگِ هر حلقه بر حسب کسرِ فاصله (۰..۱) — رنگ‌آمیزیِ مقابله با باد؛
+   * بدونِ آن رنگِ واحدِ `color` مثل قبل. */
+  ringColorAt?: (fraction: number) => [number, number, number],
 ): TubeMesh {
   const n = spline.length
   const ringCount = Math.min(Math.max(Math.floor(n / 4), 40), 160)
@@ -431,10 +434,12 @@ export function buildRouteTube(
       positions[vi] = p.x + normal[0] * cx + binormal[0] * cy
       positions[vi + 1] = p.y + normal[1] * cx + binormal[1] * cy
       positions[vi + 2] = p.z + normal[2] * cx + binormal[2] * cy
+      // سایهٔ لامبرتیِ سبک روی رنگِ حلقه (رنگ مقابله با باد یا رنگ واحد)
+      const ringColor = ringColorAt ? ringColorAt(ring / (ringCount - 1)) : color
       const shade = 0.82 + 0.18 * (Math.cos(ang) * 0.5 + 0.5)
-      colors[vi] = color[0] * shade
-      colors[vi + 1] = color[1] * shade
-      colors[vi + 2] = color[2] * shade
+      colors[vi] = ringColor[0] * shade
+      colors[vi + 1] = ringColor[1] * shade
+      colors[vi + 2] = ringColor[2] * shade
     }
   }
   let ptr = 0

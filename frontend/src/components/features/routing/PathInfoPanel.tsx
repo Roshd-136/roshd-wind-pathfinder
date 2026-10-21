@@ -15,6 +15,7 @@ import {
 } from '../../../config/routing'
 import { formatAltitudeM, formatDistanceKm, formatDurationHours } from '../../../utils/format'
 import { useFormatLang } from '../../../hooks/useFormatLang'
+import { useSettingsStore } from '../../../store/useSettingsStore'
 import { Button } from '../../ui/Button'
 import { Card } from '../../ui/Card'
 import { Collapsible } from '../../ui/Collapsible'
@@ -83,6 +84,9 @@ export function PathInfoPanel({
   void canClear
   const { t } = useTranslation()
   const lang = useFormatLang()
+  // جهتِ چیدمانِ طیف‌نما — در فارسی (راست‌به‌چپ) نقطهٔ شروعِ سفید، راست است.
+  const language = useSettingsStore((s) => s.language)
+  const isRtl = language === 'fa'
 
   const altitudeMode = altitudeModeOf(layerVisibility)
   const band = altitudeBandRange(altitudeMode)
@@ -171,6 +175,27 @@ export function PathInfoPanel({
                 {formatAltitudeM(result.layer_altitude_m, lang)}
               </div>
               <div className="text-xs text-text-muted">{t('results.layerAltitude')}</div>
+            </div>
+          </div>
+          {/* طیف‌نمای «مقابله با باد» — زیرِ سه مقدارِ جزئیات. همین رمپ
+              (سفید ۰٪ همسو با باد تا سرخ ۱۰۰٪ روبه‌باد کامل) رنگِ خط/لولهٔ
+              مسیر را در هر دو نما می‌سازد. */}
+          <div className="mt-3 border-t border-border pt-2">
+            <p className="mb-1 text-center text-[10px] font-medium text-text-secondary">
+              {t('routing.fightLegendTitle')}
+            </p>
+            <div
+              className="h-2.5 w-full rounded-full ring-1 ring-border"
+              style={{
+                background: isRtl
+                  ? 'linear-gradient(to left, #f8fafc, #dc2626)'
+                  : 'linear-gradient(to right, #f8fafc, #dc2626)',
+              }}
+              aria-hidden
+            />
+            <div className="mt-1 flex justify-between text-[10px] text-text-muted">
+              <span>{t('routing.fightZero')}</span>
+              <span>{t('routing.fightHundred')}</span>
             </div>
           </div>
         </div>
