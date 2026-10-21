@@ -81,7 +81,7 @@
     "demoRoute": "Demo route — computed on real station data (no backend)",
     "fightLegendTitle": "Wind fight along the route",
     "fightZero": "0% with the wind",
-    "fightHundred": "100% against the wind",
+    "fightHundred": "100% wind resistance",
     "resetFilters": "Reset filters"
   },
   "legend": {

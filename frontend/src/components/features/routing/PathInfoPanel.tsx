@@ -1,4 +1,4 @@
-import { RefreshCw } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type {
   Algorithm,
@@ -143,7 +143,7 @@ export function PathInfoPanel({
           title={t('routing.resetFilters')}
           aria-label={t('routing.resetFilters')}
         >
-          <RefreshCw size={14} aria-hidden />
+          <Trash2 size={14} aria-hidden />
         </Button>
       </div>
 
