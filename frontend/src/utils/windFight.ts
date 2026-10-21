@@ -107,30 +107,60 @@ export function computeFightProfile(
   return out
 }
 
-/** سرخِ انتهای رمپ — ۱۰۰٪ روبه‌باد. */
-export const FIGHT_RED: [number, number, number] = [220, 38, 38]
+/** طیفِ مقابله — ColorBrewer RdYlBu معکوس: آبیِ تیره (۰٪ همسوباد) تا سرخِ عمیق
+ * (۱۰۰٪ روبه‌باد کامل). گذر آبی→فیروزه→زرد→نارنجی→سرخ تغییرهای کوچک را در
+ * «فام» نشان میدهد نه فقط روشنایی — روی زمین سبز و نقشه روشن از هر زاویه پیداست. */
+export const FIGHT_RED: [number, number, number] = [165, 0, 38]
 
-/** سفید → سرخ: ۰٪ سفیدِ خالص، ۱۰۰٪ سرخ (بیرونِ بازه کلیپ می‌شود). */
-/** گامای perceptual رمپ — توزیعِ اطلاعاتِ مسیرِ همسوباد در ۰..۳۰٪ متراکم
- * است در حالی که مسیرِ «کمینه زمان» عمداً همسوی باد می‌خزد؛ خطیِ سفید↔سرخ
- * آن سهم‌ها را عملاً نامرئی می‌کرد (۱۰٪ = ۲۳۳ آبی). با گاما ۰٫۳۵ حتی ۳٪
- * هم (245,191,191) می‌شود و گذرِ رنگ از همان سهم‌های کم خواناست.
- * سر و تهِ رمپ فی می‌ماند: سفید خالص ۰٪، سرخ کامل ۱۰۰٪. */
-const FIGHT_RAMP_GAMMA = 0.35
+/** گامای perception — توزیعِ مقابله روی مسیرهای «کمینه زمان» در ۰..۳۰٪ متراکم
+ * است و سرعتِ پیمایشِ طیف در آن بخش باید بالا باشد؛ وگرنه کریدورِ همسوباد
+ * تمامافتادگیِ آبیِ یکدست میشود. سر و تهِ طیف فی میماند = دو برچسبِ طیفنما. */
+export const FIGHT_RAMP_GAMMA = 0.35
 
-export function whiteToRed(pct: number): [number, number, number] {
-  const t = Math.pow(Math.min(Math.max(pct, 0), 100) / 100, FIGHT_RAMP_GAMMA)
+const FIGHT_STOPS: ReadonlyArray<readonly [number, [number, number, number]]> = [
+  [0, [49, 54, 149]],
+  [10, [69, 117, 180]],
+  [20, [116, 173, 209]],
+  [30, [171, 217, 233]],
+  [40, [224, 243, 248]],
+  [50, [255, 255, 191]],
+  [60, [254, 224, 144]],
+  [70, [253, 174, 97]],
+  [80, [244, 109, 67]],
+  [90, [215, 48, 39]],
+  [100, [165, 0, 38]],
+]
+
+/** رنگِ مقابله روی طیف — ٪۰↔۱۰۰ کلیپ میشود؛ درون‌یابیِ خطیِ بین توقفهای فام. */
+export function fightColor(pct: number): [number, number, number] {
+  const u = Math.pow(Math.min(Math.max(pct, 0), 100) / 100, FIGHT_RAMP_GAMMA) * 100
+  let k = 0
+  while (k < FIGHT_STOPS.length - 2 && u > FIGHT_STOPS[k + 1][0]) k += 1
+  const [p0, c0] = FIGHT_STOPS[k]
+  const [p1, c1] = FIGHT_STOPS[k + 1]
+  const t = p1 === p0 ? 0 : Math.min(Math.max((u - p0) / (p1 - p0), 0), 1)
   return [
-    Math.round(255 + (FIGHT_RED[0] - 255) * t),
-    Math.round(255 + (FIGHT_RED[1] - 255) * t),
-    Math.round(255 + (FIGHT_RED[2] - 255) * t),
+    Math.round(c0[0] + (c1[0] - c0[0]) * t),
+    Math.round(c0[1] + (c1[1] - c0[1]) * t),
+    Math.round(c0[2] + (c1[2] - c0[2]) * t),
   ]
 }
 
-/** مثل `whiteToRed` ولی خروجیِ شناور ۰..۱ — مصرفِ مستقیمِ GL (لولهٔ سه‌بعدی). */
-export function whiteToRed01(pct: number): [number, number, number] {
-  const [r, g, b] = whiteToRed(pct)
-  return [r / 255, g / 255, b / 255]
+/** مثل `fightColor` ولی خروجیِ شناور ۰..۱ — مصرفِ مستقیمِ GL (لولهٔ سه‌بعدی). */
+export function fightColor01(pct: number): [number, number, number] {
+  const c = fightColor(pct)
+  return [c[0] / 255, c[1] / 255, c[2] / 255]
+}
+
+/**
+ * گرادیانِ CSS طیفنما از تابعِ همان رمپ ساخته میشود تا رنگِ میله دقیقاً همان
+ * رنگی باشد که خط/لوله خود را از آن میگیرند؛ توقفها هر ۲٪ — چون گاما در فضای
+ * ورودی ناهموار است، فاصلههای کم خطای CSS-lerp را صفر میکند.
+ */
+export function fightLegendGradientCss(isRtl: boolean): string {
+  const colors: string[] = []
+  for (let p = 0; p <= 100; p += 2) colors.push(`${rgbCss(fightColor(p))} ${p}%`)
+  return `linear-gradient(to ${isRtl ? 'left' : 'right'}, ${colors.join(', ')})`
 }
 
 /** CSS رنگ RGB تصادفی‌نشده. */

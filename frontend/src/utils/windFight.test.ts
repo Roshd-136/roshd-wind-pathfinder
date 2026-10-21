@@ -5,12 +5,13 @@ import {
   computeFightProfile,
   cumulativeFractions,
   fightAtFraction,
+  fightColor,
+  fightColor01,
+  fightLegendGradientCss,
   fightPercent,
   nearestField,
   rgbCss,
   segmentBearingRad,
-  whiteToRed,
-  whiteToRed01,
 } from './windFight'
 
 /** میدان همگن — همهٔ بردارها یک جهت/سرعت دارند (تست‌های خوانا). */
@@ -143,29 +144,39 @@ describe('computeFightProfile', () => {
   })
 })
 
-describe('whiteToRed', () => {
-  it('دو سرِ رمپ سفید و سرخ است', () => {
-    expect(whiteToRed(0)).toEqual([255, 255, 255])
-    expect(whiteToRed(100)).toEqual([220, 38, 38])
+describe('fightColor', () => {
+  it('دو سرِ طیف: آبیِ تیره (همسوباد) و سرخِ عمیق (روبه‌باد)', () => {
+    expect(fightColor(0)).toEqual([49, 54, 149])
+    expect(fightColor(100)).toEqual([165, 0, 38])
   })
-  it('منحنی گاما — میانه به (228,85,85) می‌رسد', () => {
-    expect(whiteToRed(50)).toEqual([228, 85, 85])
+  it('گاما — میانه به نارنجیِ پررنگ می‌رسد (245,119,72)', () => {
+    expect(fightColor(50)).toEqual([245, 119, 72])
   })
-  it('سهم‌های کم هم پیدادارند (سرخیِ قابل‌دید در ۵٪)', () => {
-    expect(whiteToRed(5)[1]).toBeLessThan(190)
-    expect(whiteToRed(30)[1]).toBeLessThan(120)
+  it('تغییرهای کوچک هم پیدایند — ۵٪ فیروزهٔ روشن، نه آبیِ تیره', () => {
+    expect(fightColor(5)).toEqual([198, 230, 241])
+    // فام در ۱۵٪ به زرد میرسد
+    expect(fightColor(15)[0]).toBeGreaterThan(250)
+    expect(fightColor(15)[2]).toBeLessThan(200)
   })
   it('خارج از بازه کلیپ می‌شود', () => {
-    expect(whiteToRed(-5)).toEqual([255, 255, 255])
-    expect(whiteToRed(140)).toEqual([220, 38, 38])
+    expect(fightColor(-5)).toEqual([49, 54, 149])
+    expect(fightColor(140)).toEqual([165, 0, 38])
   })
   it('rgbCss رشتهٔ رنگ می‌سازد', () => {
     expect(rgbCss([10, 20, 30])).toBe('rgb(10, 20, 30)')
   })
-  it('whiteToRed01 برای GL خروجی ۰..۱ می‌دهد', () => {
-    expect(whiteToRed01(0)).toEqual([1, 1, 1])
-    expect(whiteToRed01(100)[0]).toBeCloseTo(220 / 255, 6)
-    expect(whiteToRed01(100)[1]).toBeCloseTo(38 / 255, 6)
+  it('fightColor01 برای GL خروجی ۰..۱ می‌دهد', () => {
+    expect(fightColor01(0)).toEqual([49 / 255, 54 / 255, 149 / 255])
+    expect(fightColor01(100)[0]).toBeCloseTo(165 / 255, 6)
+  })
+  it('طیف‌نما از تابعِ رمپ ساخته میشود و جهتش برمی‌گردد', () => {
+    const rtl = fightLegendGradientCss(true)
+    const ltr = fightLegendGradientCss(false)
+    expect(rtl).toContain('linear-gradient(to left, rgb(49, 54, 149) 0%')
+    expect(ltr).toContain('linear-gradient(to right, rgb(49, 54, 149) 0%')
+    // آخرین توقف همان سرخِ عمیق در ۱۰۰٪
+    expect(rtl).toContain('rgb(165, 0, 38) 100%')
+    expect(ltr).toBe('linear-gradient(to right, ' + rtl.slice('linear-gradient(to left, '.length))
   })
 })
 

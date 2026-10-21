@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Coordinate, Coordinate3D, WindField } from '../../../types/routing'
 import type { ViewportSettings } from '../../../store/useUiStore'
 import { chaikinSmoothLine } from '../../../utils/geometry'
-import { cumulativeFractions, whiteToRed } from '../../../utils/windFight'
+import { cumulativeFractions, fightColor } from '../../../utils/windFight'
 import { ManualSceneView as ManualSceneView3D } from './ManualSceneView'
 import type { EditTarget, PickMissKind } from '../../../three/manual/scene-gl'
 import { applyWindFields, setParticleFlowPaused, setWindOverlaysVisible, stopParticleFlow } from './windFieldLayer'
@@ -499,12 +499,12 @@ function MapLibreView({
           const stops: number[] = []
           for (let i = 0; i < path.length; i += stride) {
             if (stops.length && fracs[i] === stops[stops.length - 2]) continue
-            const [r, g, b] = whiteToRed(fightProfile[i])
+            const [r, g, b] = fightColor(fightProfile[i])
             stops.push(fracs[i], `rgb(${r}, ${g}, ${b})`)
           }
           // بندِ پایانی دقیقاً روی ۱ — آخرین مسیرِ رنگ
           if (fracs[path.length - 1] !== stops[stops.length - 2]) {
-            const [r, g, b] = whiteToRed(fightProfile[path.length - 1])
+            const [r, g, b] = fightColor(fightProfile[path.length - 1])
             stops.push(fracs[path.length - 1], `rgb(${r}, ${g}, ${b})`)
           }
           map.setPaintProperty(ROUTE_LAYER_ID, 'line-gradient', [

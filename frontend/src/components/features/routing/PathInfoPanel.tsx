@@ -16,6 +16,7 @@ import {
 import { formatAltitudeM, formatDistanceKm, formatDurationHours } from '../../../utils/format'
 import { useFormatLang } from '../../../hooks/useFormatLang'
 import { useSettingsStore } from '../../../store/useSettingsStore'
+import { fightLegendGradientCss } from '../../../utils/windFight'
 import { Button } from '../../ui/Button'
 import { Card } from '../../ui/Card'
 import { Collapsible } from '../../ui/Collapsible'
@@ -187,11 +188,9 @@ export function PathInfoPanel({
             <div
               className="h-2.5 w-full rounded-full ring-1 ring-border"
               style={{
-                // توقف‌های میانی همان گامای رمپ در windFight.ts — پس طیف‌نما
-                // دقیقاً همان رنگی است که خط/لوله به خود می‌گیرد.
-                background: isRtl
-                  ? 'linear-gradient(to left, #ffffff, #eb8383 20%, #e66262 40%, #e24a4a 60%, #df3636 80%, #dc2626)'
-                  : 'linear-gradient(to right, #ffffff, #eb8383 20%, #e66262 40%, #e24a4a 60%, #df3636 80%, #dc2626)',
+                // از تابعِ همان رمپ ساخته میشود — طیفنما همان رنگی است که
+                // خط/لوله خود را از آن میگیرند؛ جهت با زبان برگشت میشود.
+                background: fightLegendGradientCss(isRtl),
               }}
               aria-hidden
             />

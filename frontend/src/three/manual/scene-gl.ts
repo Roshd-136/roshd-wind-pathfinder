@@ -32,7 +32,7 @@ import {
 } from './scene'
 import type { Coordinate, Coordinate3D, WindField } from '../../types/routing'
 import { chaikinSmoothXYZ } from '../../utils/geometry'
-import { cumulativeFractions, fightAtFraction, whiteToRed01 } from '../../utils/windFight'
+import { cumulativeFractions, fightAtFraction, fightColor01 } from '../../utils/windFight'
 // سقفِ ارتفاعِ پرواز — همان مرزِ بالاترین باندِ لایهٔ باد؛ موتور مسیر در
 // قفل‌های بالاتر از این «مسیر عبوری ندارد» (زمین ناهوار) رد می‌کند، پس
 // کشیدنِ محور ارتفاع را همین‌جا به قلمروِ معتبر محدود می‌کنیم.
@@ -518,7 +518,7 @@ export class Manual3DScene {
       const tube =
         profile && pathFracs
           ? buildRouteTube(spline, ROUTE_TUBE_RADIUS_KM, undefined, undefined, (f) =>
-              whiteToRed01(fightAtFraction(profile, pathFracs, f)),
+              fightColor01(fightAtFraction(profile, pathFracs, f)),
             )
           : buildRouteTube(spline, ROUTE_TUBE_RADIUS_KM)
       this.routeMesh = uploadIndexed(gl, tube.positions, tube.colors, tube.indices, gl.TRIANGLES)
