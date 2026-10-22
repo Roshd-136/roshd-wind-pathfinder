@@ -1,7 +1,10 @@
 import { useTranslation } from 'react-i18next'
-import { Card } from '../components/ui/Card'
 
-/** صفحهٔ درباره — معرفی محصول، تصاویرِ دو نما و فرایند؛ متن‌محور و بدون تزئین. */
+/**
+ * صفحهٔ درباره — شبیه راهنمای محصول: سرآیندِ وسط‌چینِ بزرگ، سکشن‌های شماره‌دار
+ * با خط جداکننده، تصاویرِ شماره‌دار با شرح، و متن‌محورِ بدون تزئین. اسکرول در
+ * همین صفحه انجام میشود — `main` اپ برای نقشهها `overflow-hidden` دارد.
+ */
 export function AboutPage() {
   const { t } = useTranslation()
 
@@ -12,58 +15,79 @@ export function AboutPage() {
   ]
   const steps = ['about.how1', 'about.how2', 'about.how3', 'about.how4', 'about.how5']
   const paragraphs = ['about.what1', 'about.what2', 'about.what3']
+  const sections = [
+    { titleKey: 'about.whatTitle', body: paragraphs as string[] },
+    { titleKey: 'about.howTitle', body: steps as string[] },
+  ]
 
   return (
-    <div className="mx-auto max-w-3xl space-y-10 p-6">
-      <header className="space-y-3">
-        <h1 className="text-xl font-semibold text-text-primary">{t('about.title')}</h1>
-        <p className="text-sm leading-7 text-text-secondary">{t('about.lead')}</p>
-      </header>
-
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold text-text-primary">{t('about.whatTitle')}</h2>
-        {paragraphs.map((key) => (
-          <p key={key} className="text-sm leading-7 text-text-secondary">
-            {t(key)}
+    <div className="h-full overflow-y-auto">
+      <div className="mx-auto max-w-3xl px-6 pb-20 pt-14">
+        {/* سرآیند — وسط‌چین و بزرگ */}
+        <header className="mx-auto max-w-2xl space-y-5 text-center">
+          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-text-muted">
+            {t('about.kicker')}
+          </div>
+          <h1 className="text-4xl font-bold leading-[1.25] text-text-primary md:text-5xl">
+            {t('about.title')}
+          </h1>
+          <p className="text-base leading-8 text-text-secondary md:text-lg md:leading-9">
+            {t('about.lead')}
           </p>
-        ))}
-      </section>
+        </header>
 
-      <section className="space-y-4">
-        <h2 className="text-base font-semibold text-text-primary">{t('about.howTitle')}</h2>
-        <ol className="list-decimal space-y-2 ps-6 text-sm leading-7 text-text-secondary">
-          {steps.map((key) => (
-            <li key={key}>{t(key)}</li>
+        <div className="mt-14 space-y-14">
+          {sections.map(({ titleKey, body }) => (
+            <section key={titleKey}>
+              <h2 className="border-b border-border pb-4 text-2xl font-semibold text-text-primary">
+                {t(titleKey)}
+              </h2>
+              <div className="mt-6 space-y-5 text-base leading-8 text-text-secondary">
+                {body.map((key) => (
+                  <p key={key}>{t(key)}</p>
+                ))}
+              </div>
+            </section>
           ))}
-        </ol>
-      </section>
 
-      <section className="space-y-4">
-        {figures.map((fig) => (
-          <figure
-            key={fig.src}
-            className="overflow-hidden rounded-xl border border-border bg-surface-raised"
-          >
-            <img src={fig.src} alt={t(fig.captionKey)} className="block w-full" loading="lazy" />
-            <figcaption className="space-y-1 p-3">
-              <div className="text-sm font-medium text-text-primary">{t(fig.titleKey)}</div>
-              <p className="text-xs leading-6 text-text-secondary">{t(fig.captionKey)}</p>
-            </figcaption>
-          </figure>
-        ))}
-      </section>
+          {/* نماهای محصول — تصاویر شماره‌دار */}
+          <section>
+            <h2 className="border-b border-border pb-4 text-2xl font-semibold text-text-primary">
+              {t('about.figuresTitle')}
+            </h2>
+            <div className="mt-6 space-y-8">
+              {figures.map((fig) => (
+                <figure
+                  key={fig.src}
+                  className="overflow-hidden rounded-xl border border-border bg-surface-raised"
+                >
+                  <img src={fig.src} alt={t(fig.captionKey)} className="block w-full" loading="lazy" />
+                  <figcaption className="space-y-2 px-4 py-4">
+                    <div className="text-base font-semibold text-text-primary">{t(fig.titleKey)}</div>
+                    <p className="text-sm leading-7 text-text-secondary">{t(fig.captionKey)}</p>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          </section>
 
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold text-text-primary">{t('about.stackTitle')}</h2>
-        <Card className="p-4">
-          <p className="text-sm leading-7 text-text-secondary">{t('about.stackText')}</p>
-        </Card>
-      </section>
+          {/* فناوری‌ها — پایانی */}
+          <section>
+            <h2 className="border-b border-border pb-4 text-2xl font-semibold text-text-primary">
+              {t('about.stackTitle')}
+            </h2>
+            <p className="mt-6 text-base leading-8 text-text-secondary">{t('about.stackText')}</p>
+          </section>
 
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold text-text-primary">{t('about.dataTitle')}</h2>
-        <p className="text-sm leading-7 text-text-secondary">{t('about.dataText')}</p>
-      </section>
+          {/* دادهٔ مبنایی */}
+          <section>
+            <h2 className="border-b border-border pb-4 text-2xl font-semibold text-text-primary">
+              {t('about.dataTitle')}
+            </h2>
+            <p className="mt-6 text-base leading-8 text-text-secondary">{t('about.dataText')}</p>
+          </section>
+        </div>
+      </div>
     </div>
   )
 }
