@@ -38,9 +38,9 @@ export function AboutPage() {
                 <p key={key}>{t(key)}</p>
               ))}
             </div>
-            {/* تصویر ۱ — کراپِ پنل تنظیمات با عدسی روی طیف‌نما */}
-            <figure className="mt-8">
-              <div className="relative w-64">
+            {/* تصویر ۱ — کراپِ پنل تنظیمات با عدسی روی طیف‌نما + متنِ کناری */}
+            <figure className="mt-8 flex flex-col gap-6 md:flex-row md:items-start">
+              <div className="relative w-64 shrink-0">
                 <div className="overflow-hidden rounded-xl border border-border bg-surface-raised">
                   <img
                     src="/img/about/panel-detail.png"
@@ -59,10 +59,13 @@ export function AboutPage() {
                   />
                 </div>
               </div>
-              <figcaption className="mt-11 max-w-2xl space-y-1">
+              <div className="min-w-0 flex-1 space-y-4 pt-2">
                 <div className="text-base font-semibold text-text-primary">{t('about.fig1Title')}</div>
                 <p className="text-sm leading-7 text-text-secondary">{t('about.fig1Caption')}</p>
-              </figcaption>
+                <div className="rounded-xl border border-border bg-surface-raised px-4 py-3 text-sm leading-7 text-text-secondary">
+                  {t('about.fig1Magnifier')}
+                </div>
+              </div>
             </figure>
           </section>
 
