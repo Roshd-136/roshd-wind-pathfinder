@@ -218,6 +218,7 @@ def compute_vertical_cost(
         "energy": energy_hours,
         "balanced": balanced_hours,
         "distance": vertical_km,
+        "safety": energy_hours,  # For vertical, safety similar to energy
     }
     if criterion not in cost_by_criterion:
         raise ValueError(
@@ -785,6 +786,7 @@ class MultiLayerWindGraph:
         ground_altitude: float = 0.0,
         layers: Sequence[float] | None = None,
         ground_elevation_at: Callable[[float, float], float] | None = None,
+        endpoint_altitudes: Sequence[float | None] | None = None,
     ) -> StackedGraph:
         """همه لایه‌ها را در یک گراف سه‌بعدی ادغام می‌کند تا مسیر بین لایه‌ها جابجا شود.
 
@@ -813,11 +815,20 @@ class MultiLayerWindGraph:
             معیار و تنظیمات مدل هزینه‌ای که گراف ادغام‌شده باید با آن وزن داشته باشد.
         ground_altitude : float
             ارتفاع گره‌های زمین (متر، پیش‌فرض صفر = روی زمین).
+        layers : Sequence[float], اختیاری
+            زیرمجموعه‌ای از لایه‌ها برای ادغام؛ ``None`` یعنی همهٔ لایه‌ها.
+        ground_elevation_at : Callable, اختیاری
+            تابع ارتفاع زمین برای ارتفاع واقعی گره‌های زمین (متر MSL).
+        endpoint_altitudes : Sequence[float | None], اختیاری
+            قفل ارتفاعی مبدأ/مقصد به‌ترتیب (طول ۲). اگر برای یک سر مقدار
+            داده شود، به‌جای گره زمین یک «لنگر هوایی» روی همان مختصات و در
+            همان سطح ساخته می‌شود؛ یعنی مسیر از آن نقطه در هوا شروع/خاتمه
+            می‌یابد و هنگام رسیدن به آن، به زمین نمی‌رسد.
 
         برمی‌گرداند
         ----------
         StackedGraph
-            گراف ادغام‌شده به‌همراه شناسه گره زمین مبدأ/مقصد.
+            گراف ادغام‌شده به‌همراه شناسه گره مبدأ/مقصد (زمین یا لنگر هوایی).
 
         استثناها
         --------
@@ -938,7 +949,8 @@ class MultiLayerWindGraph:
                     )
                 )
 
-        # ۳) گره‌های زمین مبدأ/مقصد + اتصال عمودی به پایین‌ترین لایه *قابل‌استفاده*
+        # ۳) گره‌های زمین مبدأ/مقصد + اتصال به چند گرهٔ نزدیک، **در مختصات دقیق
+        #    کاربر**.
         #
         # نکته مهم دربارهٔ ارتفاع گره زمین: پیش‌تر همیشه صفر بود، یعنی «سطح دریا».
         # با لایه‌های AGL این بی‌ضرر بود (ارتفاع لایه هم نسبت به زمین بود). حالا که
@@ -946,39 +958,120 @@ class MultiLayerWindGraph:
         # داشته باشد؛ وگرنه «صعود از زمین تا سطح پرواز» تمام ۱۴۰۰ متر ارتفاع زمین
         # را به‌عنوان صعود به هواپیما تحمیل می‌کند و هیچ مسیری هرگز صعود نمی‌کند.
         #
-        # و «پایین‌ترین لایه» لزوماً در آن نقطه وجود ندارد: روی دامنهٔ قله، پایین‌ترین
-        # سطح پرواز زیر زمین است و گره‌اش حذف شده. پس اولین سطحی که در همان مختصات
-        # گره دارد انتخاب می‌شود.
-        ground_ids: list[str] = []
-        ground_coords: list[tuple[float, float]] = []
-        for point in (origin, destination):
-            attach_altitude: float | None = None
-            lat = lon = 0.0
-            base_id: str | None = None
-            for candidate in layers:
-                candidate_layer = source.get_layer(candidate)
-                if candidate_layer is None:
-                    continue
-                candidate_id = candidate_layer.find_nearest_node(point[0], point[1])
-                if candidate_id is None:
-                    continue
-                candidate_node = candidate_layer.get_node(candidate_id)
-                if candidate_node is None:
-                    continue
-                lat, lon = candidate_node.lat, candidate_node.lon
-                base_id = candidate_id
-                attach_altitude = candidate
-                break
-            if attach_altitude is None or base_id is None:
-                raise ValueError(
-                    "No layer has a usable node at the origin/destination; "
-                    "every level is either empty or blocked by terrain."
-                )
+        # **چرا در مختصات دقیق و با چند نامزد.** پیش‌تر گره زمین روی مختصات
+        # *نزدیک‌ترین گره شبکه* ساخته می‌شد و تنها یک یال عمودی داشت. روی دامنهٔ
+        # قله، پایین‌ترین سطح پرواز زیر زمین است و گره‌هایش حذف شده‌اند؛ پس
+        # «نزدیک‌ترین گرهٔ باقی‌مانده» می‌تواند ده‌ها کیلومتر دورتر و در جهت مخالف
+        # مقصد باشد. مسیر از مختصات دقیق شروع می‌شد و بعد به آن گرهٔ دور می‌رفت —
+        # همان «قلابِ» ابتدای مسیر. حالا گره زمین دقیقاً روی مختصات کاربر است و به
+        # چند گرهٔ نزدیک در لایه‌های مختلف وصل می‌شود؛ وزن هر اتصال هزینهٔ افقی
+        # مسافتش را هم دارد، پس بهینه‌ساز جهت درست خروج را خودش انتخاب می‌کند.
+        endpoint_ids: list[str] = []
+        endpoint_coords: list[tuple[float, float]] = []
+        for index, point in enumerate((origin, destination)):
+            lat, lon = float(point[0]), float(point[1])
             local_ground = (
                 float(ground_elevation_at(lat, lon))
                 if ground_elevation_at is not None
                 else ground_altitude
             )
+            locked_alt = (
+                endpoint_altitudes[index]
+                if endpoint_altitudes is not None and index < len(endpoint_altitudes)
+                else None
+            )
+            if locked_alt is not None:
+                # لنگرِ هوایی — چک‌پوینت با ارتفاع قفل‌شده.
+                #
+                # نقطهٔ اتصال این قطعه «گره زمین» نیست؛ در غیر این صورت مسیر در
+                # انتهای قطعه تا زمین پایین می‌آمد و چک‌پوینت روی زمین عبور
+                # می‌کرد — دقیقاً همان چیزی که کاربر با قفل ارتفاع منع کرده.
+                # به‌جای آن یک گره روی همان مختصات دقیق و در سطح قفل ساخته
+                # می‌شود و به چند گرهٔ نزدیکِ *همان سطح* وصل می‌شود؛ چون
+                # اختلاف ارتفاع صفر است، هزینهٔ اتصال فقط افقی است و گذار
+                # صعود/فرود اضافی جعل نمی‌شود. برای انتهای قطعه «رسیدن به
+                # چک‌پوینت در همان ارتفاع»، برای ابتدای قطعهٔ بعد «برخاستن از
+                # همان نقطه و همان ارتفاع» معنا پیدا می‌کند.
+                # لنگر هوایی فقط در سطحی روشن است که در گراف انباشته حاضر است؛
+                # قفلِ بیرون از سطوح انباشته تناقض صریح است نه «بدشانسی
+                # برآمدنِ نامزد» — خطای شفاف می‌دهیم تا ردهٔ بالاتر با پیام
+                # فارسی همان را به کاربر برساند.
+                if locked_alt not in {float(x) for x in layers}:
+                    raise ValueError(
+                        f"Locked endpoint altitude {locked_alt:.0f} m must be "
+                        f"one of the stacked layers "
+                        f"{sorted({float(x) for x in layers})}."
+                    )
+                air_id = f"air|{locked_alt:.3f}|{lat:.6f},{lon:.6f}"
+                stacked.add_node(
+                    GraphNode(
+                        node_id=air_id,
+                        lat=lat,
+                        lon=lon,
+                        wind_speed_mps=0.0,
+                        wind_direction_deg=0.0,
+                        altitude=locked_alt,
+                        ground_elevation_m=local_ground,
+                        is_ground=False,
+                    )
+                )
+                air_node = stacked.get_node(air_id)
+                if air_node is None:
+                    raise ValueError(
+                        "Air anchor node could not be added to the stacked graph."
+                    )
+                layer = source.get_layer(locked_alt)
+                connected_km: list[float] = []
+                if layer is not None:
+                    nearby = sorted(
+                        (
+                            (haversine_km(lat, lon, node.lat, node.lon), node)
+                            for node in layer.nodes.values()
+                        ),
+                        key=lambda item: item[0],
+                    )
+                    for distance_km, node in nearby[:_ENDPOINT_CONNECTOR_CANDIDATES]:
+                        if distance_km > _ENDPOINT_CONNECTOR_RADIUS_KM:
+                            break
+                        layer_node = stacked.get_node(
+                            _stacked_node_id(locked_alt, node.node_id)
+                        )
+                        if layer_node is None:
+                            continue
+                        stacked.add_edge(
+                            _build_endpoint_connector(
+                                air_node,
+                                layer_node,
+                                distance_km,
+                                target_config,
+                                target_criterion,
+                                target_time_weight,
+                                vertical,
+                                "climb",
+                            )
+                        )
+                        stacked.add_edge(
+                            _build_endpoint_connector(
+                                layer_node,
+                                air_node,
+                                distance_km,
+                                target_config,
+                                target_criterion,
+                                target_time_weight,
+                                vertical,
+                                "descent",
+                            )
+                        )
+                        connected_km.append(distance_km)
+                if not connected_km:
+                    raise ValueError(
+                        f"No usable node at the locked altitude {locked_alt:.0f} m "
+                        f"near ({lat:.4f}, {lon:.4f}); this flight level is "
+                        "unflyable there (terrain, corridor limits or clearance)."
+                    )
+                endpoint_ids.append(air_id)
+                endpoint_coords.append((lat, lon))
+                continue
             ground_id = f"ground|{lat:.6f},{lon:.6f}"
             stacked.add_node(
                 GraphNode(
@@ -997,43 +1090,127 @@ class MultiLayerWindGraph:
                 )
             )
             ground_node = stacked.get_node(ground_id)
-            base_stacked = stacked.get_node(
-                _stacked_node_id(attach_altitude, f"{lat:.6f},{lon:.6f}")
-            )
-            if ground_node is None or base_stacked is None:
-                raise ValueError("Ground node could not be attached to the lowest usable layer.")
-            stacked.add_edge(
-                _build_vertical_edge(
-                    ground_node,
-                    base_stacked,
-                    target_config,
-                    target_criterion,
-                    target_time_weight,
-                    vertical,
-                )
-            )
-            stacked.add_edge(
-                _build_vertical_edge(
-                    base_stacked,
-                    ground_node,
-                    target_config,
-                    target_criterion,
-                    target_time_weight,
-                    vertical,
-                )
-            )
-            ground_ids.append(ground_id)
-            ground_coords.append((lat, lon))
+            if ground_node is None:
+                raise ValueError("Ground node could not be added to the stacked graph.")
 
-        if ground_ids[0] == ground_ids[1]:
+            # نزدیک‌ترین گره‌های هر لایه در شعاع اتصال. برای هر لایه چند نامزد
+            # (نه فقط یکی) تا بهینه‌ساز نقطهٔ اتصال درست را انتخاب کند.
+            attached = 0
+            for altitude in layers:
+                layer = source.get_layer(altitude)
+                if layer is None:
+                    continue
+                nearby = sorted(
+                    (
+                        (haversine_km(lat, lon, node.lat, node.lon), node)
+                        for node in layer.nodes.values()
+                    ),
+                    key=lambda item: item[0],
+                )
+                for distance_km, node in nearby[:_ENDPOINT_CONNECTOR_CANDIDATES]:
+                    if distance_km > _ENDPOINT_CONNECTOR_RADIUS_KM:
+                        break
+                    layer_node = stacked.get_node(
+                        _stacked_node_id(altitude, node.node_id)
+                    )
+                    if layer_node is None:
+                        continue
+                    stacked.add_edge(
+                        _build_endpoint_connector(
+                            ground_node,
+                            layer_node,
+                            distance_km,
+                            target_config,
+                            target_criterion,
+                            target_time_weight,
+                            vertical,
+                            "climb",
+                        )
+                    )
+                    stacked.add_edge(
+                        _build_endpoint_connector(
+                            layer_node,
+                            ground_node,
+                            distance_km,
+                            target_config,
+                            target_criterion,
+                            target_time_weight,
+                            vertical,
+                            "descent",
+                        )
+                    )
+                    attached += 2
+
+            # اگر هیچ لایه‌ای در شعاع اتصال گره نداشت (نقطه‌ای بیرون کریدور، یا
+            # همهٔ سطوح آن‌جا زیر زمین)، همان رفتار قبلی: نزدیک‌ترین گره از
+            # اولین لایهٔ *قابل‌استفاده*، با یک یال عمودی.
+            if attached == 0:
+                fallback_layer: float | None = None
+                fallback_node: GraphNode | None = None
+                for candidate in layers:
+                    candidate_layer = source.get_layer(candidate)
+                    if candidate_layer is None:
+                        continue
+                    candidate_id = candidate_layer.find_nearest_node(lat, lon)
+                    if candidate_id is None:
+                        continue
+                    candidate_node = candidate_layer.get_node(candidate_id)
+                    if candidate_node is None:
+                        continue
+                    fallback_layer = candidate
+                    fallback_node = candidate_node
+                    break
+                if fallback_layer is None or fallback_node is None:
+                    raise ValueError(
+                        "No layer has a usable node at the origin/destination; "
+                        "every level is either empty or blocked by terrain."
+                    )
+                fallback_stacked = stacked.get_node(
+                    _stacked_node_id(fallback_layer, fallback_node.node_id)
+                )
+                if fallback_stacked is None:
+                    raise ValueError(
+                        "Ground node could not be attached to the lowest usable layer."
+                    )
+                fallback_km = haversine_km(
+                    lat, lon, fallback_node.lat, fallback_node.lon
+                )
+                stacked.add_edge(
+                    _build_endpoint_connector(
+                        ground_node,
+                        fallback_stacked,
+                        fallback_km,
+                        target_config,
+                        target_criterion,
+                        target_time_weight,
+                        vertical,
+                        "climb",
+                    )
+                )
+                stacked.add_edge(
+                    _build_endpoint_connector(
+                        fallback_stacked,
+                        ground_node,
+                        fallback_km,
+                        target_config,
+                        target_criterion,
+                        target_time_weight,
+                        vertical,
+                        "descent",
+                    )
+                )
+            endpoint_ids.append(ground_id)
+            endpoint_coords.append((lat, lon))
+
+        if endpoint_ids[0] == endpoint_ids[1]:
             raise ValueError("Origin and destination snap to the same ground node.")
 
         return StackedGraph(
             graph=stacked,
-            origin_id=ground_ids[0],
-            destination_id=ground_ids[1],
-            origin_coords=ground_coords[0],
-            destination_coords=ground_coords[1],
+            origin_id=endpoint_ids[0],
+            destination_id=endpoint_ids[1],
+            origin_coords=endpoint_coords[0],
+            destination_coords=endpoint_coords[1],
             layer_altitudes=tuple(layers),
             ground_altitude=ground_altitude,
         )
@@ -1142,6 +1319,110 @@ class MultiLayerWindGraph:
 # ---------------------------------------------------------------------------
 # کمک‌تابع داخلی
 # ---------------------------------------------------------------------------
+
+
+# اتصال گره زمین مبدأ/مقصد به گراف: چند گرهٔ نزدیک در هر لایه، در شعاع محدود.
+# شعاع ۳۰ کیلومتری عمداً بزرگ است: روی دامنهٔ قله، پایین‌ترین سطح‌های پرواز
+# زیر زمین‌اند و گره‌هایشان حذف شده؛ اندازه‌گیری روی کریدور نشان داد نزدیک‌ترین
+# گرهٔ باقی‌ماندهٔ سطح ۱۵۰۰ در مبدأ کوهستانی تا ۲۱ کیلومتر دورتر است. با شعاع
+# کوچک‌تر، همان مبدأ دوباره به «اسنپ اجباری به یک گرهٔ دور» برمی‌گشت.
+_ENDPOINT_CONNECTOR_CANDIDATES = 6
+_ENDPOINT_CONNECTOR_RADIUS_KM = 30.0
+
+
+def _build_endpoint_connector(
+    from_node: GraphNode,
+    to_node: GraphNode,
+    horizontal_km: float,
+    config: CostModelConfig | None,
+    criterion: str,
+    time_weight: float | None,
+    vertical: VerticalCostConfig | None,
+    kind: str,
+) -> EdgeData:
+    """یال اتصال گره زمین به یک گره لایه: صعود/فرود به‌همراه هزینهٔ افقی.
+
+    یال عمودی خالص (``_build_vertical_edge``) برای اتصال انتهایی کافی نیست:
+    از آن‌جا که گره زمین به *چند* نامزد در لایه‌های مختلف وصل می‌شود، وزن باید
+    مسافت افقی هر نامزد را هم بداند، وگرنه همهٔ نامزدها هم‌وزن می‌شوند و
+    بهینه‌ساز دلبخواهی یکی را برمی‌دارد — همان چیزی که «رفت‌وبرگشت به سمت
+    اشتباه» را می‌ساخت.
+
+    باد نامزد در محاسبهٔ بخش افقی از خودِ گره خوانده می‌شود، ولی اگر بادِ
+    جانبی از سرعت هوایی بیشتر باشد (یال غیرقابل‌عبور)، به باد آرام برمی‌گردیم:
+    «ناتوانی در نگه‌داشتن یک یال» نباید نقطهٔ شروع/پایان مسیر را ناموجود کند.
+
+    ``ground_speed_mps`` عمداً صفر می‌ماند. این یال در ``WindRouter`` یک یال
+    عمودی شمرده می‌شود (``kind != "horizontal"``) و مصرف‌کننده‌ها نباید از
+    خروجی آن سرعت افقی استخراج کنند؛ قرارداد ``compute_vertical_cost`` همین
+    است.
+    """
+    vertical_part = compute_vertical_cost(
+        to_node.altitude - from_node.altitude,
+        config=config,
+        criterion=criterion,
+        time_weight=time_weight,
+        vertical=vertical,
+    )
+    horizontal_part = None
+    if horizontal_km > 1e-9:
+        try:
+            horizontal_part = compute_edge_cost(
+                from_node.lat,
+                from_node.lon,
+                to_node.lat,
+                to_node.lon,
+                from_node.wind_speed_mps,
+                from_node.wind_direction_deg,
+                config=config,
+                criterion=criterion,
+                time_weight=time_weight,
+            )
+        except InfeasibleEdgeError:
+            horizontal_part = compute_edge_cost(
+                from_node.lat,
+                from_node.lon,
+                to_node.lat,
+                to_node.lon,
+                0.0,
+                0.0,
+                config=config,
+                criterion=criterion,
+                time_weight=time_weight,
+            )
+
+    time_hours = vertical_part.time_hours
+    energy_hours = vertical_part.energy_hours
+    balanced_hours = vertical_part.balanced_hours
+    cost = vertical_part.cost
+    if horizontal_part is not None:
+        time_hours += horizontal_part.time_hours
+        energy_hours += horizontal_part.energy_hours
+        balanced_hours += horizontal_part.balanced_hours
+        cost += horizontal_part.cost
+
+    return EdgeData(
+        from_node=from_node.node_id,
+        to_node=to_node.node_id,
+        # قرارداد ``EdgeData``: برای یال عمودی، ``distance_km`` اختلاف ارتفاع
+        # است تا جمع آن در طول مسیر طول سه‌بعدی بدهد؛ مسافت افقیِ اتصال در
+        # ``total_distance_km`` از روی خود هندسهٔ مسیر حساب می‌شود.
+        distance_km=vertical_part.distance_km,
+        cost_result=EdgeCostResult(
+            distance_km=vertical_part.distance_km,
+            bearing_deg=0.0,
+            along_track_mps=0.0,
+            cross_track_mps=0.0,
+            ground_speed_mps=0.0,
+            time_hours=time_hours,
+            energy_hours=energy_hours,
+            balanced_hours=balanced_hours,
+            criterion=criterion,
+            cost=cost,
+        ),
+        weight=cost,
+        kind=kind,
+    )
 
 
 def _build_vertical_edge(

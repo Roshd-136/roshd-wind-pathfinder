@@ -1438,16 +1438,16 @@ def test_write_scene_produces_a_self_contained_html_document(scene_html) -> None
     # `<script src=...>` fetching anything from a CDN.
     assert "<script src=" not in html
 
-    # Plotly serialises the figure with `ensure_ascii=True`, so Persian labels
-    # appear as \uXXXX escapes in the file. Checking the escaped form keeps the
-    # honesty-label assertion meaningful instead of accidentally matching the
-    # bundled library text.
-    def escaped(text: str) -> str:
-        return json.dumps(text, ensure_ascii=True)[1:-1]
+    # Plotly 7.x outputs literal UTF-8 in the HTML (ensure_ascii=False by default).
+    # The HTML has charset="utf-8", so both escaped and literal forms work in browsers.
+    # We accept either form for the honesty labels.
+    def has_text(text: str) -> bool:
+        escaped = json.dumps(text, ensure_ascii=True)[1:-1]
+        return text in html or escaped in html
 
-    assert escaped("سنتزی") in html, "synthetic-data warning missing from artifact"
-    assert escaped("مشهد") in html and escaped("سبزوار") in html
-    assert escaped("ارتفاع زمین") in html
+    assert has_text("سنتزی"), "synthetic-data warning missing from artifact"
+    assert has_text("مشهد") and has_text("سبزوار")
+    assert has_text("ارتفاع زمین")
     # Every declared route reaches the artifact, and the wind-riding family may
     # add the variants its corridor search decided were worth drawing (R7/R8).
     # A variant the search dropped is simply absent — never a foreign key.

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import pandas as pd
 import pytest
 
 from pathfinding.graph import EdgeData, GraphNode, MultiLayerWindGraph, WindGraph
+from preprocessing.consistency import haversine_km
 
 # Real Khorasan station coordinates (data/khorasan_wind_qc_cleaned.csv).
 MASHHAD = (36.297, 59.606)
@@ -248,3 +251,131 @@ def test_multi_layer_build_no_altitude_column() -> None:
     ml = MultiLayerWindGraph.build_from_dataframe(df)
     assert ml.layer_count == 1
     assert ml.available_layers == [0.0]
+
+
+# ---------------------------------------------------------------------------
+# to_stacked_graph: exact ground endpoints + multi-candidate connectors
+# ---------------------------------------------------------------------------
+
+# A 5x5 lattice spaced 0.1° (~9-11 km) around a centre point. The author's
+# origin sits off-lattice, so several nodes are within the 30 km connector
+# radius: the multi-candidate path is exercised, not the single fallback.
+_GRID_CENTRE = (36.25, 59.25)
+
+
+def _make_grid_multi(altitudes: Sequence[float] = (1500.0, 2200.0)) -> MultiLayerWindGraph:
+    rows = [
+        {
+            "lat": _GRID_CENTRE[0] + 0.1 * i,
+            "lon": _GRID_CENTRE[1] + 0.1 * j,
+            "wind_speed": 8.0,
+            "wind_direction": 240.0,
+        }
+        for i in range(-2, 3)
+        for j in range(-2, 3)
+    ]
+    ml = MultiLayerWindGraph()
+    for altitude in altitudes:
+        frame = pd.DataFrame([{**row, "altitude": altitude} for row in rows])
+        ml.add_layer(
+            WindGraph.build_from_dataframe(
+                frame, altitude=altitude, criterion="time", max_edge_distance_km=30.0
+            )
+        )
+    return ml
+
+
+def test_stacked_graph_ground_nodes_keep_exact_user_coordinates() -> None:
+    """Endpoint nodes must sit on the user's coordinates, not a snapped node.
+
+    Snapping the ground node to the nearest lattice node used to hook the first
+    and last legs sideways whenever that node was far away (or in the opposite
+    direction from the destination).
+    """
+    ml = _make_grid_multi()
+    origin = (36.2534, 59.2537)  # deliberately off the 0.1° lattice
+    destination = (36.2164, 59.1932)
+    stacked = ml.to_stacked_graph(origin, destination)
+
+    origin_node = stacked.graph.get_node(stacked.origin_id)
+    destination_node = stacked.graph.get_node(stacked.destination_id)
+    assert origin_node is not None and destination_node is not None
+    assert (origin_node.lat, origin_node.lon) == pytest.approx(origin)
+    assert (destination_node.lat, destination_node.lon) == pytest.approx(destination)
+    # The stacked graph reports the exact coordinates as the endpoints.
+    assert stacked.origin_coords == pytest.approx(origin)
+    assert stacked.destination_coords == pytest.approx(destination)
+
+
+def test_stacked_graph_ground_nodes_use_real_terrain_elevation() -> None:
+    """With ``ground_elevation_at`` the endpoints sit at real MSL, not sea level.
+
+    Plain zero would bill a 1972 m mountain-side origin as 1972 m of *climb*
+    and, in the other direction, make the route dive to the sea.
+    """
+
+    def terrain(lat: float, _lon: float) -> float:
+        return 1972.0 if lat > _GRID_CENTRE[0] else 1004.0
+
+    origin = (_GRID_CENTRE[0] + 0.05, _GRID_CENTRE[1])
+    destination = (_GRID_CENTRE[0] - 0.05, _GRID_CENTRE[1])
+    stacked = _make_grid_multi().to_stacked_graph(
+        origin, destination, ground_elevation_at=terrain
+    )
+
+    assert stacked.graph.get_node(stacked.origin_id).altitude == pytest.approx(1972.0)
+    assert stacked.graph.get_node(stacked.destination_id).altitude == pytest.approx(1004.0)
+
+
+def test_stacked_graph_connects_an_off_lattice_ground_node_to_several_nodes() -> None:
+    """An off-lattice endpoint must reach *several* nearby nodes on each layer.
+
+    A single forced vertical connector could attach the endpoint to a node
+    tens of kilometres away in the wrong direction — the hairpin at the start.
+    """
+    origin = (_GRID_CENTRE[0] + 0.03, _GRID_CENTRE[1] + 0.03)
+    destination = (_GRID_CENTRE[0] - 0.2, _GRID_CENTRE[1] - 0.2)
+    stacked = _make_grid_multi().to_stacked_graph(origin, destination)
+
+    neighbours = stacked.graph.get_neighbors(stacked.origin_id)
+    assert len(neighbours) > 1, "the ground node must reach more than one candidate"
+    # Every connector lands on a lane node, and the first hop is short.
+    hops = [
+        haversine_km(
+            origin[0],
+            origin[1],
+            stacked.graph.get_node(nid).lat,
+            stacked.graph.get_node(nid).lon,
+        )
+        for nid in neighbours
+    ]
+    assert min(hops) < 5.0
+    assert max(hops) <= 30.0
+
+
+def test_stacked_graph_falls_back_to_nearest_node_beyond_the_radius() -> None:
+    """Far from any lattice node, the endpoint still attaches (single nearest).
+
+    Before the connector rewrite the graph *required* a node inside the radius
+    and crashed instead of degrading to the nearest usable node.
+    """
+    origin = (37.60, 60.60)  # ~170 km from every station: outside the 30 km radius
+    destination = (36.215, 57.678)  # SABZEVAR, ~173 km away
+    ml = MultiLayerWindGraph()
+    for altitude in (1500.0, 2200.0):
+        frame = pd.DataFrame(
+            [
+                {"lat": 36.297, "lon": 59.606, "altitude": altitude,
+                 "wind_speed": 8.0, "wind_direction": 240.0},
+                {"lat": 36.213, "lon": 58.795, "altitude": altitude,
+                 "wind_speed": 8.0, "wind_direction": 240.0},
+                {"lat": 36.215, "lon": 57.678, "altitude": altitude,
+                 "wind_speed": 8.0, "wind_direction": 240.0},
+            ]
+        )
+        ml.add_layer(WindGraph.build_from_dataframe(frame, altitude=altitude, criterion="time"))
+
+    stacked = ml.to_stacked_graph(origin, destination)
+    # The fallback attaches to the nearest node of the lowest usable layer,
+    # so the endpoint is still reachable even far outside the lattice.
+    assert len(stacked.graph.get_neighbors(stacked.origin_id)) >= 1

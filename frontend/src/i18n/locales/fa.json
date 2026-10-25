@@ -1,0 +1,170 @@
+{
+  "app": {
+    "name": "مسیریاب بادی"
+  },
+  "nav": {
+    "menu": "منو",
+    "map": "نقشه",
+    "settings": "تنظیمات",
+    "about": "درباره",
+    "profile": "پروفایل"
+  },
+  "map": {
+    "title": "مسیریابی",
+    "subtitle": "مسیریابی با در نظر گرفتن جریان باد",
+    "toggle2d": "۲بعدی",
+    "toggle3d": "۳بعدی",
+    "selectHint": "مبدأ و مقصد را انتخاب کنید",
+    "selectOrigin": "گام ۱ از ۲ — مبدأ را روی نقشه انتخاب کنید",
+    "selectDestination": "گام ۲ از ۲ — مقصد را روی نقشه انتخاب کنید",
+    "clear": "پاک کردن",
+    "tokenMissing": "خطا: {{code}} تنظیم نشده — نقشه بارگذاری نمی‌شود."
+  },
+  "routing": {
+    "panelTitle": "تنظیمات مسیر",
+    "optimizeFor": "بهینه‌سازی برای",
+    "optimizeTime": "سریع‌ترین",
+    "optimizeEnergy": "کم‌مصرف",
+    "optimizeBalanced": "متعادل",
+    "flightLimits": "محدودیت‌های پرواز",
+    "maxWindSpeed": "حداکثر سرعت باد (m/s)",
+    "altitudeAll": "همه",
+    "altitudeSurface": "سطحی",
+    "altitudeMid": "میانی",
+    "altitudeHigh": "بالا",
+    "altitudeTop": "بالاترین",
+    "routeErrorTitle": "خطا در محاسبهٔ مسیر",
+    "routeErrorHint": "در صورت تکرار، باند ارتفاعی بالاتر یا تنظیمات دیگر را امتحان کنید.",
+    "close": "بستن",
+    "checkpointPlacingHint": "برای ثبت چک‌پوینت، روی نقشه کلیک کنید",
+    "checkpointPlaced": "چک‌پوینت #{{n}} ثبت شد",
+    "checkpointPickMissOutside": "«اینجا بیرون از کادر دادهٔ برنامه (زمین/باد) است — نزدیک‌تر به مسیر یا داخل کادر زمین کلیک کنید»",
+    "checkpointPickMissSky": "«اینجا آسمان است — روی زمین کلیک کنید»",
+    "altitudeBandLabel": "باند ارتفاع پرواز",
+    "altitudeAllHint": "از سطح زمین تا {{max}} متر",
+    "altitudeBand": "{{min}} تا {{max}} متر",
+    "advancedSettings": "تنظیمات پیشرفته",
+    "comingSoon": "به‌زودی",
+    "avoidZonesHint": "ترسیم مناطق ممنوعه روی نقشه در فاز بعد اضافه می‌شود.",
+    "algorithm": "الگوریتم",
+    "algorithmDefault": "پیش‌فرض",
+    "algorithmFallback": "جایگزین",
+    "criterion": "معیار بهینه‌سازی",
+    "criterionTime": "زمان",
+    "criterionEnergy": "انرژی",
+    "criterionBalanced": "متعادل",
+    "criterionDistance": "فاصله",
+    "criterionSafety": "ایمنی",
+    "calculatePath": "محاسبه مسیر",
+    "recalculatePath": "محاسبه مجدد!",
+    "routeError": "خطای محاسبهٔ مسیر: {{message}}",
+    "avoidZones": "اجتناب از مناطق علامت‌گذاری‌شده",
+    "checkpoints": "چک‌پوینت‌های اجباری",
+    "checkpointHint": "برای عبور اجباری مسیر از یک نقطه، آن را به‌عنوان چک‌پوینت اضافه کنید؛ مسیر همیشه از این نقاط رد می‌شود.",
+    "addCheckpoint": "افزودن چک‌پوینت",
+    "addingCheckpoint": "روی نقشه کلیک کنید…",
+    "lockedAltitude": "در ارتفاع قفل‌شدهٔ {{alt}}",
+    "moveUp": "جابجایی به بالا",
+    "moveDown": "جابجایی به پایین",
+    "remove": "حذف",
+    "stepsTitle": "مراحل مسیر",
+    "stepOrigin": "انتخاب مبدأ",
+    "stepDestination": "انتخاب مقصد",
+    "stepOriginDone": "مبدأ",
+    "stepDestinationDone": "مقصد",
+    "stepCompute": "محاسبهٔ مسیر",
+    "stepComputeDone": "مسیر محاسبه شد",
+    "back": "مرحله قبل",
+    "next": "گام بعد",
+    "collapsePanel": "بستن پنل",
+    "openPanel": "نمایش پنل کنترل",
+    "demoRoute": "مسیر نمایشی — محاسبه‌شده روی داده واقعی ایستگاه‌ها (بدون بک‌اند)",
+    "resetFilters": "بازنشانی فیلترها"
+  },
+  "legend": {
+    "title": "سرعت باد (m/s)"
+  },
+  "trip": {
+    "title": "تنظیمات سفر"
+  },
+  "wizard": {
+    "searchPlaceholder": "جستجوی مکان…"
+  },
+  "settings": {
+    "theme": "تم",
+    "themeDark": "تاریک",
+    "themeLight": "روشن",
+    "themeSystem": "سیستم",
+    "language": "زبان",
+    "units": "واحدها",
+    "unitsMetric": "متریک (m/s، km)",
+    "unitsImperial": "ایمپریال (mph، mi)"
+  },
+  "results": {
+    "title": "نتیجه مسیر",
+    "layerAltitude": "لایه ارتفاعی",
+    "algorithm": "الگوریتم",
+    "criterion": "معیار",
+    "distance": "مسافت",
+    "eta": "زمان تخمینی",
+    "pathPoints": "تعداد نقاط مسیر"
+  },
+  "profile": {
+    "title": "پروفایل",
+    "name": "نام",
+    "email": "ایمیل",
+    "routeHistory": "تاریخچه مسیرها",
+    "emptyHistory": "هنوز مسیری ذخیره نشده است."
+  },
+  "onboarding": {
+    "welcome": "خوش آمدید",
+    "welcomeBody": "مسیریاب بادی — کوتاه‌ترین/کم‌مصرف‌ترین مسیر را با در نظر گرفتن باد پیدا کنید.",
+    "pickPoints": "انتخاب مبدأ و مقصد",
+    "pickPointsBody": "روی نقشه کلیک کنید تا مبدأ و مقصد را مشخص کنید.",
+    "layerAlgorithm": "لایه و الگوریتم",
+    "layerAlgorithmBody": "لایه ارتفاعی و الگوریتم مسیریابی را از پنل کنار نقشه انتخاب کنید.",
+    "start": "شروع کنید"
+  },
+  "about": {
+    "text": "روشد — مسیریاب بادی مبتنی بر داده واقعی ایستگاه‌های خراسان."
+  },
+  "common": {
+    "loading": "در حال بارگذاری…",
+    "error": "خطایی رخ داد",
+    "retry": "تلاش دوباره",
+    "close": "بستن"
+  },
+  "auth": {
+    "login": "ورود",
+    "register": "ثبت‌نام",
+    "name": "نام",
+    "email": "ایمیل",
+    "password": "رمز عبور",
+    "forgotPassword": "رمز عبور را فراموش کرده‌اید؟",
+    "sendResetLink": "ارسال لینک بازیابی",
+    "resetEmailSent": "در صورت وجود این ایمیل، لینک بازیابی ارسال شد.",
+    "resetPassword": "تعیین رمز عبور جدید",
+    "newPassword": "رمز عبور جدید",
+    "confirmPassword": "تکرار رمز عبور جدید",
+    "resetToken": "کد بازیابی",
+    "resetSuccess": "رمز عبور با موفقیت تغییر کرد.",
+    "passwordMismatch": "رمز عبور و تکرار آن یکسان نیستند.",
+    "haveToken": "کد بازیابی دارم",
+    "backToLogin": "بازگشت به ورود",
+    "verifyEmail": "تایید ایمیل",
+    "verifyEmailHint": "لینک تایید به ایمیل شما ارسال شده است.",
+    "verifySuccess": "ایمیل با موفقیت تایید شد.",
+    "registerSuccess": "ثبت‌نام موفق — ایمیل تایید ارسال شد."
+  },
+  "viewport": {
+    "title": "نمای نقشه",
+    "mapStyle": "نقشهٔ پایه",
+    "styleSimple": "ساده",
+    "styleSatellite": "ماهواره‌ای",
+    "showArrows": "پیکان‌های باد (۳بعدی)",
+    "showParticles": "جریان ذرات باد",
+    "animateWind": "حرکت ذرات باد",
+    "showHeatmap": "نقشهٔ رنگی باد",
+    "showHillshade": "سایهٔ کوهستان"
+  }
+}
