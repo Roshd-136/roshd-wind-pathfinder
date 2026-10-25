@@ -7,7 +7,12 @@
  * مسیرهای auth) یک‌بار با `/auth/refresh` تمدید و درخواست تکرار می‌شود.
  */
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
+/**
+ * همان‌مبدا پیشفرض است (`/v1/...`) — در توسعه vite proxy کرده و در استقرار
+ * nginx `/v1/` را به backend میریزد. `VITE_API_BASE_URL` برای نمونههای
+ * جداگانه باقی مانده است.
+ */
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 const REFRESH_KEY = 'windpath-refresh-token'
 
 export class ApiError extends Error {
