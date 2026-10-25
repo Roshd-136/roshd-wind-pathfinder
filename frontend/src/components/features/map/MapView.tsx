@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Coordinate, Coordinate3D, WindField } from '../../../types/routing'
 import type { ViewportSettings } from '../../../store/useUiStore'
 import { chaikinSmoothLine } from '../../../utils/geometry'
+import { cumulativeFractions, fightColor } from '../../../utils/windFight'
 import { ManualSceneView as ManualSceneView3D } from './ManualSceneView'
 import type { EditTarget, PickMissKind } from '../../../three/manual/scene-gl'
 import { applyWindFields, setParticleFlowPaused, setWindOverlaysVisible, stopParticleFlow } from './windFieldLayer'
@@ -18,6 +19,9 @@ interface MapViewProps {
   path3d?: Coordinate3D[] | null
   /** میدان‌های بادِ نمایان (مرتب بر ارتفاع) — نقشهٔ حرارتی + پیکان‌ها. */
   windFields?: WindField[]
+  /** درصد مقابله با باد برای هر نقطهٔ مسیر (هم‌طولِ path) — گرادیانِ خط؛
+   * null/ناموجود = رنگ ثابت سفید قبلی. */
+  fightProfile?: number[] | null
   viewport: ViewportSettings
   /** هر کلیک نقشه — صفحه تصمیم می‌گیرد مبدأ/مقصد/جایگزینی/اطلاعات نقطه است. */
   onMapClick: (coord: Coordinate) => void
@@ -108,7 +112,7 @@ function baseStyle(): maplibregl.StyleSpecification {
         ],
       },
       'wind-particles': { type: 'geojson' as const, data: EMPTY_FC },
-      'route-line': { type: 'geojson', data: EMPTY_LINE },
+      'route-line': { type: 'geojson', data: EMPTY_LINE, lineMetrics: true },
       'route-dots': { type: 'geojson', data: EMPTY_FC },
     },
     layers: [
@@ -221,7 +225,7 @@ export function MapView(props: MapViewProps) {
  * نمای دوبعدی (MapLibre) — تمام منطق قبلی نقشهٔ ۲بعدی این‌جاست.
  */
 function MapLibreView({
-  mode, origin, destination, checkpoints = [], path, path3d, windFields = [],
+  mode, origin, destination, checkpoints = [], path, path3d, windFields = [], fightProfile = null,
   viewport, onMapClick, onReady, active = true,
 }: MapViewProps) {
   void mode
@@ -479,6 +483,46 @@ function MapLibreView({
     }
   }, [path, mapCreated])
 
+  // رنگ‌آمیزیِ مقابله با باد روی خط مسیر — گرادیانِ GPU روی طول خط با
+  // line-progress (منبع با lineMetrics ساخته می‌شود). هر نقطهٔ اصلی مسیر
+  // یک توقف رنگی است (نازک‌شده)؛ بدونِ پروفایل، رنگ سفیدِ ثابت قبلی.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const apply = () => {
+      try {
+        if (fightProfile && path && fightProfile.length === path.length) {
+          const fracs = cumulativeFractions(path)
+          // توقف‌ها نازک می‌شوند (سقف ~۷۲) تا عبارتِ interpolate سبک بماند؛
+          // کسرهای تکراری (قطعهٔ صفر) هم یکتا می‌شوند.
+          const stride = Math.max(1, Math.ceil(path.length / 72))
+          const stops: number[] = []
+          for (let i = 0; i < path.length; i += stride) {
+            if (stops.length && fracs[i] === stops[stops.length - 2]) continue
+            const [r, g, b] = fightColor(fightProfile[i])
+            stops.push(fracs[i], `rgb(${r}, ${g}, ${b})`)
+          }
+          // بندِ پایانی دقیقاً روی ۱ — آخرین مسیرِ رنگ
+          if (fracs[path.length - 1] !== stops[stops.length - 2]) {
+            const [r, g, b] = fightColor(fightProfile[path.length - 1])
+            stops.push(fracs[path.length - 1], `rgb(${r}, ${g}, ${b})`)
+          }
+          map.setPaintProperty(ROUTE_LAYER_ID, 'line-gradient', [
+            'interpolate',
+            ['linear'],
+            ['line-progress'],
+            ...stops,
+          ])
+        } else {
+          map.setPaintProperty(ROUTE_LAYER_ID, 'line-gradient', null)
+        }
+      } catch {
+        // استایل هنوز کامل نیست — بی‌خیال؛ تغییر بعدیِ مسیر دوباره اعمال می‌کند
+      }
+    }
+    apply()
+  }, [fightProfile, path, mapCreated])
+
   // بازگشت از حالت مخفی (۲↔۳بعدی با نگه‌داشتن زنده) — بوم اندازهٔ کهنه دارد؛
   // صریح resize می‌کنیم تا نقشه به‌جای کادر صفر/کهنه، کادر واقعی را بگیرد.
   useEffect(() => {
@@ -493,7 +537,7 @@ function MapLibreView({
  * سه‌بعدی بوم mount نمی‌شود تا صفحهٔ سیاه/خالی دیده نشود.
  */
 function MapView3D({
-  origin, destination, checkpoints = [], path3d, windFields = [],
+  origin, destination, checkpoints = [], path3d, windFields = [], fightProfile = null,
   viewport, onMapClick, paused = false, editTarget = null, placingPoint, onPointEdit, onPointPick, onPickMiss,
 }: MapViewProps) {
   const has3dPath = Boolean(path3d && path3d.length > 1)
@@ -506,6 +550,7 @@ function MapView3D({
           checkpoints={checkpoints}
           path3d={path3d}
           windFields={windFields}
+          fightProfile={fightProfile}
           showArrows={viewport.showArrows}
           paused={paused}
           editTarget={editTarget}

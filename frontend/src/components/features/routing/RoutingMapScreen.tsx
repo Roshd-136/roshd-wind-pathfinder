@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type maplibregl from 'maplibre-gl'
 import { MapView } from '../map/MapView'
@@ -11,6 +11,7 @@ import { useRouteStore } from '../../../store/useRouteStore'
 import { useUiStore } from '../../../store/useUiStore'
 import type { Checkpoint, Coordinate, RouteResult, WindField, LayerVisibility } from '../../../types/routing'
 import { fieldSpeedRange } from '../../../utils/windField'
+import { computeFightProfile } from '../../../utils/windFight'
 import { WIND_LAYER_BANDS } from '../../../config/routing'
 import { ApiError } from '../../../services/api/client'
 import { PathInfoPanel } from './PathInfoPanel'
@@ -149,6 +150,21 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
       ),
     )
     .sort((a, b) => a.altitude_m - b.altitude_m)
+
+  // پروفایل «مقابله با باد» برای رنگِ مسیر در هر دو نما (۲بعدی گرادیانِ
+  // خط، ۳بعدی لولهٔ رنگی) — هر نقطه با نزدیک‌ترین لایهٔ ارتفاعیِ خودش
+  // نمونه می‌شود. بدونِ نتیجه یا میدانِ باد null تا نماها رنگ ثابت بمانند.
+  const fightProfile = useMemo(
+    () =>
+      result
+        ? computeFightProfile(
+            result.path_3d ??
+              result.path.map((c) => ({ ...c, alt: result.layer_altitude_m })),
+            fields,
+          )
+        : null,
+    [result, fields],
+  )
 
   // حالت «افزودن چک‌پوینت»: کلیک بعدی در هر دو نما چک‌پوینت می‌گذارد
   // (بدون نگه‌داشتن). در ۲بعدی کلیک روی نقشه است؛ در ۳بعدی کلیک روی دشتِ
@@ -298,6 +314,7 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
           checkpoints={checkpoints}
           path={result?.path ?? null}
           path3d={result?.path_3d ?? null}
+          fightProfile={fightProfile}
           windFields={visibleFields}
           viewport={viewport}
           onMapClick={handleMapClick}

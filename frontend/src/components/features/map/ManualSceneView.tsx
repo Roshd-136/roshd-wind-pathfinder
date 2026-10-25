@@ -9,6 +9,8 @@ interface ManualSceneViewProps {
   checkpoints?: Array<Coordinate & { alt?: number }>
   path3d?: Coordinate3D[] | null
   windFields?: WindField[]
+  /** درصد مقابله با باد برای هر نقطهٔ path3d — رنگِ لولهٔ مسیر (سفید→سرخ). */
+  fightProfile?: number[] | null
   /** کلید «پیکان‌های باد» تنظیمات نما — در صحنهٔ دستی هم محترم است. */
   showArrows?: boolean
   /** صحنه مخفی است (کاربر در ۲بعدی است): حلقهٔ رندر متوقف ولی داده‌ها زنده. */
@@ -39,6 +41,7 @@ export function ManualSceneView({
   checkpoints = [],
   path3d,
   windFields = [],
+  fightProfile = null,
   showArrows = true,
   paused = false,
   editTarget = null,
@@ -53,10 +56,10 @@ export function ManualSceneView({
   const labelsRef = useRef<HTMLDivElement>(null)
   // آخرین داده‌ها در ref — boot ناهمگام پس از initTerrain آخرین وضعیت را
   // می‌گیرد و اثر داده هم هر تغییر را به صحنهٔ آماده اعمال می‌کند.
-  const dataRef = useRef({ origin, destination, checkpoints, path3d, windFields, showArrows, paused })
+  const dataRef = useRef({ origin, destination, checkpoints, path3d, windFields, fightProfile, showArrows, paused })
   const handlersRef = useRef({ onMapClick, onPointEdit, onPointPick, onPickMiss, editTarget })
   useEffect(() => {
-    dataRef.current = { origin, destination, checkpoints, path3d, windFields, showArrows, paused }
+    dataRef.current = { origin, destination, checkpoints, path3d, windFields, fightProfile, showArrows, paused }
     handlersRef.current = { onMapClick, onPointEdit, onPointPick, onPickMiss, editTarget }
   })
 
@@ -70,6 +73,7 @@ export function ManualSceneView({
       origin: d.origin,
       destination: d.destination,
       checkpoints: d.checkpoints,
+      fightProfile: d.fightProfile,
     })
   }
 
