@@ -40,6 +40,8 @@
     "checkpointPlaced": "چک‌پوینت #{{n}} ثبت شد",
     "checkpointPickMissOutside": "«اینجا بیرون از کادر دادهٔ برنامه (زمین/باد) است — نزدیک‌تر به مسیر یا داخل کادر زمین کلیک کنید»",
     "checkpointPickMissSky": "«اینجا آسمان است — روی زمین کلیک کنید»",
+    "checkpointAltitudeAria": "ارتفاع چک‌پوینت #{{n}} (متر MSL)",
+    "checkpointAltitudeHint": "ارتفاع اجباری عبور به متر MSL — خالی = عبور آزاد",
     "altitudeBandLabel": "باند ارتفاع پرواز",
     "altitudeAllHint": "از سطح زمین تا {{max}} متر",
     "altitudeBand": "{{min}} تا {{max}} متر",
