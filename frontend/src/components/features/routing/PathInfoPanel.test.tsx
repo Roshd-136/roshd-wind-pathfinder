@@ -1,8 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
-import type { ReactNode } from 'react'
+import userEvent from '@testing-library/user-event'
+import { useState, type ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import i18n from '../../../i18n'
+import type { RouteConstraints, RouteResult } from '../../../types/routing'
 import { PathInfoPanel } from './PathInfoPanel'
 
 // ژئوکدینگ معکوس (شبکهٔ واقعی OSM) در آزمون به نتیجهٔ ثابت قفل می‌شود —
@@ -125,5 +127,142 @@ describe('PathInfoPanel', () => {
   it('has no straight-line row until both points are chosen', () => {
     withProviders(<PathInfoPanel {...pickedProps} destination={null} />)
     expect(screen.queryByTestId('straight-line')).not.toBeInTheDocument()
+  })
+
+  // ————— سرعت موتور (کامنت ۷) —————
+
+  const advancedToggle = () => screen.getByRole('button', { name: 'Advanced settings' })
+  const motorInput = () => screen.getByLabelText('Motor speed (m/s)')
+
+  const emptyConstraints: RouteConstraints = {
+    criterion: 'time',
+    altitude_range_m: null,
+    max_wind_speed_mps: null,
+    avoid_zones: [],
+  }
+
+  /**
+   * شبیه‌سازی والد واقعی: `constraints` از استور برمی‌گردد تا پیشنویسِ
+   * ورودی سرعت موتور با vessel همگام بماند (رفتار واقعی RoutingMapScreen) —
+   * بدون این، ورودی کنترل‌شده در آزمون با مقدار خودش همگام نمی‌شود.
+   */
+  function MotorHarness(props: {
+    initialConstraints: RouteConstraints
+    onConstraintsChange: (c: RouteConstraints) => void
+    result?: RouteResult | null
+    windSpeedAtLayer?: { altitudeM: number; speedMps: number } | null
+  }) {
+    const [constraints, setConstraints] = useState(props.initialConstraints)
+    return (
+      <PathInfoPanel
+        {...baseProps}
+        constraints={constraints}
+        onConstraintsChange={(c) => {
+          setConstraints(c)
+          props.onConstraintsChange(c)
+        }}
+        result={props.result ?? null}
+        windSpeedAtLayer={props.windSpeedAtLayer ?? null}
+      />
+    )
+  }
+
+  it('writes the motor speed into constraints.vessel (comment 7)', async () => {
+    const user = userEvent.setup()
+    const onConstraintsChange = vi.fn()
+    withProviders(
+      <MotorHarness
+        initialConstraints={emptyConstraints}
+        onConstraintsChange={onConstraintsChange}
+      />,
+    )
+    await user.click(advancedToggle())
+    await user.type(motorInput(), '18')
+    expect(onConstraintsChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        vessel: {
+          type: 'aircraft',
+          airspeed_mps: 18,
+          induced_drag_coeff: 0.3,
+          headwind_penalty_coeff: 0.25,
+        },
+      }),
+    )
+  })
+
+  it('clearing the input drops vessel so the backend engine default applies', async () => {
+    const user = userEvent.setup()
+    const onConstraintsChange = vi.fn()
+    withProviders(
+      <MotorHarness
+        initialConstraints={{
+          ...emptyConstraints,
+          vessel: {
+            type: 'aircraft',
+            airspeed_mps: 20,
+            induced_drag_coeff: 0.3,
+            headwind_penalty_coeff: 0.25,
+          },
+        }}
+        onConstraintsChange={onConstraintsChange}
+      />,
+    )
+    await user.click(advancedToggle())
+    expect(motorInput()).toHaveValue('20')
+    await user.clear(motorInput())
+    const last = onConstraintsChange.mock.lastCall?.[0] as RouteConstraints
+    expect(last).not.toHaveProperty('vessel')
+  })
+
+  it('shows wind speed at the flight layer and the ≈ badge when motor matches', async () => {
+    const user = userEvent.setup()
+    withProviders(
+      <MotorHarness
+        initialConstraints={emptyConstraints}
+        onConstraintsChange={vi.fn()}
+        result={sampleResult}
+        windSpeedAtLayer={{ altitudeM: 1500, speedMps: 7.1 }}
+      />,
+    )
+    await user.click(advancedToggle())
+    expect(screen.getByTestId('wind-at-layer')).toHaveTextContent(
+      'Wind speed at 1,500 m: 7.1 m/s',
+    )
+    await user.type(motorInput(), '7')
+    // |۷ − ۷٫۱| = ۰٫۱ ≤ ۵٪ × ۷٫۱ — نشانِ «تقریباً برابر» دیده می‌شود
+    expect(screen.getByTestId('motor-matches-wind')).toBeInTheDocument()
+  })
+
+  it('does not show the ≈ badge when the motor speed clearly differs from wind', async () => {
+    const user = userEvent.setup()
+    withProviders(
+      <MotorHarness
+        initialConstraints={emptyConstraints}
+        onConstraintsChange={vi.fn()}
+        result={sampleResult}
+        windSpeedAtLayer={{ altitudeM: 1500, speedMps: 7.1 }}
+      />,
+    )
+    await user.click(advancedToggle())
+    await user.type(motorInput(), '15')
+    expect(screen.queryByTestId('motor-matches-wind')).not.toBeInTheDocument()
+  })
+
+  it('enables the unified reset once a motor speed is set', () => {
+    withProviders(
+      <PathInfoPanel
+        {...baseProps}
+        constraints={{
+          ...emptyConstraints,
+          vessel: {
+            type: 'aircraft',
+            airspeed_mps: 20,
+            induced_drag_coeff: 0.3,
+            headwind_penalty_coeff: 0.25,
+          },
+        }}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Reset filters' })).toBeEnabled()
   })
 })

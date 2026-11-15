@@ -10,7 +10,7 @@ import { useWindFields } from '../../../hooks/useWindData'
 import { useRouteStore } from '../../../store/useRouteStore'
 import { useUiStore } from '../../../store/useUiStore'
 import type { Checkpoint, Coordinate, RouteResult, WindField, LayerVisibility } from '../../../types/routing'
-import { fieldSpeedRange } from '../../../utils/windField'
+import { fieldSpeedRange, meanWindSpeedMps } from '../../../utils/windField'
 import { WIND_LAYER_BANDS } from '../../../config/routing'
 import { ApiError } from '../../../services/api/client'
 import { PathInfoPanel } from './PathInfoPanel'
@@ -150,6 +150,22 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
     )
     .sort((a, b) => a.altitude_m - b.altitude_m)
 
+  // سرعت میانگین بادِ نزدیک‌ترین لایهٔ نمایان به لایهٔ پروازِ نتیجه —
+  // گزارهٔ «سرعت موتور ≈ سرعت باد» در تنظیمات پیشرفته (کامنت ۷).
+  const windSpeedAtLayer = (() => {
+    if (!result || visibleFields.length === 0) return null
+    let best = visibleFields[0]
+    let bestDist = Math.abs(best.altitude_m - result.layer_altitude_m)
+    for (const field of visibleFields.slice(1)) {
+      const dist = Math.abs(field.altitude_m - result.layer_altitude_m)
+      if (dist < bestDist) {
+        best = field
+        bestDist = dist
+      }
+    }
+    return { altitudeM: best.altitude_m, speedMps: meanWindSpeedMps(best) }
+  })()
+
   // حالت «افزودن چک‌پوینت»: کلیک بعدی در هر دو نما چک‌پوینت می‌گذارد
   // (بدون نگه‌داشتن). در ۲بعدی کلیک روی نقشه است؛ در ۳بعدی کلیک روی دشتِ
   // زمین واقعی — پیکان‌یابی زمینی صحنه (`pickLatLon`) مختصات را می‌دهد و
@@ -285,6 +301,7 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
       resultIsDemo={isDemoResult}
       origin={origin}
       destination={destination}
+      windSpeedAtLayer={windSpeedAtLayer}
     />
   )
 

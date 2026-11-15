@@ -150,6 +150,17 @@ export function speedBucket(speedMps: number): '0' | '5' | '10' | '15' | '20' {
 }
 
 /**
+ * میانگین سرعت باد میدان — برای گزارهٔ «سرعت موتور ≈ سرعت باد این لایه»
+ * (کامنت ۷ «کامنت‌های نرم‌افزار»: کاربر میخواهد بداند سرعت موتوری که وارد
+ * میکند با بادِ ارتفاع پرواز قابل مقایسه است یا نه).
+ */
+export function meanWindSpeedMps(field: WindField): number {
+  if (field.vectors.length === 0) return 0
+  const sum = field.vectors.reduce((acc, v) => acc + v.speed_mps, 0)
+  return Number((sum / field.vectors.length).toFixed(2))
+}
+
+/**
  * بازهٔ [min,max] سرعت خود میدان — برای رنگ‌آمیزی نسبی (مثل رفتار
  * `arrowscale` نسبی صحنهٔ بصری‌سازی).
  */
