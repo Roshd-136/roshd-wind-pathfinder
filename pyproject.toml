@@ -22,6 +22,15 @@ dev = [
     "pytest>=7.4",
     "ruff>=0.4",
 ]
+# سرویس API (src/api) — این وابستگیها از قبل توسط کدِ ادغامشده لازمند؛
+# این extra صرفاً واقعیتِ موجود را اعلان میکند (کامنت ۱۳ — آزمون API).
+api = [
+    "fastapi>=0.100",
+    "uvicorn>=0.23",
+    "httpx>=0.24",
+    "email-validator>=2.0",
+    "pyjwt>=2.8",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
