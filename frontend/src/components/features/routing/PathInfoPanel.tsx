@@ -58,6 +58,8 @@ interface PathInfoPanelProps {
   /** سرعت میانگین باد نزدیک‌ترین لایهٔ نمایان به لایهٔ پروازِ نتیجه —
    * برای گزارهٔ «سرعت موتور ≈ سرعت باد» (کامنت ۷). */
   windSpeedAtLayer?: { altitudeM: number; speedMps: number } | null
+  /** ثبت ارتفاع اجباری چک‌پوینت (کامنت ۸) — به CheckpointManager پاس می‌شود. */
+  onSetCheckpointAltitude?: (index: number, alt: number | null) => void
 }
 
 /**
@@ -99,6 +101,7 @@ export function PathInfoPanel({
   origin,
   destination,
   windSpeedAtLayer = null,
+  onSetCheckpointAltitude,
 }: PathInfoPanelProps) {
   void onClear
   void canClear
@@ -357,6 +360,7 @@ export function PathInfoPanel({
           adding={addingCheckpoint}
           onToggleAdd={onToggleAddCheckpoint}
           canAdd={canAddCheckpoint}
+          onSetAltitude={onSetCheckpointAltitude}
         />
       </section>
 

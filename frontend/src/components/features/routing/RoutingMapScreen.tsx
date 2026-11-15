@@ -62,6 +62,7 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
     removeCheckpoint,
     setCheckpointCoord,
     moveCheckpoint,
+    setCheckpointAltitude,
     setAlgorithm,
     setConstraints,
     setLayerVisibility,
@@ -302,6 +303,7 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
       origin={origin}
       destination={destination}
       windSpeedAtLayer={windSpeedAtLayer}
+      onSetCheckpointAltitude={setCheckpointAltitude}
     />
   )
 

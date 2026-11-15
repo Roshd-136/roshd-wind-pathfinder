@@ -27,6 +27,8 @@ interface RouteState {
   removeCheckpoint: (index: number) => void
   setCheckpointCoord: (index: number, coord: Coordinate) => void
   moveCheckpoint: (index: number, direction: -1 | 1) => void
+  /** ارتفاع اجباری چک‌پوینت (متر MSL) — null یعنی عبور آزاد (کامنت ۸). */
+  setCheckpointAltitude: (index: number, alt: number | null) => void
   setAlgorithm: (a: Algorithm) => void
   setConstraints: (c: RouteConstraints) => void
   setLayerVisibility: (v: LayerVisibility) => void
@@ -87,6 +89,19 @@ export const useRouteStore = create<RouteState>((set) => ({
       ;[next[index], next[target]] = [next[target], next[index]]
       return { checkpoints: next.map((cp, i) => ({ ...cp, order: i })) }
     }),
+  // ارتفاع اجباری چک‌پوینت (کامنت ۸ «کامنت‌های نرم‌افزار») — همان `alt`ای که
+  // بکاند در `Checkpoint.alt` (gt=0) میخواند و مسیر را دقیقاً در آن ارتفاع
+  // قفل میکند؛ null یعنی بدون قفل ارتفاع.
+  setCheckpointAltitude: (index, alt) =>
+    set((s) => ({
+      checkpoints: s.checkpoints.map((cp, i) => {
+        if (i !== index) return cp
+        const next: Checkpoint = { ...cp }
+        if (alt == null) delete next.alt
+        else next.alt = alt
+        return next
+      }),
+    })),
   setAlgorithm: (algorithm) => set({ algorithm }),
   setConstraints: (constraints) => set({ constraints }),
   setLayerVisibility: (layerVisibility) => set({ layerVisibility }),

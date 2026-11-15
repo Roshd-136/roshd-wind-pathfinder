@@ -40,6 +40,8 @@
     "checkpointPlaced": "Checkpoint #{{n}} added",
     "checkpointPickMissOutside": "Outside the data bounds (terrain/wind) — click closer to the route or inside the terrain area",
     "checkpointPickMissSky": "This is the sky — click on the ground instead",
+    "checkpointAltitudeAria": "Altitude of checkpoint #{{n}} (m MSL)",
+    "checkpointAltitudeHint": "Required crossing altitude in m MSL — empty = free crossing",
     "altitudeBandLabel": "Flight altitude band",
     "altitudeAllHint": "All altitude bands (0 to {{max}} m)",
     "altitudeBand": "{{min}} to {{max}} m above ground",
