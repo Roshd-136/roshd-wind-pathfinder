@@ -8,7 +8,7 @@ import { useUiStore } from '../../../store/useUiStore'
  * نقشهٔ رنگی باد و سایهٔ کوهستان. همه در `useUiStore` نگه داشته می‌شود و
  * MapView مستقیماً به آن واکنش نشان می‌دهد.
  */
-export function ViewportSettings() {
+export function ViewportSettings({ placement = 'side' }: { placement?: 'side' | 'below' }) {
   const { t } = useTranslation()
   const viewport = useUiStore((s) => s.viewport)
   const setViewport = useUiStore((s) => s.setViewport)
@@ -34,12 +34,20 @@ export function ViewportSettings() {
       // کلاس‌های Tailwindِ ساخته‌شده با interpolation هرگز استخراج نمی‌شوند
       // (قبلاً همین‌جا بی‌اثر بود و قاب سر جای تنظیم‌شده نمی‌نشست). سمتِ
       // افقی منطقی است (end-full): در RTL به سمت نقشه از ستون ابزارِ چپ و
-      // در LTR به سمت نقشه از ستونِ راست باز می‌شود.
-      className="absolute end-full z-20 w-64 rounded-2xl border border-border bg-surface/95 p-3 shadow-[var(--shadow-card),inset_0_1px_2px_rgba(255,255,255,0.06),inset_0_-1px_2px_rgba(0,0,0,0.18)] backdrop-blur-sm"
-      style={{
-        top: `${VIEWPORT_POPOVER.topRem}rem`,
-        marginInlineEnd: `${VIEWPORT_POPOVER.gapRem}rem`,
-      }}
+      // در LTR به سمت نقشه از ستونِ راست باز می‌شود. در ردیف افقی موبایل
+      // (`below`) قاب زیر دکمه باز میشود — کنارِ آن بیرونِ قاب می‌افتد و
+      // کِشش افقی ردیف را هم خراب میکرد.
+      className={`absolute z-20 w-64 rounded-2xl border border-border bg-surface/95 p-3 shadow-[var(--shadow-card),inset_0_1px_2px_rgba(255,255,255,0.06),inset_0_-1px_2px_rgba(0,0,0,0.18)] backdrop-blur-sm ${
+        placement === 'below' ? 'start-0 top-full mt-2' : 'end-full'
+      }`}
+      style={
+        placement === 'below'
+          ? undefined
+          : {
+              top: `${VIEWPORT_POPOVER.topRem}rem`,
+              marginInlineEnd: `${VIEWPORT_POPOVER.gapRem}rem`,
+            }
+      }
     >
       <div className="mb-2 flex items-center justify-between">
         <span className="text-xs font-semibold text-text-primary">{t('viewport.title')}</span>

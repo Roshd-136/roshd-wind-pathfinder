@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { useUiStore } from '../../store/useUiStore'
 
 interface MobileBottomSheetProps {
@@ -8,29 +8,135 @@ interface MobileBottomSheetProps {
 }
 
 /**
- * Bottom sheet موبایل — جایگزین پنل کنترل سمت راست دسکتاپ روی صفحات باریک
- * (< md)؛ به سبک Uber/Snapp: نقشهٔ تمام‌صفحه و شیت تنظیمات سفر پایین صفحه
- * با دستهٔ کشیدنی. فقط زیر md نمایش داده می‌شود (پنل دسکتاپ در
- * AppShell/صفحات با `md:flex` مخفی نگه داشته می‌شود).
+ * Bottom sheet موبایل کشیدنی — جایگزین پنل کنارِ دسکتاپ روی صفحات باریک
+ * (< md). دو حالت سنجاق دارد: جمع‌شده (فقط دسته و عنوان، پایین صفحه) و
+ * باز (به سمت بالا، با فاصلهٔ ~۴rem از سقف تا نقشه دیده بماند).
+ *
+ * دستهٔ بالایی با PointerEvent کشیده میشود و در پایان به نزدیک‌ترین
+ * سنجاق می‌نشیند؛ کلیک روی دسته و کیبورد (Enter/Space روی دکمهٔ دسته)
+ * هم حالت را عوض میکند. پیشتر شیت نه کشیدنی بود و نه جمع‌شونده — با
+ * بازشدن تقریباً کل قاب را می‌پوشاند و «با دست جابهجا نمیشد»
+ * (بازخورد تست موبایل). ارتفاع محتوا همیشه در DOM میماند تا ریاضیاتِ
+ * کشش (فاصلهٔ سنجاقِ جمع) درست باشد؛ محتوای جمعشده با `inert` از
+ * ترتیب تب و درخت دسترس‌پذیری خارج میشود.
  */
 export function MobileBottomSheet({ children, title }: MobileBottomSheetProps) {
-  const { isMobileSheetOpen, closeMobileSheet } = useUiStore()
+  const isOpen = useUiStore((s) => s.isMobileSheetOpen)
+  const openMobileSheet = useUiStore((s) => s.openMobileSheet)
+  const closeMobileSheet = useUiStore((s) => s.closeMobileSheet)
+
+  const sheetRef = useRef<HTMLDivElement | null>(null)
+  const headerRef = useRef<HTMLDivElement | null>(null)
+  /** جابهجایی زندهٔ شیت در حین کشش — null یعنی خارج از کشش (کلاس CSS). */
+  const [dragY, setDragY] = useState<number | null>(null)
+  const drag = useRef<{ startY: number; peekY: number; lastY: number } | null>(null)
+  /** آیا در این کشش واقعاً جابهجایی رخ داد — برای ساکت‌کردن clickِ پس از رهاکردن. */
+  const movedRef = useRef(false)
+
+  function handlePointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+    const sheet = sheetRef.current
+    const header = headerRef.current
+    if (!sheet || !header) return
+    const peekY = Math.max(0, sheet.offsetHeight - header.offsetHeight)
+    drag.current = { startY: e.clientY, peekY, lastY: isOpen ? 0 : peekY }
+    movedRef.current = false
+    try {
+      header.setPointerCapture(e.pointerId)
+    } catch {
+      // محیط بدون setPointerCapture — کشش بدون قفلِ اشارهگر ادامه می‌یابد
+    }
+    setDragY(drag.current.lastY)
+  }
+
+  function handlePointerMove(e: ReactPointerEvent<HTMLDivElement>) {
+    const d = drag.current
+    if (!d) return
+    if (Math.abs(e.clientY - d.startY) > 6) movedRef.current = true
+    const y = Math.min(d.peekY, Math.max(0, d.lastY + (e.clientY - d.startY)))
+    d.lastY = y
+    setDragY(y)
+  }
+
+  function settle() {
+    const d = drag.current
+    if (!d) return
+    const goOpen = d.lastY < d.peekY / 2
+    drag.current = null
+    setDragY(null)
+    if (goOpen) openMobileSheet()
+    else closeMobileSheet()
+  }
+
+  function handleToggleClick() {
+    // بعد از کشیدن، مرورگر یک click مصنوعی میدهد — اگر واقعاً کشیده شده
+    // بود، سنجاقِ pointerup را خراب نکند.
+    if (movedRef.current) {
+      movedRef.current = false
+      return
+    }
+    if (isOpen) closeMobileSheet()
+    else openMobileSheet()
+  }
+
+  const whileDragging = dragY != null
 
   return (
-    <div
-      className={`fixed inset-x-0 bottom-0 z-20 max-h-[80dvh] overflow-y-auto rounded-t-2xl border-t border-border bg-surface p-4 shadow-[var(--shadow-card)] transition-transform duration-300 md:hidden ${
-        isMobileSheetOpen ? 'translate-y-0' : 'translate-y-[calc(100%-4.5rem)]'
-      }`}
-    >
-      <button
-        onClick={closeMobileSheet}
-        aria-label="toggle sheet"
-        className="mx-auto mb-3 block h-1.5 w-12 rounded-full bg-border"
-      />
-      {title && (
-        <h2 className="mb-3 text-center text-sm font-semibold text-text-primary">{title}</h2>
-      )}
-      {children}
+    <div className="fixed inset-x-0 bottom-0 z-30 md:hidden">
+      <div
+        ref={sheetRef}
+        data-testid="mobile-sheet"
+        style={whileDragging ? { transform: `translateY(${dragY}px)`, transition: 'none' } : undefined}
+        className={`flex max-h-[calc(100dvh-4rem)] flex-col rounded-t-2xl border-t border-border bg-surface shadow-[var(--shadow-card)] ${
+          whileDragging
+            ? ''
+            : isOpen
+              ? 'translate-y-0 transition-transform duration-300'
+              : 'translate-y-[calc(100%-3.5rem)] transition-transform duration-300'
+        }`}
+      >
+        {/* دسته + عنوان — نوار بالای شیت؛ در حالت جمع فقط همین باریکه
+            (۳٫۵rem) از پایین صفحه دیده میشود. touch-none کشش را از
+            اسکرول/پULL-تو-رفرش مرورگر جدا میکند. */}
+        <div
+          ref={headerRef}
+          data-testid="mobile-sheet-grab"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={settle}
+          onPointerCancel={() => {
+            // رهاکردن اشارهگر بدون تصمیم (مثلاً تماس قطع شد) — برگشت به
+            // حالت قبل، بدون تغییر سنجاق
+            drag.current = null
+            setDragY(null)
+          }}
+          className="h-14 shrink-0 touch-none select-none"
+        >
+          <button
+            type="button"
+            onClick={handleToggleClick}
+            aria-expanded={isOpen}
+            aria-controls="mobile-sheet-content"
+            aria-label={title ?? 'toggle sheet'}
+            className="mx-auto mt-2 flex h-6 w-24 items-center justify-center rounded-full"
+          >
+            <span className="block h-1.5 w-12 rounded-full bg-border" aria-hidden />
+          </button>
+          {title && (
+            <h2 className="text-center text-sm font-semibold text-text-primary">{title}</h2>
+          )}
+        </div>
+        {/* محتوا — همیشه در DOM (اندازهٔ کامل شیت برای ریاضیاتِ کشش)،
+            فقط در حالت باز دیده/در دسترس است. سقف محتوا ۴rem از سقفِ
+            نمایشگر فاصله میگذارد تا نقشه بالا سرش دیده بماند. */}
+        <div
+          id="mobile-sheet-content"
+          className="min-h-0 overflow-y-auto overscroll-contain px-4 pb-4"
+          aria-hidden={!isOpen}
+          inert={!isOpen}
+        >
+          {children}
+        </div>
+      </div>
     </div>
   )
 }

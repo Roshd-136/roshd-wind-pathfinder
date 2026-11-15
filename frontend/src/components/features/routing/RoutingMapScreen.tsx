@@ -389,37 +389,50 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
             onClose={() => pathfinding.reset()}
           />
         )}
-        {/* ویزارد مراحل — قاب وسط بالا؛ بازگشت انتخابِ گام فرود را پاک می‌کند
-            (کاربر باید دوباره انتخاب کند تا «بعدی» باز شود) */}
-        <StepsWizard
-          origin={origin}
-          destination={destination}
-          hasResult={Boolean(result)}
-          step={wizardStep}
-          onBack={() => {
-            // رفتن به گام قبل، انتخاب همان گام را پاک می‌کند: گام ۲ → مقصد،
-            // گام ۳ → نتیجه (مسیر روی صفحه می‌ماند ولی «انجام‌شده» نیست).
-            const prev = Math.max(1, wizardStep - 1) as 1 | 2 | 3
-            if (wizardStep === 2) setDestination(null)
-            else if (wizardStep === 3) {
-              setResult(null)
-              setAlternatives([])
-              setIsDemoResult(false)
-            }
-            setWizardStep(prev)
-          }}
-          onNext={() => {
-            // گام بعدی فقط وقتی گام جاری ورودی خود را دارد
-            const hasInput = wizardStep === 1 ? origin !== null : wizardStep === 2 ? destination !== null : true
-            if (!hasInput) return
-            setWizardStep(Math.min(3, wizardStep + 1) as 1 | 2 | 3)
-          }}
-          canNext={wizardStep === 1 ? origin !== null : wizardStep === 2 ? destination !== null : true}
-          onCalculate={handleCalculate}
-          canCalculate={Boolean(origin && destination)}
-          isCalculating={pathfinding.isPending}
-          isStale={isStale}
-        />
+        {/* پوشش واکنش‌گرای ویزارد — دسکتاپ: قاب وسط بالا به عرض ۲۴rem
+            (همانند قبل). موبایل: عرض قاب = کل پهنا منهای ۲rem و ردیف افقی
+            ابزار زیر آن؛ قبلاً ویزارد خودش موضع مطلق داشت و ستون ابزارِ
+            `top-4 end-4` با آن همپوشانی می‌ساخت (بازخورد تست موبایل).
+            بازگشت انتخابِ گام فرود را پاک می‌کند (کاربر باید دوباره
+            انتخاب کند تا «بعدی» باز شود). */}
+        <div className="absolute inset-x-2 top-4 z-10 flex flex-col items-center gap-2 md:left-1/2 md:right-auto md:w-[24rem] md:-translate-x-1/2">
+          <StepsWizard
+            origin={origin}
+            destination={destination}
+            hasResult={Boolean(result)}
+            step={wizardStep}
+            onBack={() => {
+              // رفتن به گام قبل، انتخاب همان گام را پاک می‌کند: گام ۲ → مقصد،
+              // گام ۳ → نتیجه (مسیر روی صفحه می‌ماند ولی «انجام‌شده» نیست).
+              const prev = Math.max(1, wizardStep - 1) as 1 | 2 | 3
+              if (wizardStep === 2) setDestination(null)
+              else if (wizardStep === 3) {
+                setResult(null)
+                setAlternatives([])
+                setIsDemoResult(false)
+              }
+              setWizardStep(prev)
+            }}
+            onNext={() => {
+              // گام بعدی فقط وقتی گام جاری ورودی خود را دارد
+              const hasInput =
+                wizardStep === 1 ? origin !== null : wizardStep === 2 ? destination !== null : true
+              if (!hasInput) return
+              setWizardStep(Math.min(3, wizardStep + 1) as 1 | 2 | 3)
+            }}
+            canNext={wizardStep === 1 ? origin !== null : wizardStep === 2 ? destination !== null : true}
+            onCalculate={handleCalculate}
+            canCalculate={Boolean(origin && destination)}
+            isCalculating={pathfinding.isPending}
+            isStale={isStale}
+          />
+          {/* ردیف ابزار افقی موبایل — زیر ویزارد، قابل کشش افقی (فقط زیر md) */}
+          <MapTools
+            layout="horizontal"
+            onZoomIn={() => mapRef.current?.zoomIn()}
+            onZoomOut={() => mapRef.current?.zoomOut()}
+          />
+        </div>
       </div>
 
       {/* پنل شناور روی نقشه (دسکتاپ) — باز/جمع‌شدن با لغزش نرم به بیرون +
