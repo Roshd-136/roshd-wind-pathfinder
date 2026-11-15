@@ -5,6 +5,7 @@ import {
   colorForFieldSpeed,
   colorForSpeed,
   gridMeta,
+  meanWindSpeedMps,
   sampleWindAtPoint,
   speedBucket,
 } from './windField'
@@ -127,5 +128,15 @@ describe('colorForFieldSpeed (relative coloring — like the routing scene)', ()
     const c = colorForFieldSpeed(7.8, range)
     expect(a).not.toEqual(b)
     expect(b).not.toEqual(c)
+  })
+})
+
+describe('meanWindSpeedMps (motor-vs-wind statement — comment 7)', () => {
+  it('averages the vector speeds of the field (9 vectors, sum 72 → 8)', () => {
+    expect(meanWindSpeedMps(FIELD)).toBe(8)
+  })
+
+  it('returns 0 for an empty field instead of NaN', () => {
+    expect(meanWindSpeedMps({ altitude_m: 1500, vectors: [] })).toBe(0)
   })
 })

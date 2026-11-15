@@ -1,4 +1,5 @@
 import { RefreshCw } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type {
   Algorithm,
@@ -19,6 +20,7 @@ import {
   formatAltitudeM,
   formatDistanceKm,
   formatDurationHours,
+  formatSpeedMps,
   toFaDigits,
 } from '../../../utils/format'
 import { useFormatLang } from '../../../hooks/useFormatLang'
@@ -29,6 +31,7 @@ import { Segmented } from '../../ui/Segmented'
 import { AlgorithmSelector } from './AlgorithmSelector'
 import { CheckpointManager } from './CheckpointManager'
 import { PlaceLabel } from './PlaceLabel'
+import { TextField } from '../../ui/TextField'
 
 interface PathInfoPanelProps {
   algorithm: Algorithm
@@ -52,6 +55,9 @@ interface PathInfoPanelProps {
   /** مبدا/مقصد برای بخش «همیشه‌دید» و مقایسهٔ خط مستقیم (کامنت ۹). */
   origin: Coordinate | null
   destination: Coordinate | null
+  /** سرعت میانگین باد نزدیک‌ترین لایهٔ نمایان به لایهٔ پروازِ نتیجه —
+   * برای گزارهٔ «سرعت موتور ≈ سرعت باد» (کامنت ۷). */
+  windSpeedAtLayer?: { altitudeM: number; speedMps: number } | null
 }
 
 /**
@@ -69,8 +75,8 @@ function altitudeModeOf(v: LayerVisibility): AltitudeMode {
  * ۱) نتیجه (بعد از محاسبه در صدر پنل)، ۲) «مبدا و مقصد» همیشه‌دید با خط
  * مستقیم هوایی (کامنت ۹ «کامنت‌های نرم‌افزار»)، ۳) «بهینه‌سازی برای»
  * به‌صورت سگمنت (معیار، مهم‌ترین انتخاب)، ۴) محدودیت‌های پرواز (حداکثر باد
- * + باند ارتفاع یکپارچه)، ۵) چک‌پوینت‌ها، ۶) تنظیمات پیشرفته (الگوریتم
- * و اجتناب از مناطق) جمع‌شونده. تنظیمات «نمایش نقشه» جای جداگانه خود را
+ * + باند ارتفاع یکپارچه)، ۵) چک‌پوینت‌ها، ۶) تنظیمات پیشرفته (الگوریتم،
+ * سرعت موتور و اجتناب از مناطق) جمع‌شونده. تنظیمات «نمایش نقشه» جای جداگانه خود را
  * دارد (پاپ‌آور نوار ابزار) و در این پنل تکرار نمی‌شود.
  */
 export function PathInfoPanel({
@@ -92,11 +98,66 @@ export function PathInfoPanel({
   resultIsDemo = false,
   origin,
   destination,
+  windSpeedAtLayer = null,
 }: PathInfoPanelProps) {
   void onClear
   void canClear
   const { t } = useTranslation()
   const lang = useFormatLang()
+
+  // ————— سرعت موتور (کامنت ۷) —————
+  // پیشنویسِ متنی برای اینکه نقطهٔ اعشار میانی (مثل «7.») خورده نشود.
+  // `committed` مقداری است که این پیشنویس همراهِ آن معتبر است: هر بار که
+  // vessel بیرونی مقدار دیگری شود (مثل رست)، پیشنویس خودبهخود بیاعتبار
+  // میشود و نمایش به مقدار vessel برمیگردد — بدون اثرِ setState-in-effect.
+  const [motorDraft, setMotorDraft] = useState<{
+    text: string
+    committed: number | null
+  } | null>(null)
+  const vesselSpeed = constraints.vessel?.airspeed_mps
+  const motorText =
+    motorDraft && motorDraft.committed === vesselSpeed
+      ? motorDraft.text
+      : vesselSpeed != null
+        ? String(vesselSpeed)
+        : ''
+
+  function handleMotorChange(text: string) {
+    const trimmed = text.trim()
+    if (trimmed === '') {
+      // خالی = حذف vessel — پیشفرض موتور بکاند (۲۰ m/s)
+      setMotorDraft({ text, committed: null })
+      const rest: RouteConstraints = { ...constraints }
+      delete rest.vessel
+      onConstraintsChange(rest)
+      return
+    }
+    const value = Number(trimmed)
+    if (Number.isFinite(value) && value > 0) {
+      setMotorDraft({ text, committed: value })
+      onConstraintsChange({
+        ...constraints,
+        vessel: {
+          type: 'aircraft',
+          airspeed_mps: value,
+          induced_drag_coeff: 0.3,
+          headwind_penalty_coeff: 0.25,
+        },
+      })
+      return
+    }
+    // نیمهکاره/نامعتبر: پیشنویس تا وقتی vessel عوض نشده میماند —
+    // آخرین مقدار معتبر میماند
+    setMotorDraft({ text, committed: vesselSpeed ?? null })
+  }
+
+  // گزارهٔ «سرعت موتور ≈ سرعت باد این لایه» — اختلاف تا ۵٪ باد
+  const motorMatchesWind =
+    result != null &&
+    windSpeedAtLayer != null &&
+    vesselSpeed != null &&
+    Math.abs(vesselSpeed - windSpeedAtLayer.speedMps) <=
+      0.05 * windSpeedAtLayer.speedMps
 
   const altitudeMode = altitudeModeOf(layerVisibility)
   const band = altitudeBandRange(altitudeMode)
@@ -136,6 +197,7 @@ export function PathInfoPanel({
     (constraints.criterion ?? 'time') !== 'time' ||
     constraints.altitude_range_m != null ||
     constraints.max_wind_speed_mps != null ||
+    constraints.vessel != null ||
     Boolean(constraints.avoid_zones?.length) ||
     ALTITUDE_MODES.some((mode) => !layerVisibility[mode])
 
@@ -298,9 +360,40 @@ export function PathInfoPanel({
         />
       </section>
 
-      {/* تنظیمات پیشرفته — الگوریتم و اجتناب از مناطق، جمع‌شونده */}
+      {/* تنظیمات پیشرفته — الگوریتم، سرعت موتور و اجتناب از مناطق، جمع‌شونده */}
       <Collapsible title={t('routing.advancedSettings')}>
         <AlgorithmSelector value={algorithm} onChange={onAlgorithmChange} />
+        {/* سرعت موتور جهانی مسیر (کامنت ۷ «کامنت‌های نرم‌افزار») — برای
+            قطعههای مخالف باد؛ خالی = پیشفرض بکاند. گزارهٔ بادِ لایهٔ
+            پرواز به کاربر کمک میکند مقدار را آگاهانه انتخاب کند. */}
+        <div className="space-y-1.5">
+          <TextField
+            label={t('routing.motorSpeed')}
+            type="text"
+            inputMode="decimal"
+            className="max-w-[12rem]"
+            data-testid="motor-speed-input"
+            value={motorText}
+            placeholder="20"
+            onChange={(event) => handleMotorChange(event.target.value)}
+          />
+          <p className="text-xs text-text-muted">{t('routing.motorSpeedHint')}</p>
+          {result != null && windSpeedAtLayer != null && (
+            <div className="rounded-md border border-border bg-surface-raised p-2" data-testid="wind-at-layer">
+              <p className="text-xs text-text-secondary">
+                {t('routing.windAtFlightLayer', {
+                  alt: formatAltitudeM(windSpeedAtLayer.altitudeM, lang),
+                  speed: formatSpeedMps(windSpeedAtLayer.speedMps, lang),
+                })}
+              </p>
+              {motorMatchesWind && (
+                <p className="mt-1 text-xs font-medium text-accent" data-testid="motor-matches-wind">
+                  {t('routing.motorMatchesWind')}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
         {/* ترسیم مناطق ممنوعه هنوز پیاده‌سازی نشده — به‌جای چک‌باکس بی‌اثر،
             وضعیت صادقانه «به‌زودی» نمایش داده می‌شود */}
         <div className="rounded-md border border-dashed border-border p-2.5">
