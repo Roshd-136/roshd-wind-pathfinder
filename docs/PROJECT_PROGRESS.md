@@ -1954,6 +1954,10 @@ vitest ۷۲/۷۲ + build سبز. کامیتهای `1709e25` و `87b77a4`.
 - آزمون‌های نو: `tests/api/test_route_error_messages.py` (۵ آزمون — نخستین
   آزمونهای APIِ تحت `tests/api/`): پیام فارسی lon/lat با مقدار، حفظِ ساختار
   استاندارد برای خطاهای بی‌ربط، و نگاشت `ValueError` → ۴۰۰.
+- اعلامِ وابستگیهای از-پیش-لازم: `pyproject.toml` حالا extraٔ `api` دارد
+  (`fastapi`/`uvicorn`/`httpx` — وابستگیهای واقعیِ `src/api`ی ادغامشده که
+  اعلان نشده بودند) و CI با `.[dev,api]` نصب میکند؛ بدون این، آزمونهای API
+  در CI جمع نمیشدند (`ModuleNotFoundError: fastapi`).
 
 **گیتها:** `ruff check .` سبز؛ `pytest` سبز — ۲۱۷/۲۱۷ (۵ آزمون نو).
 شاخهٔ `task/route-error-messages` از `origin/main` تازه (پس از #۲۵).
