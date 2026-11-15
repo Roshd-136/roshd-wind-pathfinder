@@ -4,11 +4,12 @@ Routes Router — POST /routes, GET /routes/{routeId}, GET /routes/jobs/{jobId},
 Implements the routing endpoints per api/openapi.yaml.
 """
 import math
+from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -448,7 +449,10 @@ def _get_router(criterion: str, algorithm: str, multi_graph=None, aircraft_confi
     )
 
 
-def compute_route_sync(request: RouteRequest) -> RouteResult:
+def compute_route_sync(
+    request: RouteRequest,
+    report: Callable[[int], None] | None = None,
+) -> RouteResult:
     """
     Call the actual pathfinding engine using WindRouter.
     Supports multi-segment routing through checkpoints.
@@ -512,6 +516,13 @@ def compute_route_sync(request: RouteRequest) -> RouteResult:
 
     router = _get_router(criterion, algorithm)
 
+    # گزارش درصد پیشرفت (کامنت ۱۲ «کامنت‌های نرم‌افزار») — milestones:
+    # ۵٪ آغاز (بعد از اعتبارسنجی)، هر قطعه ۵→۹۰٪، ۹۵٪ پیش از ساخت نتیجه،
+    # ۱۰۰٪ در تکمیل کار (`_run_job`). مونوتون با max در گیرنده تضمین میشود.
+    total_segments = len(waypoints) - 1
+    if report is not None:
+        report(5)
+
     # Route between consecutive waypoints and concatenate results
     all_path_coords = []
     all_path_3d = []
@@ -523,6 +534,8 @@ def compute_route_sync(request: RouteRequest) -> RouteResult:
     last_result = None
 
     for i in range(len(waypoints) - 1):
+        if report is not None:
+            report(min(90, 5 + int(85 * i / total_segments)))
         origin = (waypoints[i].lat, waypoints[i].lon)
         destination = (waypoints[i + 1].lat, waypoints[i + 1].lon)
 
@@ -799,6 +812,9 @@ def compute_route_sync(request: RouteRequest) -> RouteResult:
             "مسیری محاسبه نشد — احتمالاً نقاط مسیر بسیار نزدیک به هم هستند."
         )
 
+    if report is not None:
+        report(95)
+
     # Convert to API format
     path_coords = [Coordinate(lat=lat, lon=lon) for lat, lon in all_path_coords]
     # ``path_3d`` عمداً ارتفاع **MSL** می‌خواهد (صحنه سه‌بعدی همین را می‌کشد)،
@@ -867,6 +883,39 @@ def compute_route_sync(request: RouteRequest) -> RouteResult:
     )
 
 
+def _run_job(job_id: str, request: RouteRequest) -> None:
+    """اجرای واقعی کارِ ناهمگام در پسزمینه با گزارش درصد پیشرفت.
+
+    کامنت ۱۲ «کامنت‌های نرم‌افزار»: کاربر میخواهد هنگام محاسبه، درصد پیشرفت
+    واقعی را ببیند — پیشتر وضعیت برای همیشه «pending» و progress برای همیشه
+    «۰» بود چون هیچ اجرایی در کار نبود. خطاهای موتور (پیام فارسی) به
+    ``error`` کار میروند تا کلاینتِ polling همان را نشان دهد.
+    """
+    job = _jobs.get(job_id)
+    if job is None:
+        return
+    job.status = "running"
+
+    def report(pct: int) -> None:
+        current = _jobs.get(job_id)
+        if current is not None:
+            current.progress = max(current.progress or 0, pct)
+
+    try:
+        result = compute_route_sync(request, report=report)
+    except Exception as exc:  # noqa: BLE001 — پیام موتور به کلاینت میرسد
+        current = _jobs.get(job_id)
+        if current is not None:
+            current.status = "failed"
+            current.error = str(exc)
+        return
+    current = _jobs.get(job_id)
+    if current is not None:
+        current.status = "completed"
+        current.progress = 100
+        current.result = result
+
+
 # ---- Endpoints ----
 
 @router.post(
@@ -881,7 +930,7 @@ def compute_route_sync(request: RouteRequest) -> RouteResult:
         429: {"description": "Rate limited"},
     },
 )
-async def calculate_route(request: RouteRequest):
+async def calculate_route(request: RouteRequest, background_tasks: BackgroundTasks):
     """
     Calculate optimal route.
 
@@ -895,7 +944,9 @@ async def calculate_route(request: RouteRequest):
             status="pending",
             progress=0,
         )
-        # In production: enqueue background task (Celery, RQ, etc.)
+        # اجرای واقعی در پسزمینه (FastAPI BackgroundTasks) — پیشتر فقط
+        # پذیرش میشد و هیچ محاسبهای نمیرفت (کامنت ۱۲).
+        background_tasks.add_task(_run_job, job_id, request)
         # قرارداد اسپک: پذیرش کار = ۲۰۲ (نه ۲۰۰) — کلاینت از وضعیت متمایز می‌فهمد
         # که پاسخ «نتیجه» نیست و باید polling کند.
         return JSONResponse(

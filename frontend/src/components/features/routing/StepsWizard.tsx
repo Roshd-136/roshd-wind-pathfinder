@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import type { Coordinate } from '../../../types/routing'
 import { reverseGeocode } from '../../../utils/geocode'
+import { toFaDigits } from '../../../utils/format'
+import { useFormatLang } from '../../../hooks/useFormatLang'
 import { useSettingsStore } from '../../../store/useSettingsStore'
 import { Button } from '../../ui/Button'
 
@@ -32,6 +34,8 @@ interface StepsWizardProps {
   onCalculate: () => void
   canCalculate: boolean
   isCalculating: boolean
+  /** درصد پیشرفت زندهٔ کار ناهمگام (کامنت ۱۲) — null یعنی هنوز گزارشی نیامده. */
+  progress?: number | null
   /** انتخاب‌ها بعد از آخرین محاسبه عوض شده‌اند — دکمه «محاسبه مجدد!» می‌شود. */
   isStale?: boolean
 }
@@ -53,9 +57,11 @@ export function StepsWizard({
   onCalculate,
   canCalculate,
   isCalculating,
+  progress = null,
   isStale = false,
 }: StepsWizardProps) {
   const { t } = useTranslation()
+  const lang = useFormatLang()
   const isRtl = document.documentElement.dir === 'rtl'
   const slideSign = isRtl ? 1 : -1
   const NextIcon = isRtl ? ChevronLeft : ChevronRight
@@ -170,7 +176,14 @@ export function StepsWizard({
           disabled={!canCalculate || isCalculating}
         >
           {isCalculating
-            ? t('common.loading')
+            ? progress != null
+              ? t('routing.calculatingProgress', {
+                  percent:
+                    lang === 'fa'
+                      ? `${toFaDigits(String(progress))}٪`
+                      : `${progress}%`,
+                })
+              : t('common.loading')
             : isStale
               ? t('routing.recalculatePath', 'محاسبه مجدد!')
               : t('routing.calculatePath')}

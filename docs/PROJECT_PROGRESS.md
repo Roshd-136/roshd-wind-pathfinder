@@ -1962,3 +1962,37 @@ vitest ۷۲/۷۲ + build سبز. کامیتهای `1709e25` و `87b77a4`.
 
 **گیتها:** `ruff check .` سبز؛ `pytest` سبز — ۲۱۷/۲۱۷ (۵ آزمون نو).
 شاخهٔ `task/route-error-messages` از `origin/main` تازه (پس از #۲۵).
+
+## درصد پیشرفت واقعی مسیریابی (۲۰۲۶-۱۱-۱۵) — رفع کامنت ۱۲ «کامنت‌های نرم‌افزار»
+
+بازخورد کاربر: «درصد پیشرفت مسیریابی را نشان دهید» — ریشه‌یابی: حالت ناهمگام
+(`async=true`) فقط «کار پذیرفتهشده» برمی‌گرداند و هیچ اجرایی در کار نبود
+(«In production: enqueue background task») — وضعیت برای همیشه `pending` و
+`progress` برای همیشه `0` بود؛ و درخواست همگام هم ذاتاً درصد ندارد.
+
+**تغییرها:**
+
+- بکاند (`src/api/routers/routes.py`): کار ناهمگام حالا **واقعاً در
+  پسزمینه اجرا میشود** (`BackgroundTasks` → `_run_job`): `pending` →
+  `running` → `completed` با `progress=100` و `result`؛ خطای موتور
+  (پیام فارسی) → `failed` + `error` تا کلاینتِ polling همان را نشان دهد.
+  `compute_route_sync` پارامتر اختیاری `report: Callable[[int], None]`
+  گرفت: ۵٪ آغاز، هر قطعهٔ مسیر تا ۹۰٪، ۹۵٪ پیش از ساخت نتیجه — مسیر
+  همگام بدون تغییر (report پیشفرض None).
+- فرانت: `calculateRouteWithProgress` در `services/api/routing.ts` —
+  درخواست `async: true` (۲۰۲) و polling وضعیت هر ۵۰۰ms تا تکمیل؛ هر
+  `progress` به `onProgress`. پاسخ همگامِ بکاند قدیمی مستقیم pass-through
+  میشود تا چیزی نشکند. `usePathfinding` حالا `progress` زنده exposes
+  میکند؛ دکمهٔ «محاسبه مسیر» ویزارد هنگام محاسبه «در حال محاسبه… ۴۵٪»
+  (فا) / «Calculating… 45%» (en) نشان میدهد.
+- کلید i18n نو: `routing.calculatingProgress` (فا/en).
+- آزمونهای نو: `tests/api/test_routing_progress.py` (۳ آزمون — کاملشدن کار
+  با ۱۰۰٪ و نتیجهٔ واقعی ۱۷۴ ک.م، صعودی‌بودن نقاط عطف ۵…۹۵، شکست با پیام
+  فارسی) و ۳ آزمون `services/api/routing.test.ts` (polling + گزارش پیشرفت،
+  خطای فارسیِ کار، pass-through همگام) و ۲ آزمون ویزارد (نمایش درصد،
+  «Loading…» تا اولین گزارش).
+
+**گیتها:** `ruff check .` سبز؛ `pytest` سبز — ۲۲۰/۲۲۰ (۳ آزمون نو).
+فرانت: typecheck/lint سبز؛ vitest ۷۷/۷۷ (۵ آزمون نو)؛ build سبز.
+شاخهٔ `task/routing-progress` سوار بر `task/route-error-messages` (PR #۲۹)
+چون آزمونهای API به extraٔ `api` همین PR نیاز دارند.
