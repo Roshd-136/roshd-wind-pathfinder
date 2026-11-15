@@ -29,6 +29,7 @@ api = [
     "uvicorn>=0.23",
     "httpx>=0.24",
     "email-validator>=2.0",
+    "pyjwt>=2.8",
 ]
 
 [tool.setuptools.packages.find]
