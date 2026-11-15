@@ -6,11 +6,13 @@ import type { EditTarget, PickMissKind } from '../../../three/manual/scene-gl'
 import { WindSpeedLegend } from '../layers/WindSpeedLegend'
 import { MobileBottomSheet } from '../../layout/MobileBottomSheet'
 import { usePathfinding } from '../../../hooks/usePathfinding'
-import { useWindFields } from '../../../hooks/useWindData'
+import { useWindFields, useWindLayers } from '../../../hooks/useWindData'
 import { useRouteStore } from '../../../store/useRouteStore'
 import { useUiStore } from '../../../store/useUiStore'
 import type { Checkpoint, Coordinate, RouteResult, WindField, LayerVisibility } from '../../../types/routing'
 import { fieldSpeedRange } from '../../../utils/windField'
+import { formatAgeHours } from '../../../utils/format'
+import { useFormatLang } from '../../../hooks/useFormatLang'
 import { WIND_LAYER_BANDS } from '../../../config/routing'
 import { ApiError } from '../../../services/api/client'
 import { PathInfoPanel } from './PathInfoPanel'
@@ -74,6 +76,8 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
   const [isDemoResult, setIsDemoResult] = useState(false)
   const pathfinding = usePathfinding()
   const { fields } = useWindFields()
+  const layersSnapshot = useWindLayers()
+  const lang = useFormatLang()
   const openMobileSheet = useUiStore((s) => s.openMobileSheet)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const isControlPanelOpen = useUiStore((s) => s.isControlPanelOpen)
@@ -149,6 +153,16 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
       ),
     )
     .sort((a, b) => a.altitude_m - b.altitude_m)
+
+  // عمر داده‌های باد (کامنت ۱۰ «کامنت‌های نرم‌افزار») — عمرِ حسابشدهٔ بکاند
+  // (`data_age_hours`، در همان قابِ مهرِ CSV) یا فیکسچر dev (مهر آگاه از
+  // UTC که سرویس در queryFn می‌سنجد). فرمت‌سازی اینجا خالص است — Date.now
+  // فقط در queryFn/بکاند صدا میشود، نه در رندر (قاعدهٔ react-hooks)؛
+  // مهرِ بی‌منطقهٔ زمانی هرگز مبنای «چند ساعت پیش» نمیشود.
+  const windDataAgeText = (() => {
+    const hours = layersSnapshot.data?.dataAgeHours
+    return hours == null ? null : formatAgeHours(hours, lang)
+  })()
 
   // حالت «افزودن چک‌پوینت»: کلیک بعدی در هر دو نما چک‌پوینت می‌گذارد
   // (بدون نگه‌داشتن). در ۲بعدی کلیک روی نقشه است؛ در ۳بعدی کلیک روی دشتِ
@@ -328,6 +342,14 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
                 [Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY],
               )}
             />
+            {windDataAgeText && (
+              <p
+                className="mt-1 text-center text-[11px] text-text-muted"
+                data-testid="wind-data-age"
+              >
+                {t('routing.windDataAge', { age: windDataAgeText })}
+              </p>
+            )}
           </div>
         )}
         {placingCheckpoint && (

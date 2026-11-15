@@ -1,6 +1,6 @@
 import { useQuery, useQueries } from '@tanstack/react-query'
 import { WIND_LAYER_BANDS } from '../config/routing'
-import { getWindField, listWindLayers } from '../services/api/windLayers'
+import { getWindField, getWindLayersSnapshot } from '../services/api/windLayers'
 import type { WindField } from '../types/routing'
 
 /**
@@ -12,11 +12,11 @@ import type { WindField } from '../types/routing'
  */
 export const UI_LAYER_ALTITUDES = WIND_LAYER_BANDS.map((b) => b.fieldAltitude)
 
-/** GET /wind-layers — لیست لایه‌های ارتفاعی موجود. */
+/** GET /wind-layers — خلاصهٔ نرمالشده (ارتفاعها + مهر زمانی مشاهدات). */
 export function useWindLayers() {
   return useQuery({
     queryKey: ['wind-layers'],
-    queryFn: listWindLayers,
+    queryFn: getWindLayersSnapshot,
     staleTime: 5 * 60_000,
   })
 }

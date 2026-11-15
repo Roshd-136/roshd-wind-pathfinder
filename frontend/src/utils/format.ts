@@ -66,6 +66,25 @@ export function formatSpeedMps(mps: number, lang: DisplayLang = 'fa'): string {
 }
 
 /**
+ * عمر داده به متن گویا — «کمتر از یک ساعت پیش» / «۳ ساعت پیش» / «۵ روز پیش»
+ * (کامنت ۱۰ «کامنت‌های نرم‌افزار»: کاربر میخواهد بداند داده‌های باد از چند
+ * ساعت پیش است؛ بیش از ۴۸ ساعت با واحد روز خواناتر است).
+ */
+export function formatAgeHours(hours: number, lang: DisplayLang = 'fa'): string {
+  if (hours < 1) {
+    return lang === 'fa' ? 'کمتر از یک ساعت پیش' : 'less than an hour ago'
+  }
+  if (hours < 48) {
+    const h = Math.floor(hours)
+    if (lang === 'fa') return `${faNumber(h)} ساعت پیش`
+    return `${h} hour${h === 1 ? '' : 's'} ago`
+  }
+  const days = Math.floor(hours / 24)
+  if (lang === 'fa') return `${faNumber(days)} روز پیش`
+  return `${days} day${days === 1 ? '' : 's'} ago`
+}
+
+/**
  * ارتفاع (متر) — فارسی: «۳٬۶۰۰ متر»، انگلیسی: «3,600 m».
  */
 export function formatAltitudeM(meters: number, lang: DisplayLang = 'fa'): string {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  formatAgeHours,
   formatAltitudeM,
   formatDistanceKm,
   formatDurationHours,
@@ -61,5 +62,22 @@ describe('formatAltitudeM', () => {
   it('Persian: metres with Persian digits', () => {
     expect(formatAltitudeM(3600, 'fa')).toBe('۳٬۶۰۰ متر')
     expect(formatAltitudeM(3600, 'en')).toBe('3,600 m')
+  })
+})
+
+describe('formatAgeHours (data freshness — comment 10)', () => {
+  it('under an hour says so explicitly in both languages', () => {
+    expect(formatAgeHours(0.4, 'fa')).toBe('کمتر از یک ساعت پیش')
+    expect(formatAgeHours(0.9, 'en')).toBe('less than an hour ago')
+  })
+
+  it('hours below two days in Persian digits and units', () => {
+    expect(formatAgeHours(3.2, 'fa')).toBe('۳ ساعت پیش')
+    expect(formatAgeHours(47.9, 'en')).toBe('47 hours ago')
+  })
+
+  it('older than two days switches to days', () => {
+    expect(formatAgeHours(78 * 24 + 5, 'fa')).toBe('۷۸ روز پیش')
+    expect(formatAgeHours(48, 'en')).toBe('2 days ago')
   })
 })
