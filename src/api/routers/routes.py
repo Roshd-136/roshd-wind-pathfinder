@@ -508,7 +508,7 @@ def compute_route_sync(request: RouteRequest) -> RouteResult:
     waypoints = [request.origin] + (request.checkpoints or []) + [request.destination]
 
     if len(waypoints) < 2:
-        raise ValueError("At least origin and destination are required")
+        raise ValueError("حداقل مبدا و مقصد لازم است")
 
     router = _get_router(criterion, algorithm)
 
@@ -570,7 +570,10 @@ def compute_route_sync(request: RouteRequest) -> RouteResult:
                 # Build layer samplers from stored fields
                 global _wind_fields
                 if _wind_fields is None:
-                    raise ValueError("Wind fields not initialized")
+                    raise ValueError(
+                        "داده‌های باد هنوز بارگذاری نشده است؛ لطفاً بعد از "
+                        "آماده‌شدن سرویس دوباره تلاش کنید."
+                    )
                 fields = _wind_fields
                 all_layers = [
                     (level, sampler) for level, sampler in _layer_samplers(fields)
@@ -677,7 +680,12 @@ def compute_route_sync(request: RouteRequest) -> RouteResult:
                             "کمی تغییر دهید یا باند بالاتر را امتحان کنید."
                         )
                     if band_levels is None:
-                        raise ValueError("Wind riding route could not be planned")
+                        raise ValueError(
+                            "برنامهٔ بادسواری برای این مسیر در هیچ لایه‌ای یافت "
+                            "نشده است؛ باد در ارتفاع‌های موجود مساعد نیست یا "
+                            "زمین سر راه است. باند ارتفاعی دیگری را امتحان "
+                            "کنید یا الگوریتم مسیریابی را تغییر دهید."
+                        )
                     result = _route_on_band(router, origin, destination, band_levels)
                 else:
                     result = wind_riding_route_result(
@@ -787,7 +795,9 @@ def compute_route_sync(request: RouteRequest) -> RouteResult:
         last_result = result
 
     if not all_path_coords:
-        raise ValueError("Could not compute route — waypoints may be too close together")
+        raise ValueError(
+            "مسیری محاسبه نشد — احتمالاً نقاط مسیر بسیار نزدیک به هم هستند."
+        )
 
     # Convert to API format
     path_coords = [Coordinate(lat=lat, lon=lon) for lat, lon in all_path_coords]
