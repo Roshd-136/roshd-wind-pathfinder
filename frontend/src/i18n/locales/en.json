@@ -39,6 +39,7 @@
     "checkpointPlacingHint": "Click on the map to place the checkpoint",
     "checkpointPlaced": "Checkpoint #{{n}} added",
     "checkpointPickMissOutside": "Outside the data bounds (terrain/wind) — click closer to the route or inside the terrain area",
+    "windDataAge": "Wind data from {{age}}",
     "checkpointPickMissSky": "This is the sky — click on the ground instead",
     "altitudeBandLabel": "Flight altitude band",
     "altitudeAllHint": "All altitude bands (0 to {{max}} m)",

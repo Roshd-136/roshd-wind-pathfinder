@@ -95,6 +95,19 @@ class WindLayersList(BaseModel):
     layers: list[WindLayerSummary]
     available_altitudes_m: list[float]
     latest_timestamp: str
+    data_age_hours: int
+
+
+def _data_age_hours(hour: pd.Timestamp) -> int:
+    """عمر مشاهدات به ساعت — مقایسهٔ سادهٔ همقاب (کامنت ۱۰).
+
+    مهر CSV منطقهٔ زمانی ندارد (``2026-08-29 12:00:00`` خام)؛ پس مقایسه در
+    همان قابِ ساده انجام میشود و بیشترین خطای ممکن ±۳٫۵ ساعت (اختلاف
+    تهران/UTC) است — در مقیاس «چند روز پیش» بیاثر. فرضِ بی‌مبنا دربارهٔ
+    منطقهٔ زمانی نمیزنیم (قاعدهٔ «حقایق را از منبع واقعی بگیر»).
+    """
+    age = (pd.Timestamp.now() - hour).total_seconds() / 3600.0
+    return max(0, int(age))
 
 
 @router.get("", response_model=WindLayersList)
@@ -128,6 +141,7 @@ async def list_wind_layers(
         layers=layers,
         available_altitudes_m=[float(a) for a in FLIGHT_LEVELS_MSL],
         latest_timestamp=hour.isoformat(),
+        data_age_hours=_data_age_hours(hour),
     )
 
 

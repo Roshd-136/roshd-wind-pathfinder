@@ -21,11 +21,15 @@ class TestWindDataCache(unittest.TestCase):
 
     def test_store_and_retrieve(self):
         """Test storing and retrieving wind data."""
+        # یک مهر واحد برای ذخیره و بازیابی — دو فراخوانی جداگانهٔ
+        # int(time.time()) میتوانند از مرزِ ثانیه رد شوند و کلید بازیابی
+        # با کلید ذخیره فرق کند (flaky در CI).
+        timestamp = int(time.time())
         self.cache.store_wind_data(
-            lat=35.7, lon=51.4, altitude=1000, timestamp=int(time.time()),
+            lat=35.7, lon=51.4, altitude=1000, timestamp=timestamp,
             u_component=5.0, v_component=2.0
         )
-        result = self.cache.get_wind_data(35.7, 51.4, 1000, int(time.time()))
+        result = self.cache.get_wind_data(35.7, 51.4, 1000, timestamp)
         self.assertIsNotNone(result)
         self.assertEqual(result, (5.0, 2.0))
 
