@@ -18,11 +18,21 @@ const STOPS = [
 interface WindSpeedLegendProps {
   /** بازهٔ [کمینه، بیشینه] سرعت میدان‌های نمایان (م/ث). */
   range?: [number, number]
+  /**
+   * `horizontal` — نوار افقی با سه برچسب (پیشفرض، دسکتاپ). `vertical` —
+   * نوار عمودی با کمینه بالا و بیشینه پایین (موبایل): نوار افقیِ عریضِ
+   * ‏۲۰rem روی گوشی جا نمی‌شد و زیر شیت جمعشده پنهان میشد (بازخورد تست
+   * موبایل).
+   */
+  orientation?: 'horizontal' | 'vertical'
 }
 
-export function WindSpeedLegend({ range = [0, 20] }: WindSpeedLegendProps) {
+export function WindSpeedLegend({ range = [0, 20], orientation = 'horizontal' }: WindSpeedLegendProps) {
   const lang = useFormatLang()
-  const gradient = `linear-gradient(to var(--legend-direction, right), ${STOPS.map((s) => s.color).join(', ')})`
+  const isVertical = orientation === 'vertical'
+  const gradient = isVertical
+    ? `linear-gradient(to bottom, ${STOPS.map((s) => s.color).join(', ')})`
+    : `linear-gradient(to var(--legend-direction, right), ${STOPS.map((s) => s.color).join(', ')})`
   const [min, max] =
     Number.isFinite(range[0]) && Number.isFinite(range[1]) && range[1] > range[0]
       ? range
@@ -31,6 +41,20 @@ export function WindSpeedLegend({ range = [0, 20] }: WindSpeedLegendProps) {
   const format = (value: number) => (Math.round(value * 10) / 10).toString()
   // واحد سرعت — فارسی «م/ث»، انگلیسی m/s
   const unit = lang === 'fa' ? 'م/ث' : 'm/s'
+
+  if (isVertical) {
+    // عمودی — نوار باریک بلند؛ کمینه بالا، بیشینه (با واحد) پایین. اعداد
+    // لاتین‌اند؛ با dir=ltr ترتیب کمینه→بیشینه از بالا به پایین ثابت است.
+    return (
+      <div className="flex flex-col items-center gap-1 text-[10px] leading-none text-text-muted" dir="ltr">
+        <span>{format(min)}</span>
+        <div className="h-24 w-2 rounded-full" style={{ background: gradient }} />
+        <span>
+          {format(max)} {unit}
+        </span>
+      </div>
+    )
+  }
 
   return (
     <div className="ltr-only text-xs text-text-muted">

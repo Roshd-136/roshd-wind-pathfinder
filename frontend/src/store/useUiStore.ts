@@ -23,6 +23,7 @@ interface UiState {
   viewport: ViewportSettings
   toggleControlPanel: () => void
   toggleSidebar: () => void
+  closeSidebar: () => void
   openMobileSheet: () => void
   closeMobileSheet: () => void
   setMapMode: (mode: '2d' | '3d') => void
@@ -50,6 +51,7 @@ export const useUiStore = create<UiState>((set) => ({
   },
   toggleControlPanel: () => set((s) => ({ isControlPanelOpen: !s.isControlPanelOpen })),
   toggleSidebar: () => set((s) => ({ isSidebarOpen: !s.isSidebarOpen })),
+  closeSidebar: () => set({ isSidebarOpen: false }),
   openMobileSheet: () => set({ isMobileSheetOpen: true }),
   closeMobileSheet: () => set({ isMobileSheetOpen: false }),
   setMapMode: (mapMode) => set({ mapMode }),

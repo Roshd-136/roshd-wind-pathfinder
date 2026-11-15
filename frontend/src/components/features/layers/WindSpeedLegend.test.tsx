@@ -37,4 +37,15 @@ describe('WindSpeedLegend', () => {
       await i18n.changeLanguage('en')
     }
   })
+
+  it('vertical orientation shows a tall bar with min on top and max at the bottom', () => {
+    // موبایل — نوار عمودی باریک به‌جای کارت افقی عریض (بازخورد تست موبایل)
+    render(<WindSpeedLegend orientation="vertical" range={[4.2, 13.8]} />)
+    expect(screen.getByText('4.2')).toBeInTheDocument()
+    expect(screen.getByText('13.8 m/s')).toBeInTheDocument()
+    // نوار عمودی کلاس ارتفاع/عرض خودش را دارد
+    const bar = screen.getByText('4.2').parentElement?.querySelector('div[style]')
+    expect(bar).not.toBeNull()
+    expect(bar?.className).toContain('h-24 w-2')
+  })
 })

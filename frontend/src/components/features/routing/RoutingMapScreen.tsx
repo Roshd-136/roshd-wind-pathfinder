@@ -5,6 +5,7 @@ import { MapView } from '../map/MapView'
 import type { EditTarget, PickMissKind } from '../../../three/manual/scene-gl'
 import { WindSpeedLegend } from '../layers/WindSpeedLegend'
 import { MobileBottomSheet } from '../../layout/MobileBottomSheet'
+import { MobileMenuButton, MobileMenuPanel } from '../../layout/MobileMenu'
 import { usePathfinding } from '../../../hooks/usePathfinding'
 import { useWindFields } from '../../../hooks/useWindData'
 import { useRouteStore } from '../../../store/useRouteStore'
@@ -166,6 +167,16 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
     }
     return { altitudeM: best.altitude_m, speedMps: meanWindSpeedMps(best) }
   })()
+
+  // بازهٔ واقعی سرعت میدان‌های نمایان — مشترک بین لجند افقی دسکتاپ و
+  // عمودی موبایل (برچسب طیف با رنگ نقشه می‌خواند).
+  const visibleSpeedRange = visibleFields.reduce<[number, number]>(
+    (acc, field) => {
+      const [min, max] = fieldSpeedRange(field)
+      return [Math.min(acc[0], min), Math.max(acc[1], max)]
+    },
+    [Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY],
+  )
 
   // حالت «افزودن چک‌پوینت»: کلیک بعدی در هر دو نما چک‌پوینت می‌گذارد
   // (بدون نگه‌داشتن). در ۲بعدی کلیک روی نقشه است؛ در ۳بعدی کلیک روی دشتِ
@@ -332,24 +343,24 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
           onPickMiss={handlePlacingMiss}
         />
         {visibleFields.length > 0 && (
-          // راهنمای سرعت باد — وسط پایین و پهن، دور از زوم و انتساب.
-          // طیف با بازهٔ *واقعی* میدان‌های نمایان برچسب می‌خورد — رنگ‌آمیزی
-          // نقشه نسبی است (کمینه → آبی، بیشینه → قرمز) و طیف ثابت ۰-۲۰
-          // قبلی با آن نمی‌خواند.
-          <div className="absolute bottom-4 left-1/2 z-10 w-80 -translate-x-1/2 rounded-xl border border-border bg-surface/90 p-3 shadow-[var(--shadow-card)] backdrop-blur-sm">
-            <div className="mb-1 text-center text-xs font-medium text-text-secondary">
-              {t('legend.title')}
+          // راهنمای سرعت باد — طیف با بازهٔ *واقعی* میدان‌های نمایان برچسب
+          // می‌خورد — رنگ‌آمیزی نقشه نسبی است (کمینه → آبی، بیشینه → قرمز)
+          // و طیف ثابت ۰-۲۰ قبلی با آن نمی‌خواند.
+          <>
+            {/* دسکتاپ: کارت افقی وسط پایین با عنوان */}
+            <div className="absolute bottom-4 left-1/2 z-10 hidden w-80 -translate-x-1/2 rounded-xl border border-border bg-surface/90 p-3 shadow-[var(--shadow-card)] backdrop-blur-sm md:block">
+              <div className="mb-1 text-center text-xs font-medium text-text-secondary">
+                {t('legend.title')}
+              </div>
+              <WindSpeedLegend range={visibleSpeedRange} />
             </div>
-            <WindSpeedLegend
-              range={visibleFields.reduce<[number, number]>(
-                (acc, field) => {
-                  const [min, max] = fieldSpeedRange(field)
-                  return [Math.min(acc[0], min), Math.max(acc[1], max)]
-                },
-                [Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY],
-              )}
-            />
-          </div>
+            {/* موبایل: نوار عمودی باریک لبهٔ end وسط نقشه — بدون عنوان؛
+                کارت افقی عریض روی گوشی زیر شیت جمعشده پنهان میشد (بازخورد
+                تست موبایل: «گرادیان در نمای گوشی عمودی باشد»). */}
+            <div className="absolute end-2 top-1/2 z-10 -translate-y-1/2 rounded-xl border border-border bg-surface/90 p-1.5 shadow-[var(--shadow-card)] backdrop-blur-sm md:hidden">
+              <WindSpeedLegend orientation="vertical" range={visibleSpeedRange} />
+            </div>
+          </>
         )}
         {placingCheckpoint && (
           // راهنمای حالت افزودن چک‌پوینت — دکمهٔ «در حال افزودن» به‌تنهایی
@@ -425,6 +436,7 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
             canCalculate={Boolean(origin && destination)}
             isCalculating={pathfinding.isPending}
             isStale={isStale}
+            menuSlot={<MobileMenuButton />}
           />
           {/* ردیف ابزار افقی موبایل — زیر ویزارد، قابل کشش افقی (فقط زیر md) */}
           <MapTools
@@ -432,6 +444,8 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
             onZoomIn={() => mapRef.current?.zoomIn()}
             onZoomOut={() => mapRef.current?.zoomOut()}
           />
+          {/* پنل منوی موبایل — زیر ویزارد باز میشود (فقط زیر md) */}
+          <MobileMenuPanel />
         </div>
       </div>
 

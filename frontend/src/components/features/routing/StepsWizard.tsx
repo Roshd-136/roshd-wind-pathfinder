@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, Search, Undo2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import type { ReactNode } from 'react'
 import type { Coordinate } from '../../../types/routing'
 import { PlaceLabel } from './PlaceLabel'
 import { Button } from '../../ui/Button'
@@ -20,6 +21,12 @@ interface StepsWizardProps {
   isCalculating: boolean
   /** انتخاب‌ها بعد از آخرین محاسبه عوض شده‌اند — دکمه «محاسبه مجدد!» می‌شود. */
   isStale?: boolean
+  /**
+   * جای دکمهٔ منوی موبایل — در ردیف جستجو سمتِ مقابلِ ذره‌بین، و در گام ۳
+   * (بدون ردیف جستجو) به‌جای فلش «بعد» که آنجا همیشه غیرفعال است. محتوای
+   * اسلات خودش `md:hidden` دارد (روی دسکتاپ سایدبار AppShell هست).
+   */
+  menuSlot?: ReactNode
 }
 
 /**
@@ -40,6 +47,7 @@ export function StepsWizard({
   canCalculate,
   isCalculating,
   isStale = false,
+  menuSlot,
 }: StepsWizardProps) {
   const { t } = useTranslation()
   const isRtl = document.documentElement.dir === 'rtl'
@@ -92,6 +100,8 @@ export function StepsWizard({
             aria-label={t('wizard.searchPlaceholder')}
             className="w-full bg-transparent text-sm text-text-primary outline-none placeholder:text-text-muted"
           />
+          {/* دکمهٔ منوی موبایل — سمت مقابلِ ذره‌بینِ جستجو */}
+          {menuSlot}
         </div>
       )}
 
@@ -113,10 +123,14 @@ export function StepsWizard({
           disabled={!canNext || step >= 3}
           aria-label={t('routing.next')}
           title={t('routing.next')}
-          className={`${arrowBtn} end-2`}
+          className={`${arrowBtn} end-2 ${step === 3 ? 'max-md:hidden' : ''}`}
         >
           <NextIcon size={16} aria-hidden />
         </button>
+        {/* گام ۳: فلش «بعد» همیشه غیرفعال است — در موبایل جایش دکمهٔ منو */}
+        {step === 3 && menuSlot && (
+          <span className="absolute end-2 top-1/2 z-[1] -translate-y-1/2">{menuSlot}</span>
+        )}
 
         <div className="overflow-hidden">
           <div
