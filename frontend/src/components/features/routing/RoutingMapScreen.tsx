@@ -397,6 +397,7 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
           onCalculate={handleCalculate}
           canCalculate={Boolean(origin && destination)}
           isCalculating={pathfinding.isPending}
+          progress={pathfinding.progress}
           isStale={isStale}
         />
       </div>

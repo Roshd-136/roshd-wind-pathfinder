@@ -59,6 +59,17 @@ describe('StepsWizard', () => {
     expect(screen.queryByText('Route steps')).not.toBeInTheDocument()
   })
 
+  it('shows the live progress percent while calculating (comment 12)', () => {
+    withProviders(<StepsWizard {...base} isCalculating progress={45} />)
+    expect(screen.getByText('Calculating… 45%')).toBeInTheDocument()
+  })
+
+  it('keeps the plain loading label until the first progress report arrives', () => {
+    withProviders(<StepsWizard {...base} isCalculating progress={null} />)
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+    expect(screen.queryByText(/Calculating…/)).not.toBeInTheDocument()
+  })
+
   it('disables the back arrow on the first step and the next arrow on the last', () => {
     const first = withProviders(<StepsWizard {...base} step={1} />)
     expect(prevButton()).toBeDisabled()
