@@ -1,22 +1,8 @@
 import { ChevronLeft, ChevronRight, Search, Undo2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useQuery } from '@tanstack/react-query'
 import type { Coordinate } from '../../../types/routing'
-import { reverseGeocode } from '../../../utils/geocode'
-import { useSettingsStore } from '../../../store/useSettingsStore'
+import { PlaceLabel } from './PlaceLabel'
 import { Button } from '../../ui/Button'
-
-/** نام مکان یک نقطه (استان/شهر/خیابان) — ژئوکدینگ معکوس آزاد OSM. */
-function PlaceLabel({ point }: { point: Coordinate }) {
-  const language = useSettingsStore((s) => s.language)
-  const { data } = useQuery({
-    queryKey: ['geocode', point.lat.toFixed(3), point.lon.toFixed(3), language],
-    queryFn: () => reverseGeocode(point.lat, point.lon, language),
-    staleTime: Infinity,
-  })
-  const fallback = `${point.lat.toFixed(3)}, ${point.lon.toFixed(3)}`
-  return <>{data ?? fallback}</>
-}
 
 interface StepsWizardProps {
   origin: Coordinate | null

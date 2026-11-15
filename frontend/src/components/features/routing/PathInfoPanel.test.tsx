@@ -5,6 +5,12 @@ import { describe, expect, it, vi } from 'vitest'
 import i18n from '../../../i18n'
 import { PathInfoPanel } from './PathInfoPanel'
 
+// ژئوکدینگ معکوس (شبکهٔ واقعی OSM) در آزمون به نتیجهٔ ثابت قفل می‌شود —
+// PlaceLabel داخل پنل همان را نشان می‌دهد و آزمون به شبکه وابسته نمی‌ماند.
+vi.mock('../../../utils/geocode', () => ({
+  reverseGeocode: vi.fn().mockResolvedValue('Test place'),
+}))
+
 /** PlaceLabel داخل پنل از react-query استفاده می‌کند — ارائه‌دهندهٔ تست. */
 function withProviders(ui: ReactNode) {
   const client = new QueryClient({
@@ -29,6 +35,15 @@ const baseProps = {
   onToggleAddCheckpoint: vi.fn(),
   canAddCheckpoint: true,
   result: null,
+  origin: null,
+  destination: null,
+}
+
+/** جفت آزمایشی یک‌درجهٔ عرض — خط مستقیم ≈ ۱۱۱٫۲ ک.م. */
+const pickedProps = {
+  ...baseProps,
+  origin: { lat: 0, lon: 0 },
+  destination: { lat: 0, lon: 1 },
 }
 
 describe('PathInfoPanel', () => {
@@ -67,5 +82,48 @@ describe('PathInfoPanel', () => {
     // هیچ ردی از آن در پنل بماند.
     expect(screen.queryByText(/لایه‌های باد در نقطه/)).not.toBeInTheDocument()
     expect(screen.queryByText('View Wind Layers at Point')).not.toBeInTheDocument()
+  })
+
+  it('always shows the origin/destination section (even with no result)', async () => {
+    withProviders(<PathInfoPanel {...pickedProps} />)
+    // کامنت ۹ «کامنت‌های نرم‌افزار»: بخش مبدا و مقصد همیشه‌دید است، نه فقط
+    // بعد از محاسبه.
+    expect(screen.getByTestId('points-summary')).toBeInTheDocument()
+    // برچسب ژئوکدینگ ناهمگام می‌رسد — findBy منتظرش می‌ماند.
+    expect(await screen.findByText('Test place')).toBeInTheDocument()
+    expect(screen.getByTestId('straight-line')).toHaveTextContent('111.2 km')
+  })
+
+  it('compares the computed route against the straight line', () => {
+    withProviders(<PathInfoPanel {...pickedProps} result={sampleResult} />)
+    // ۱۷۳٫۱ ک.م نسبت به ۱۱۱٫۲ ک.م ≈ ۵۶٪ دورتر
+    const comparison = screen.getByTestId('straight-comparison')
+    expect(comparison).toHaveTextContent('+56%')
+    expect(comparison).toHaveTextContent('173.1 km')
+    expect(comparison).toHaveTextContent('111.2 km')
+  })
+
+  it('renders the comparison with Persian digits and percent in fa', async () => {
+    await i18n.changeLanguage('fa')
+    try {
+      withProviders(<PathInfoPanel {...pickedProps} result={sampleResult} />)
+      expect(screen.getByTestId('straight-line')).toHaveTextContent('۱۱۱٫۲ ک.م')
+      expect(screen.getByTestId('straight-comparison')).toHaveTextContent('+۵۶٪')
+    } finally {
+      await i18n.changeLanguage('en')
+    }
+  })
+
+  it('shows the picking hint and no straight-line row while points are missing', () => {
+    withProviders(<PathInfoPanel {...baseProps} />)
+    expect(screen.getByTestId('points-summary')).toHaveTextContent('Not selected')
+    expect(screen.getByTestId('points-summary')).toHaveTextContent('Click the map')
+    expect(screen.queryByTestId('straight-line')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('straight-comparison')).not.toBeInTheDocument()
+  })
+
+  it('has no straight-line row until both points are chosen', () => {
+    withProviders(<PathInfoPanel {...pickedProps} destination={null} />)
+    expect(screen.queryByTestId('straight-line')).not.toBeInTheDocument()
   })
 })

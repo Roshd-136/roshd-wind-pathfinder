@@ -283,6 +283,8 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
       canClear={canClear}
       result={result}
       resultIsDemo={isDemoResult}
+      origin={origin}
+      destination={destination}
     />
   )
 

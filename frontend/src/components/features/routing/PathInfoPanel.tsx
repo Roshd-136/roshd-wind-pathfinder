@@ -4,6 +4,7 @@ import type {
   Algorithm,
   AltitudeMode,
   Checkpoint,
+  Coordinate,
   LayerVisibility,
   RouteConstraints,
   RouteResult,
@@ -13,7 +14,13 @@ import {
   WIND_ALTITUDE_MAX,
   altitudeBandRange,
 } from '../../../config/routing'
-import { formatAltitudeM, formatDistanceKm, formatDurationHours } from '../../../utils/format'
+import { greatCircleDistanceKm } from '../../../utils/geo'
+import {
+  formatAltitudeM,
+  formatDistanceKm,
+  formatDurationHours,
+  toFaDigits,
+} from '../../../utils/format'
 import { useFormatLang } from '../../../hooks/useFormatLang'
 import { Button } from '../../ui/Button'
 import { Card } from '../../ui/Card'
@@ -21,6 +28,7 @@ import { Collapsible } from '../../ui/Collapsible'
 import { Segmented } from '../../ui/Segmented'
 import { AlgorithmSelector } from './AlgorithmSelector'
 import { CheckpointManager } from './CheckpointManager'
+import { PlaceLabel } from './PlaceLabel'
 
 interface PathInfoPanelProps {
   algorithm: Algorithm
@@ -41,6 +49,9 @@ interface PathInfoPanelProps {
   result: RouteResult | null
   /** مسیر از فیکسچر نمایشی dev آمده (بدون بک‌اند) — با برچسب صریح. */
   resultIsDemo?: boolean
+  /** مبدا/مقصد برای بخش «همیشه‌دید» و مقایسهٔ خط مستقیم (کامنت ۹). */
+  origin: Coordinate | null
+  destination: Coordinate | null
 }
 
 /**
@@ -55,9 +66,10 @@ function altitudeModeOf(v: LayerVisibility): AltitudeMode {
 
 /**
  * پنل تنظیمات مسیر — بازطراحی‌شده با سلسله‌مراتبِ تصمیم کاربر:
- * ۱) نتیجه (بعد از محاسبه در صدر پنل)، ۲) «بهینه‌سازی برای» به‌صورت سگمنت
- * (معیار، مهم‌ترین انتخاب)، ۳) محدودیت‌های پرواز (حداکثر باد + باند ارتفاع
- * یکپارچه)، ۴) چک‌پوینت‌ها، ۵) تنظیمات پیشرفته (الگوریتم
+ * ۱) نتیجه (بعد از محاسبه در صدر پنل)، ۲) «مبدا و مقصد» همیشه‌دید با خط
+ * مستقیم هوایی (کامنت ۹ «کامنت‌های نرم‌افزار»)، ۳) «بهینه‌سازی برای»
+ * به‌صورت سگمنت (معیار، مهم‌ترین انتخاب)، ۴) محدودیت‌های پرواز (حداکثر باد
+ * + باند ارتفاع یکپارچه)، ۵) چک‌پوینت‌ها، ۶) تنظیمات پیشرفته (الگوریتم
  * و اجتناب از مناطق) جمع‌شونده. تنظیمات «نمایش نقشه» جای جداگانه خود را
  * دارد (پاپ‌آور نوار ابزار) و در این پنل تکرار نمی‌شود.
  */
@@ -78,6 +90,8 @@ export function PathInfoPanel({
   canClear,
   result,
   resultIsDemo = false,
+  origin,
+  destination,
 }: PathInfoPanelProps) {
   void onClear
   void canClear
@@ -86,6 +100,23 @@ export function PathInfoPanel({
 
   const altitudeMode = altitudeModeOf(layerVisibility)
   const band = altitudeBandRange(altitudeMode)
+
+  // خط مستقیم هوایی و مقایسه با مسیر پیشنهادی (کامنت ۹) — پیش‌محاسبه خارج
+  // از JSX تا شاخه‌بندی خوانا بماند.
+  const straightKm =
+    origin && destination ? greatCircleDistanceKm(origin, destination) : null
+  const comparison = (() => {
+    if (!result || straightKm == null || straightKm === 0) return null
+    const percent = Math.round(((result.total_distance_km - straightKm) / straightKm) * 100)
+    const sign = percent >= 0 ? '+' : '−'
+    const magnitude = toFaDigits(String(Math.abs(percent)))
+    const percentText = lang === 'fa' ? `${sign}${magnitude}٪` : `${sign}${Math.abs(percent)}%`
+    return t('routing.straightVsRoute', {
+      route: formatDistanceKm(result.total_distance_km, lang),
+      straight: formatDistanceKm(straightKm, lang),
+      percent: percentText,
+    })
+  })()
 
   /** رست‌کردن کامل فیلترها (پیش‌فرض‌ها) — بدون دست‌زدن به مبدأ/مقصد و نتیجه. */
   function handleReset() {
@@ -141,6 +172,45 @@ export function PathInfoPanel({
           <RefreshCw size={14} aria-hidden />
         </Button>
       </div>
+
+      {/* مبدا و مقصد — همیشه‌دید (کامنت ۹ «کامنت‌های نرم‌افزار»): کاربر
+          پیش‌تر بعد از محاسبه، مبدأ/مقصدِ انتخابی و میزان انحراف مسیر از
+          خط مستقیم را نمی‌دید؛ حالا نام مکان (ژئوکدینگ معکوس آزاد OSM)،
+          مختصاتِ جایگزین، خط مستقیم هوایی و مقایسه با مسیر پیشنهادی
+          همیشه در پنل است. */}
+      <section className="space-y-1.5" data-testid="points-summary">
+        <h3 className={sectionTitle}>{t('routing.pointsTitle')}</h3>
+        <div className="space-y-1 text-xs">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="shrink-0 text-text-muted">{t('routing.origin')}</span>
+            <span className="text-end text-text-primary">
+              {origin ? <PlaceLabel point={origin} /> : t('routing.notSelected')}
+            </span>
+          </div>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="shrink-0 text-text-muted">{t('routing.destination')}</span>
+            <span className="text-end text-text-primary">
+              {destination ? <PlaceLabel point={destination} /> : t('routing.notSelected')}
+            </span>
+          </div>
+          {straightKm != null && (
+            <div className="flex items-baseline justify-between gap-2" data-testid="straight-line">
+              <span className="shrink-0 text-text-muted">{t('routing.straightLine')}</span>
+              <span className="text-end font-medium text-text-primary">
+                {formatDistanceKm(straightKm, lang)}
+              </span>
+            </div>
+          )}
+          {comparison && (
+            <p className="leading-5 text-text-muted" data-testid="straight-comparison">
+              {comparison}
+            </p>
+          )}
+          {!origin && !destination && (
+            <p className="leading-5 text-text-muted">{t('routing.pickPointsHint')}</p>
+          )}
+        </div>
+      </section>
 
       {/* خلاصه نتیجه — بعد از محاسبه، مهم‌ترین اطلاعات بالای پنل است */}
       {result && (
