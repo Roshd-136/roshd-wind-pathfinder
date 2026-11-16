@@ -33,7 +33,10 @@ interface UiState {
 /** حالت‌های صرفاً رابط کاربری — چیزی که نباید در URL یا سرور ذخیره شود. */
 export const useUiStore = create<UiState>((set) => ({
   isControlPanelOpen: true,
-  isMobileSheetOpen: true,
+  // شیت موبایل پیشفرض جمع‌شده (فقط دسته و عنوان) — قبلاً باز بود و کل
+  // قاب را می‌پوشاند و نقشه دیده نمیشد (بازخورد تست موبایل). با انتخاب
+  // مبدأ و مقصد اثرِ auto-open آن را باز میکند.
+  isMobileSheetOpen: false,
   isSidebarOpen: false,
   mapMode: '2d',
   isViewportSettingsOpen: false,
