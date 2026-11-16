@@ -40,11 +40,14 @@ export function MapTools({
   const toggleViewportSettings = useUiStore((s) => s.toggleViewportSettings)
   const isHorizontal = layout === 'horizontal'
 
+  // در ردیف افقی موبایل بدون سایه — سایهٔ کارت (۲۴px تاری در تم تاریک) روی
+  // دکمه‌های کوچک، هالهٔ تیز و سنگین می‌سازد (بازخورد تست موبایل)؛ کادر و
+  // شیشه‌مات کافی است. دسکتاپ همان ظاهر سایه‌دار قبلی را دارد.
   const btn = isHorizontal
-    ? 'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface/95 text-text-secondary shadow-[var(--shadow-card)] backdrop-blur-sm transition-colors hover:text-text-primary'
+    ? 'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface/95 text-text-secondary backdrop-blur-sm transition-colors hover:text-text-primary'
     : 'flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface/95 text-text-secondary shadow-[var(--shadow-card)] backdrop-blur-sm transition-colors hover:text-text-primary'
   const activeBtn = isHorizontal
-    ? 'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-accent bg-accent text-white shadow-[var(--shadow-card)]'
+    ? 'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-accent bg-accent text-white'
     : 'flex h-10 w-10 items-center justify-center rounded-lg border border-accent bg-accent text-white shadow-[var(--shadow-card)]'
 
   const modeBtn = (mapMode: '2d' | '3d') =>
@@ -76,14 +79,13 @@ export function MapTools({
       )}
 
       {/* ردیف دکمه‌ها — عمودی در دسکتاپ؛ در موبایل افقی و قابل کشش افقی.
-          `justify-between` لبهٔ اولین/آخرین دکمه را به لبهٔ ویزارد
-          میرساند (لبه‌های موازی — بازخورد تست موبایل روی آیفون).
-          پاپ‌آور بیرونِ این ردیف رندر میشود تا کِشش `overflow-x-auto` آن را
-          نَبُرد. */}
+          فشرده با فاصلهٔ ثابت — قبلاً justify-between داشت که بین دکمه‌ها
+          شکافِ بزرگ می‌ساخت (بازخورد تست موبایل). پاپ‌آور بیرونِ این ردیف
+          رندر میشود تا کِشش `overflow-x-auto` آن را نَبُرد. */}
       <div
         className={
           isHorizontal
-            ? 'flex w-full flex-row items-center justify-between gap-1.5 overflow-x-auto pb-1'
+            ? 'flex w-full flex-row items-center gap-1.5 overflow-x-auto pb-1'
             : 'flex flex-col gap-1.5'
         }
       >
@@ -113,7 +115,7 @@ export function MapTools({
           aria-label={t('map.toggle2d')}
           className={
             isHorizontal
-              ? 'flex w-auto shrink-0 flex-row items-center rounded-lg border border-border bg-surface/95 p-1 shadow-[var(--shadow-card),inset_0_1px_2px_rgba(255,255,255,0.06),inset_0_-1px_2px_rgba(0,0,0,0.18)] backdrop-blur-sm'
+              ? 'flex w-auto shrink-0 flex-row items-center rounded-lg border border-border bg-surface/95 p-1 backdrop-blur-sm'
               : 'flex w-10 flex-col items-center rounded-lg border border-border bg-surface/95 p-1 shadow-[var(--shadow-card),inset_0_1px_2px_rgba(255,255,255,0.06),inset_0_-1px_2px_rgba(0,0,0,0.18)] backdrop-blur-sm'
           }
         >
