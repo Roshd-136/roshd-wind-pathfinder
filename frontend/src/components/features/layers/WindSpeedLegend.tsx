@@ -43,15 +43,17 @@ export function WindSpeedLegend({ range = [0, 20], orientation = 'horizontal' }:
   const unit = lang === 'fa' ? 'م/ث' : 'm/s'
 
   if (isVertical) {
-    // عمودی — نوار باریک بلند؛ کمینه بالا، بیشینه (با واحد) پایین. اعداد
-    // لاتین‌اند؛ با dir=ltr ترتیب کمینه→بیشینه از بالا به پایین ثابت است.
+    // عمودی — نوار باریک بلند؛ کمینه بالا، بیشینه پایین، واحد «م/ث» کنارِ
+    // نوار (نه زیر آن — بازخورد تست موبایل). اعداد لاتین‌اند؛ با dir=ltr
+    // ترتیب کمینه→بیشینه از بالا به پایین ثابت است.
     return (
       <div className="flex flex-col items-center gap-1 text-[10px] leading-none text-text-muted" dir="ltr">
         <span>{format(min)}</span>
-        <div className="h-24 w-2 rounded-full" style={{ background: gradient }} />
-        <span>
-          {format(max)} {unit}
-        </span>
+        <div className="flex items-center gap-1">
+          <div className="h-24 w-2 rounded-full" style={{ background: gradient }} />
+          <span className="text-text-muted">{unit}</span>
+        </div>
+        <span>{format(max)}</span>
       </div>
     )
   }

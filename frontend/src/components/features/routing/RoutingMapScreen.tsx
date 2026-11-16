@@ -354,10 +354,11 @@ export function RoutingMapScreen({ mode: modeProp }: RoutingMapScreenProps) {
               </div>
               <WindSpeedLegend range={visibleSpeedRange} />
             </div>
-            {/* موبایل: نوار عمودی باریک لبهٔ end وسط نقشه — بدون عنوان؛
-                کارت افقی عریض روی گوشی زیر شیت جمعشده پنهان میشد (بازخورد
-                تست موبایل: «گرادیان در نمای گوشی عمودی باشد»). */}
-            <div className="absolute end-2 top-1/2 z-10 -translate-y-1/2 rounded-xl border border-border bg-surface/90 p-1.5 shadow-[var(--shadow-card)] backdrop-blur-sm md:hidden">
+            {/* موبایل: نوار عمودی باریک پایینِ چپ با فاصله از لبهٔ پایین
+                (بالای دستهٔ شیت جمعشده) — بدون عنوان؛ کارت افقی عریض روی
+                گوشی زیر شیت جمعشده پنهان میشد و خواستهٔ کاربر «پایین چپ»
+                بود، نه وسط لبه (بازخورد تست موبایل). */}
+            <div className="absolute bottom-20 left-2 z-10 rounded-xl border border-border bg-surface/90 p-1.5 shadow-[var(--shadow-card)] backdrop-blur-sm md:hidden">
               <WindSpeedLegend orientation="vertical" range={visibleSpeedRange} />
             </div>
           </>

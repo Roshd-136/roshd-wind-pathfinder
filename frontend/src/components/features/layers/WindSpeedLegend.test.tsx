@@ -38,14 +38,17 @@ describe('WindSpeedLegend', () => {
     }
   })
 
-  it('vertical orientation shows a tall bar with min on top and max at the bottom', () => {
-    // موبایل — نوار عمودی باریک به‌جای کارت افقی عریض (بازخورد تست موبایل)
+  it('vertical orientation shows a tall bar with min on top, max at the bottom, unit beside the bar', () => {
+    // موبایل — نوار عمودی باریک به‌جای کارت افقی عریض (بازخورد تست موبایل):
+    // واحد کنارِ نوار است، نه زیر بیشینه.
     render(<WindSpeedLegend orientation="vertical" range={[4.2, 13.8]} />)
     expect(screen.getByText('4.2')).toBeInTheDocument()
-    expect(screen.getByText('13.8 m/s')).toBeInTheDocument()
-    // نوار عمودی کلاس ارتفاع/عرض خودش را دارد
-    const bar = screen.getByText('4.2').parentElement?.querySelector('div[style]')
-    expect(bar).not.toBeNull()
+    expect(screen.getByText('13.8')).toBeInTheDocument()
+    expect(screen.getByText('m/s')).toBeInTheDocument()
+    // برچسب پایین فقط عدد است — واحد به آن چسبیده نیست
+    expect(screen.queryByText('13.8 m/s')).not.toBeInTheDocument()
+    // نوار عمودی کلاس ارتفاع/عرض خودش را دارد و در همان ردیفِ واحد است
+    const bar = screen.getByText('m/s').previousElementSibling
     expect(bar?.className).toContain('h-24 w-2')
   })
 })

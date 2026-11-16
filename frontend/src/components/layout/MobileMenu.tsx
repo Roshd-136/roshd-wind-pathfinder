@@ -53,7 +53,7 @@ export function MobileMenuPanel() {
         role="dialog"
         aria-label={t('nav.menu')}
         data-testid="mobile-menu-panel"
-        className="relative z-20 w-full max-w-[24rem] rounded-2xl border border-border bg-surface/95 p-2 shadow-[var(--shadow-card)] backdrop-blur-sm md:hidden"
+        className="relative z-20 w-full md:max-w-[24rem] rounded-2xl border border-border bg-surface/95 p-2 shadow-[var(--shadow-card)] backdrop-blur-sm md:hidden"
       >
         <div className="mb-1 flex items-center justify-between px-2 pt-1">
           <span className="text-xs font-semibold text-text-primary">{t('app.name')}</span>
