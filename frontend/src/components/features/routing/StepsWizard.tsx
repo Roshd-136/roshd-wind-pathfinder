@@ -78,7 +78,10 @@ export function StepsWizard({
       // جای‌گذاری (وسط بالا) از پوششِ والد در RoutingMapScreen می‌آید —
       // همین قاب روی موبایل زیر ویزارد در ردیف ابزار هم کار می‌گذارد و
       // جابه‌جایی مطلق خودش، همپوشانی با نوار ابزار موبایل می‌ساخت.
-      className="w-full max-w-[24rem] rounded-2xl border border-border bg-surface/95 shadow-[var(--shadow-card)] backdrop-blur-sm"
+      // سقف ۲۴rem فقط دسکتاپ — در موبایل ویزارد تا عرض کامل پوشش میرود
+      // تا لبه‌هایش با ردیف ابزار زیرش موازی و هم‌عرض باشد (بازخورد تست
+      // موبایل روی آیفون: «عرض ویزارد کمتر است و لبه‌ها موازی نیستند»).
+      className="w-full md:max-w-[24rem] rounded-2xl border border-border bg-surface/95 shadow-[var(--shadow-card)] backdrop-blur-sm"
       role="status"
       aria-label={t('routing.stepsTitle')}
     >

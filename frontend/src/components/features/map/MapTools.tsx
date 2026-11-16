@@ -76,12 +76,14 @@ export function MapTools({
       )}
 
       {/* ردیف دکمه‌ها — عمودی در دسکتاپ؛ در موبایل افقی و قابل کشش افقی.
+          `justify-between` لبهٔ اولین/آخرین دکمه را به لبهٔ ویزارد
+          میرساند (لبه‌های موازی — بازخورد تست موبایل روی آیفون).
           پاپ‌آور بیرونِ این ردیف رندر میشود تا کِشش `overflow-x-auto` آن را
           نَبُرد. */}
       <div
         className={
           isHorizontal
-            ? 'flex w-full flex-row items-center gap-1.5 overflow-x-auto pb-1'
+            ? 'flex w-full flex-row items-center justify-between gap-1.5 overflow-x-auto pb-1'
             : 'flex flex-col gap-1.5'
         }
       >
