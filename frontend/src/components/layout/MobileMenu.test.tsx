@@ -86,10 +86,10 @@ describe('MobileMenu', () => {
       </>,
     )
     fireEvent.click(screen.getByTestId('mobile-menu-trigger'))
-    // لایهٔ بیرون‌کلیک
-    const overlay = document.querySelector('div.fixed.inset-0')
-    expect(overlay).not.toBeNull()
-    fireEvent.click(overlay as Element)
+    // پردهٔ تیرهٔ مودال
+    const backdrop = screen.getByTestId('mobile-menu-backdrop')
+    expect(backdrop.className).toContain('bg-black/50')
+    fireEvent.click(backdrop)
     expect(useUiStore.getState().isSidebarOpen).toBe(false)
     expect(screen.queryByTestId('mobile-menu-panel')).toBeNull()
 

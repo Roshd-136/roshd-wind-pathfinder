@@ -30,7 +30,8 @@ export function MobileMenuButton() {
 /**
  * پنل منوی موبایل — مستقیم زیر قاب ویزارد باز میشود (فرزندِ بعدی در
  * پوشش ویزارد) بهجای کشوی تمام‌صفحه؛ خودش دکمهٔ بستن دارد («دکمهٔ بستن
- * روی خود سایدبار») و کلیک بیرون هم می‌بندد. فقط زیر md.
+ * روی خود سایدبار») و کلیک بیرون هم می‌بندد. پشت پنل پردهٔ نیمهتیره
+ * می‌افتد تا تمرکز روی پنل باشد (بازخورد تست موبایل). فقط زیر md.
  */
 export function MobileMenuPanel() {
   const { t } = useTranslation()
@@ -41,8 +42,13 @@ export function MobileMenuPanel() {
 
   return (
     <>
-      {/* کلیک بیرون پنل → بستن؛ لایه زیر پنل و بالای نقشه (md:hidden) */}
-      <div aria-hidden onClick={closeSidebar} className="fixed inset-0 z-[15] md:hidden" />
+      {/* پردهٔ تیرهٔ مودال — کلیک روی آن می‌بندد؛ زیر md فقط */}
+      <div
+        aria-hidden
+        data-testid="mobile-menu-backdrop"
+        onClick={closeSidebar}
+        className="fixed inset-0 z-[15] bg-black/50 md:hidden"
+      />
       <div
         role="dialog"
         aria-label={t('nav.menu')}
