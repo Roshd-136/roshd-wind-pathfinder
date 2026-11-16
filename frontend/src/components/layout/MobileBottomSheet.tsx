@@ -12,13 +12,16 @@ interface MobileBottomSheetProps {
  * (< md). دو حالت سنجاق دارد: جمع‌شده (فقط دسته و عنوان، پایین صفحه) و
  * باز (به سمت بالا، با فاصلهٔ ~۴rem از سقف تا نقشه دیده بماند).
  *
- * دستهٔ بالایی با PointerEvent کشیده میشود و در پایان به نزدیک‌ترین
- * سنجاق می‌نشیند؛ کلیک روی دسته و کیبورد (Enter/Space روی دکمهٔ دسته)
- * هم حالت را عوض میکند. پیشتر شیت نه کشیدنی بود و نه جمع‌شونده — با
- * بازشدن تقریباً کل قاب را می‌پوشاند و «با دست جابهجا نمیشد»
- * (بازخورد تست موبایل). ارتفاع محتوا همیشه در DOM میماند تا ریاضیاتِ
- * کشش (فاصلهٔ سنجاقِ جمع) درست باشد؛ محتوای جمعشده با `inert` از
- * ترتیب تب و درخت دسترس‌پذیری خارج میشود.
+ * خودِ شیت عنصر `fixed` است (بدون غلاف) تا جابهجایی transform ناحیهٔ
+ * کلیک آن را هم جابهجا کند — قبلاً یک غلافِ ثابتِ تمام‌ارتفاع دور شیت
+ * بود که با شیتِ جمعشده هم جعبه‌اش روی نقشه می‌ماند و تک‌لمسِ نقشه
+ * (جابهجایی/انتخاب/چک‌پوینت) را میخورد (بازخورد تست موبایل).
+ *
+ * هنگام باز بودن، پسزمینه با پردهٔ نیمهتیره تار میشود تا تمرکز روی شیت
+ * باشد؛ کلیک روی پرده می‌بندد. دستهٔ بالایی با PointerEvent کشیده میشود
+ * و در پایان به نزدیک‌ترین سنجاق می‌نشیند؛ کلیک روی دسته و کیبورد هم
+ * حالت را عوض میکند. محتوای جمعشده با `inert` از ترتیب تب و درخت
+ * دسترسپذیری خارج میشود.
  */
 export function MobileBottomSheet({ children, title }: MobileBottomSheetProps) {
   const isOpen = useUiStore((s) => s.isMobileSheetOpen)
@@ -81,12 +84,22 @@ export function MobileBottomSheet({ children, title }: MobileBottomSheetProps) {
   const whileDragging = dragY != null
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-30 md:hidden">
+    <>
+      {/* پردهٔ مودال — فقط وقتی باز؛ نقشه پشت آن دیده ولی غیرفعال میشود
+          (تمرکز روی شیت، طبق بازخورد تست موبایل). md:hidden: فقط موبایل. */}
+      {isOpen && (
+        <div
+          aria-hidden
+          data-testid="mobile-sheet-backdrop"
+          onClick={closeMobileSheet}
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+        />
+      )}
       <div
         ref={sheetRef}
         data-testid="mobile-sheet"
         style={whileDragging ? { transform: `translateY(${dragY}px)`, transition: 'none' } : undefined}
-        className={`flex max-h-[calc(100dvh-4rem)] flex-col rounded-t-2xl border-t border-border bg-surface shadow-[var(--shadow-card)] ${
+        className={`fixed inset-x-0 bottom-0 z-40 flex max-h-[calc(100dvh-4rem)] flex-col rounded-t-2xl border-t border-border bg-surface shadow-[var(--shadow-card)] md:hidden ${
           whileDragging
             ? ''
             : isOpen
@@ -96,7 +109,7 @@ export function MobileBottomSheet({ children, title }: MobileBottomSheetProps) {
       >
         {/* دسته + عنوان — نوار بالای شیت؛ در حالت جمع فقط همین باریکه
             (۳٫۵rem) از پایین صفحه دیده میشود. touch-none کشش را از
-            اسکرول/پULL-تو-رفرش مرورگر جدا میکند. */}
+            اسکرول/پULL-تو‌رفرش مرورگر جدا میکند. */}
         <div
           ref={headerRef}
           data-testid="mobile-sheet-grab"
@@ -137,6 +150,6 @@ export function MobileBottomSheet({ children, title }: MobileBottomSheetProps) {
           {children}
         </div>
       </div>
-    </div>
+    </>
   )
 }

@@ -107,4 +107,18 @@ describe('MobileBottomSheet', () => {
     fireEvent.click(grab)
     expect(grab).toHaveAttribute('aria-expanded', 'true')
   })
+
+  it('dims the map behind the open sheet; tapping the backdrop closes it', () => {
+    const grab = screen.getByRole('button', { name: 'route settings' })
+    // جمعشده: بدون پرده — نقشه کاملاً در دسترس است
+    expect(screen.queryByTestId('mobile-sheet-backdrop')).toBeNull()
+
+    fireEvent.click(grab)
+    const backdrop = screen.getByTestId('mobile-sheet-backdrop')
+    expect(backdrop.className).toContain('bg-black/50')
+
+    fireEvent.click(backdrop)
+    expect(useUiStore.getState().isMobileSheetOpen).toBe(false)
+    expect(screen.queryByTestId('mobile-sheet-backdrop')).toBeNull()
+  })
 })
