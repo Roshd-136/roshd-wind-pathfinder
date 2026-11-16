@@ -47,8 +47,11 @@ describe('WindSpeedLegend', () => {
     expect(screen.getByText('m/s')).toBeInTheDocument()
     // برچسب پایین فقط عدد است — واحد به آن چسبیده نیست
     expect(screen.queryByText('13.8 m/s')).not.toBeInTheDocument()
+    // واحد عمودی چرخیده است (writing-mode) و در همان ردیفِ نوار است
+    const unitSpan = screen.getByText('m/s')
+    expect(unitSpan.className).toContain('[writing-mode:vertical-rl]')
     // نوار عمودی کلاس ارتفاع/عرض خودش را دارد و در همان ردیفِ واحد است
-    const bar = screen.getByText('m/s').previousElementSibling
+    const bar = unitSpan.previousElementSibling
     expect(bar?.className).toContain('h-24 w-2')
   })
 })

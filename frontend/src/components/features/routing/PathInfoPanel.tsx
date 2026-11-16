@@ -225,7 +225,11 @@ export function PathInfoPanel({
           قبلی و «بازنشانی فیلترها» در بخش پیشرفته، دو کار مستقل و گمراه‌کننده
           داشتند — دو دکمهٔ مشابه با دو معنا. حالا فقط همین یکی است. */}
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-text-primary">{t('routing.panelTitle')}</h2>
+        {/* عنوان پنل فقط دسکتاپ — در موبایل سربرگِ شیت «تنظیمات سفر» را
+            نشان میدهد و این h2 زیرش تکرار میشد (بازخورد تست موبایل). */}
+        <h2 className="max-md:hidden text-sm font-semibold text-text-primary">
+          {t('routing.panelTitle')}
+        </h2>
         <Button
           variant="outline"
           className="shrink-0 !px-2 !py-1.5"

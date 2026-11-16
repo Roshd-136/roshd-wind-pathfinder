@@ -51,7 +51,7 @@ export function WindSpeedLegend({ range = [0, 20], orientation = 'horizontal' }:
         <span>{format(min)}</span>
         <div className="flex items-center gap-1">
           <div className="h-24 w-2 rounded-full" style={{ background: gradient }} />
-          <span className="text-text-muted">{unit}</span>
+          <span className="[writing-mode:vertical-rl] text-text-muted">{unit}</span>
         </div>
         <span>{format(max)}</span>
       </div>
