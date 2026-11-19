@@ -1152,7 +1152,16 @@ export class Manual3DScene {
         const prev = this.pinchState
         // زوم: نسبت فاصلهٔ انگشت‌ها → فاصلهٔ دوربین (پینچ به بیرون = نزدیک‌تر)
         if (prev.dist > 0 && m.dist > 0) {
-          this.camDist = Math.min(Math.max(this.camDist * (prev.dist / m.dist), 15), 900)
+          // — سقف فاصله با گسترهٔ زمین مقیاس می‌گیرد —
+          //
+          // سقف ثابت ۹۰۰ km برای کریدور خراسان درست بود، اما با زمین سراسری
+          // ایران (گسترهٔ ~۱۸۰۰ km) نمای اولیه ~۱۷۰۰ km است و نخستین پینچ
+          // دوربین را یک‌باره به ۹۰۰ می‌پراند. برای کریدور همان ۹۰۰ می‌ماند.
+          const spanKm = this.frame
+            ? Math.max(this.frame.widthKm, this.frame.heightKm)
+            : 0
+          const maxDistKm = Math.max(900, spanKm * 2.5)
+          this.camDist = Math.min(Math.max(this.camDist * (prev.dist / m.dist), 15), maxDistKm)
           // بازسازی فلش‌های گیمبال فقط با تغییر محسوسِ فاصله (٪۳) — مثل wheel
           if (
             this.editTarget &&
