@@ -343,6 +343,12 @@ export class Manual3DScene {
   private lastX = 0
   private lastY = 0
   private dragMoved = false
+  /** انگشت‌های فعال لمس — مبنای ژست دو‌انگشتی (پینچ‌زوم + جابه‌جایی). */
+  private touchPoints = new Map<number, { x: number; y: number }>()
+  /** خط پایهٔ ژست دو‌انگشتی — فاصله و میانهٔ دو انگشت در آخرین گام. */
+  private pinchState: { dist: number; midX: number; midY: number } | null = null
+  /** ژست اخیر چند‌انگشتی بود — برداشتن انگشت‌ها نباید کلیک شلیک کند. */
+  private multiTouchGesture = false
   /** کاربر دوربین را جابه‌جا کرده؟ — تا تعویض حالت، نما را به‌هم نزنیم. */
   private userMoved = false
   /** اثر مسیر قبلی — تشخیص «مسیر عوض شد» برای کادر کردن دوبارهٔ نما. */
@@ -593,6 +599,7 @@ export class Manual3DScene {
     this.canvas.removeEventListener('pointerdown', this.onPointerDown)
     window.removeEventListener('pointermove', this.onPointerMove)
     window.removeEventListener('pointerup', this.onPointerUp)
+    window.removeEventListener('pointercancel', this.onPointerCancel)
     this.canvas.removeEventListener('wheel', this.onWheel)
     const gl = this.gl
     if (this.terrain) {
@@ -1041,10 +1048,52 @@ export class Manual3DScene {
     this.canvas.addEventListener('pointerdown', this.onPointerDown)
     window.addEventListener('pointermove', this.onPointerMove)
     window.addEventListener('pointerup', this.onPointerUp)
+    window.addEventListener('pointercancel', this.onPointerCancel)
     this.canvas.addEventListener('wheel', this.onWheel, { passive: false })
   }
 
+  /** دو انگشت نخست (به ترتیب ورود) — مبنای پینچ و جابه‌جایی دو‌انگشتی. */
+  private touchPair(): [{ x: number; y: number }, { x: number; y: number }] | null {
+    if (this.touchPoints.size < 2) return null
+    const it = this.touchPoints.values()
+    const a = it.next().value as { x: number; y: number }
+    const b = it.next().value as { x: number; y: number }
+    return [a, b]
+  }
+
+  private pinchMetrics([a, b]: [{ x: number; y: number }, { x: number; y: number }]): {
+    dist: number
+    midX: number
+    midY: number
+  } {
+    return {
+      dist: Math.hypot(a.x - b.x, a.y - b.y),
+      midX: (a.x + b.x) / 2,
+      midY: (a.y + b.y) / 2,
+    }
+  }
+
   private onPointerDown = (e: PointerEvent): void => {
+    // — ژست دو‌انگشتی لمسی: انگشت دوم = پینچ‌زوم + جابه‌جایی؛ چرخش/گیمبالِ
+    // تک‌انگشتی همان لحظه قطع می‌شود. پیش‌تر فقط درگِ تک‌اشاره و wheel بود
+    // و روی گوشی زوم/پنِ دو‌انگشتی در نمای سه‌بعدی وجود نداشت (بازخورد
+    // تست موبایل).
+    if (e.pointerType === 'touch') {
+      this.touchPoints.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (this.touchPoints.size === 2) {
+        this.multiTouchGesture = true
+        this.pointerDown = false
+        this.panMode = false
+        this.dragAxis = null
+        this.dragStartScreen = null
+        this.dragStartPosKm = null
+        const pair = this.touchPair()
+        this.pinchState = pair ? this.pinchMetrics(pair) : null
+        return
+      }
+      if (this.touchPoints.size > 2) return
+      this.multiTouchGesture = false
+    }
     // — گیمبال: کلیک روی یک پیکان = شروع کشیدن همان محور (اولویت با گیمبال) —
     if (!e.shiftKey && e.button === 0) {
       const axis = this.pickGizmoAxis(e.clientX, e.clientY)
@@ -1094,6 +1143,50 @@ export class Manual3DScene {
   }
 
   private onPointerMove = (e: PointerEvent): void => {
+    // — ژست دو‌انگشتی لمسی: پینچ = زوم، حرکت میانهٔ دو انگشت = جابه‌جایی —
+    if (e.pointerType === 'touch' && this.touchPoints.has(e.pointerId)) {
+      this.touchPoints.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      const pair = this.touchPair()
+      if (this.pinchState && pair) {
+        const m = this.pinchMetrics(pair)
+        const prev = this.pinchState
+        // زوم: نسبت فاصلهٔ انگشت‌ها → فاصلهٔ دوربین (پینچ به بیرون = نزدیک‌تر)
+        if (prev.dist > 0 && m.dist > 0) {
+          // — سقف فاصله با گسترهٔ زمین مقیاس می‌گیرد —
+          //
+          // سقف ثابت ۹۰۰ km برای کریدور خراسان درست بود، اما با زمین سراسری
+          // ایران (گسترهٔ ~۱۸۰۰ km) نمای اولیه ~۱۷۰۰ km است و نخستین پینچ
+          // دوربین را یک‌باره به ۹۰۰ می‌پراند. برای کریدور همان ۹۰۰ می‌ماند.
+          const spanKm = this.frame
+            ? Math.max(this.frame.widthKm, this.frame.heightKm)
+            : 0
+          const maxDistKm = Math.max(900, spanKm * 2.5)
+          this.camDist = Math.min(Math.max(this.camDist * (prev.dist / m.dist), 15), maxDistKm)
+          // بازسازی فلش‌های گیمبال فقط با تغییر محسوسِ فاصله (٪۳) — مثل wheel
+          if (
+            this.editTarget &&
+            (this.gizmoMeshes.length === 0 ||
+              this.lastGizmoDist === 0 ||
+              Math.abs(this.camDist - this.lastGizmoDist) > this.lastGizmoDist * 0.03)
+          ) {
+            this.rebuildGizmo()
+          }
+        }
+        // جابه‌جایی: حرکت میانهٔ دو انگشت — همان ریاضیِ shift-درگ دسکتاپ
+        const dx = m.midX - prev.midX
+        const dy = m.midY - prev.midY
+        const s = this.camDist * 0.0016
+        const cos = Math.cos(this.camYaw)
+        const sin = Math.sin(this.camYaw)
+        this.camTarget[0] += sin * dx * s - cos * dy * s
+        this.camTarget[1] += -cos * dx * s - sin * dy * s
+        this.pinchState = m
+        this.userMoved = true
+        return
+      }
+      // تک‌انگشت پس از پایان ژست چند‌انگشتی — بدون پرشِ دوربین
+      if (!this.pointerDown) return
+    }
     // — حالت «افزودن چک‌پوینت» — همیشه crosshair؛ هاور عادی بی‌اثر است.
     if (this.placingPoint) {
       this.canvas.style.cursor = 'crosshair'
@@ -1139,6 +1232,23 @@ export class Manual3DScene {
   }
 
   private onPointerUp = (e: PointerEvent): void => {
+    // — پایان لمس: ژست چند‌انگشتی هرگز کلیک/انتخاب شلیک نمی‌کند —
+    if (e.pointerType === 'touch' && this.touchPoints.has(e.pointerId)) {
+      this.touchPoints.delete(e.pointerId)
+      if (this.pinchState) {
+        this.pinchState = null
+        this.pointerDown = false
+        this.dragMoved = true
+        const pair = this.touchPair()
+        if (pair) this.pinchState = this.pinchMetrics(pair)
+        return
+      }
+      if (this.multiTouchGesture) {
+        this.pointerDown = false
+        if (this.touchPoints.size === 0) this.multiTouchGesture = false
+        return
+      }
+    }
     if (!this.pointerDown) return
     this.pointerDown = false
     // — رها کردن پیکان گیمبال: گزارش مختصات نهایی به صفحه —
@@ -1205,6 +1315,20 @@ export class Manual3DScene {
       if (hit) this.onMapClick(hit.lat, hit.lon)
       else if (this.placingPoint) this.onPickMiss?.(this.lastPickMiss ?? 'outside')
     }
+  }
+
+  /** لغو اشارهگر (لمس قطع‌شده / تماس سیستم) — وضعیت کشش و ژست پاک می‌شود. */
+  private onPointerCancel = (e: PointerEvent): void => {
+    if (e.pointerType === 'touch') {
+      this.touchPoints.delete(e.pointerId)
+      const pair = this.touchPair()
+      this.pinchState = pair ? this.pinchMetrics(pair) : null
+      if (this.touchPoints.size === 0) this.multiTouchGesture = false
+    }
+    this.pointerDown = false
+    this.dragAxis = null
+    this.dragStartScreen = null
+    this.dragStartPosKm = null
   }
 
   private onWheel = (e: WheelEvent): void => {    e.preventDefault()
