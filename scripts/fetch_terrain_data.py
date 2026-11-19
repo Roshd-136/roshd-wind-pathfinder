@@ -194,7 +194,12 @@ def main(argv: list[str] | None = None) -> None:
         for line in partial_path.read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue
-            record = json.loads(line)
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                # آخرین خط ممکن است در قطع ناگهانی نیمه‌کاره مانده باشد؛
+                # بقیهٔ چک‌پوینت سالم است، پس همان دسته دوباره گرفته می‌شود.
+                continue
             completed[int(record["batch"])] = [float(value) for value in record["elevation"]]
         print(f"Resuming — {len(completed)} batches already fetched from {partial_path.name}.")
     elif args.fresh and partial_path.exists():

@@ -506,6 +506,14 @@ export function buildWindArrows(
       const [x, y] = lonLatToKm(frame, lon, lat)
       // ارتفاع لایه: متر MSL → کیلومتر اغراق‌شده، با حداقل فاصله از زمین
       const groundM = terrainElevationAt(terrain, lat, lon)
+      // — لایهٔ زیر زمین را نکش —
+      //
+      // روی قله‌های البرز/زاگرس سطح ۱۵۰۰ متری *زیر* زمین است. قبلاً پیکان با
+      // «حداقل فاصله از زمین» بالا کشیده می‌شد و همان‌جا می‌نشست که پیکان
+      // لایه‌های بالاتر — چهار لایه روی هم. در کریدور خراسان این حالت چند گره
+      // بود؛ در نمای سراسری ایران نصف رشته‌کوه‌ها را می‌پوشاند. پرواز در
+      // ارتفاعی که زیر زمین است معنا ندارد، پس پیکانش هم کشیده نمی‌شود.
+      if (field.altitude_m < groundM + MIN_TERRAIN_CLEARANCE_M) continue
       const elevM = Math.max(field.altitude_m, groundM + MIN_TERRAIN_CLEARANCE_M)
       const zKm = (elevM / 1000) * VERTICAL_EXAGGERATION
       // طول پیکان — خطی با کف و سقف؛ حتی باد ملایم هم دیده شود

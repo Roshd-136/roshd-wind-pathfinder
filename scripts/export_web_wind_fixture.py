@@ -83,13 +83,11 @@ def export_fields(stations: pd.DataFrame, output_dir: Path) -> None:
     lats, lons = display_lattice()
     # زمین روی همان شبکهٔ منظمِ خروجی — ترتیب آرگومان‌ها (lat, lon) است.
     lon_mesh, lat_mesh = np.meshgrid(lons, lats)
-    corridor_ground = terrain.elevation_at(lat_mesh, lon_mesh).reshape(lat_mesh.shape)
+    ground = terrain.elevation_at(lat_mesh, lon_mesh).reshape(lat_mesh.shape)
     lat_flat, lon_flat = lat_mesh.ravel(), lon_mesh.ravel()
 
     for level_msl in UI_LAYER_MSL_M:
-        field = interpolate_level_field(
-            stations, float(level_msl), lats, lons, corridor_ground
-        )
+        field = interpolate_level_field(stations, float(level_msl), lats, lons, ground)
         payload = {
             "altitude_m": float(level_msl),
             "vectors": [
