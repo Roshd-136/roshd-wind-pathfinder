@@ -55,7 +55,7 @@ const EMPTY_LINE = {
 /** تصویر شفاف ۱×۱ — جای‌نگهدار منبع image تا اولین به‌روزرسانی میدان. */
 const TRANSPARENT_PIXEL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII='
-const Khorasan_CENTER: [number, number] = [58.65, 36.18]
+const IRAN_CENTER: [number, number] = [54.0, 32.5]
 
 /**
  * استایل نقشه — کاشی‌های آزاد OpenStreetMap و تصویر ماهواره‌ای Esri (هر دو
@@ -287,8 +287,8 @@ function MapLibreView({
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: baseStyle(),
-      center: Khorasan_CENTER,
-      zoom: 7,
+      center: IRAN_CENTER,
+      zoom: 4.5,
       attributionControl: false, // فقط یک کنترل صریح (پایین) — بدون تکرار
     })
     // انتساب OSM (الزام مجوز) — گوشهٔ پایین

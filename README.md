@@ -145,10 +145,21 @@ roshd-wind-pathfinder/
 │   └── test_wind_qc.py
 │
 └── data/                     # دادههای نمونه/آزمایشی
-    ├── khorasan_wind_qc_cleaned.csv       # داده QC شده خراسان
-    ├── khorasan_qc_report.json            # گزارش QC
+    ├── iran_wind_qc_cleaned.csv           # باد واقعی ۳۷ ایستگاه سراسری (QC شده)
+    ├── iran_qc_report.json                # گزارش QC داده سراسری ایران
+    ├── iran_terrain.csv                   # DEM سراسری ایران (سلول ۱۰ کیلومتر)
+    ├── khorasan_wind_qc_cleaned.csv       # فیکسچر آزمون‌ها (سه ایستگاه کریدور)
+    ├── khorasan_qc_report.json            # گزارش QC کریدور
+    ├── khorasan_terrain.csv               # DEM کریدور (فیکسچر آزمون‌ها)
     └── khorasan_pathfinding_ready.csv     # داده آماده مسیریابی
 ```
+
+> **داده سراسری در برابر فیکسچر:** برنامه (API و نقشه) از فایل‌های `iran_*`
+> می‌خواند؛ فایل‌های `khorasan_*` به‌عنوان فیکسچر آزمون‌های کریدور و اسناد
+> بازتولیدپذیر مرحله ۲ باقی مانده‌اند. روش ساخت هر دو یکی است:
+> `scripts/fetch_iran_data.py` و
+> `scripts/fetch_terrain_data.py --bbox iran --output data/iran_terrain.csv`
+> (جزئیات: [`docs/task_iran_dataset.md`](docs/task_iran_dataset.md)).
 
 ### راهنمای مسیریابی کد
 

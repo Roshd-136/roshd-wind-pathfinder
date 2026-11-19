@@ -1,0 +1,29 @@
+{
+  "summary": {
+    "total_records": 1776,
+    "valid_records": 1729,
+    "removed_records": 47,
+    "removal_rate_pct": 2.65
+  },
+  "error_counts": {
+    "STATISTICAL_OUTLIER": 34,
+    "TEMPORAL_JUMP": 13
+  },
+  "config": {
+    "min_speed": 0.0,
+    "max_speed": 100.0,
+    "min_direction": 0.0,
+    "max_direction": 360.0,
+    "outlier_method": "zscore",
+    "z_threshold": 3.0,
+    "max_speed_jump": 30.0,
+    "max_dir_jump": 150.0,
+    "spatial_neighbor_radius_deg": 0.25,
+    "spatial_z_threshold": 3.0,
+    "min_spatial_neighbors": 3,
+    "group_cols": [
+      "lat",
+      "lon"
+    ]
+  }
+}

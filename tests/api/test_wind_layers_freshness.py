@@ -46,7 +46,7 @@ def test_data_age_matches_recorded_hour() -> None:
     from viz.wind_field import select_scene_hour
 
     root = Path(__file__).resolve().parents[2]
-    raw = pd.read_csv(root / "data" / "khorasan_wind_qc_cleaned.csv")
+    raw = pd.read_csv(root / "data" / "iran_wind_qc_cleaned.csv")
     hour = select_scene_hour(raw)
 
     body = client.get("/v1/wind-layers").json()

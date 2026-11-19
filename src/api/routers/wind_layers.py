@@ -21,13 +21,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import numpy as np
 import pandas as pd
 
-from viz.terrain import TERRAIN_CSV_PATH, load_terrain
+from viz.terrain import IRAN_TERRAIN_CSV_PATH, load_terrain
 from viz.wind_field import (
-    CORRIDOR_BBOX,
+    DISPLAY_LAT_STEP,
     FLIGHT_LEVELS_MSL,
-    GRAPH_LAT_STEP,
-    build_level_fields,
-    corridor_lattice,
+    IRAN_BBOX,
+    display_lattice,
+    interpolate_level_field,
     load_station_winds,
     select_scene_hour,
 )
@@ -53,19 +53,27 @@ def _get_cached_fields():
     if _level_fields_cache is not None and _station_cache is not None:
         return _level_fields_cache, _station_cache[0]
 
-    csv_path = _DATA_DIR / "khorasan_wind_qc_cleaned.csv"
+    csv_path = _DATA_DIR / "iran_wind_qc_cleaned.csv"
     raw = pd.read_csv(csv_path)
     hour = select_scene_hour(raw)
     stations = load_station_winds(csv_path, timestamp=hour)
 
-    terrain = load_terrain(TERRAIN_CSV_PATH)
-    graph_lats, graph_lons = corridor_lattice(stations)
-    level_lon_mesh, level_lat_mesh = np.meshgrid(graph_lons, graph_lats)
-    corridor_ground = terrain.elevation_at(level_lat_mesh, level_lon_mesh).reshape(
-        level_lat_mesh.shape
-    )
+    # — میدان نمایشی سراسری: شبکهٔ منظم ۰٫۵° روی کل ایران —
+    #
+    # پیش‌تر همین‌جا شبکهٔ *گراف کریدور* ساخته می‌شد؛ با داده سه‌ایستگاهی
+    # خراسان منطقی بود، ولی با داده سراسری، پیکان‌ها فقط در یک مستطیل کوچک
+    # شرق کشور ظاهر می‌شدند. حالا باد از همان ۳۷ ایستگاه سراسری درون‌یابی
+    # می‌شود و روی کل کشور پخش می‌شود؛ زمین هم روی همین شبکه (نه شبکه گراف)
+    # نمونه‌برداری می‌شود تا ارتفاع «بالای زمین»ِ هر گره درست باشد.
+    terrain = load_terrain(IRAN_TERRAIN_CSV_PATH)
+    level_lats, level_lons = display_lattice()
+    level_lon_mesh, level_lat_mesh = np.meshgrid(level_lons, level_lats)
+    ground = terrain.elevation_at(level_lat_mesh, level_lon_mesh).reshape(level_lat_mesh.shape)
 
-    fields = build_level_fields(stations, corridor_ground)
+    fields = [
+        interpolate_level_field(stations, level, level_lats, level_lons, ground)
+        for level in FLIGHT_LEVELS_MSL
+    ]
     _station_cache = (hour, stations)
     _level_fields_cache = fields
     return fields, hour
@@ -125,14 +133,14 @@ async def list_wind_layers(
             timestamp=hour.isoformat(),
             source="station_interpolated",
             coverage_bbox=[
-                CORRIDOR_BBOX["lon_min"],
-                CORRIDOR_BBOX["lat_min"],
-                CORRIDOR_BBOX["lon_max"],
-                CORRIDOR_BBOX["lat_max"],
+                IRAN_BBOX["lon_min"],
+                IRAN_BBOX["lat_min"],
+                IRAN_BBOX["lon_max"],
+                IRAN_BBOX["lat_max"],
             ],
-            # شبکهٔ گراف دوگام است (۰٫۰۵° عرض × ۰٫۱۰° طول)؛ اسکما یک عدد
-            # می‌خواهد — ریزترین گام گزارش می‌شود.
-            resolution_deg=float(GRAPH_LAT_STEP),
+            # شبکهٔ نمایش سراسری تک‌گام است (۰٫۵° × ۰٫۵°) — برخلاف گراف
+            # مسیریابی که دو گام جدا دارد.
+            resolution_deg=float(DISPLAY_LAT_STEP),
         )
         for alt in FLIGHT_LEVELS_MSL
     ]

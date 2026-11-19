@@ -176,8 +176,10 @@ def _init_pathfinding() -> None:
         select_scene_hour,
     )
 
-    # Load wind data
-    DATA_PATH = ROOT / "data" / "khorasan_wind_qc_cleaned.csv"
+    # Load wind data — داده سراسری ایران (۳۷ ایستگاه). گراف مسیریابی دمو همچنان
+    # روی ``CORRIDOR_BBOX`` ساخته می‌شود (مسیر نمایشی مشهد→سبزوار)؛ فقط منبع
+    # باد و DEM سراسری شده تا با لایه‌های نمایشی یک منبع داشته باشند.
+    DATA_PATH = ROOT / "data" / "iran_wind_qc_cleaned.csv"
     hour = select_scene_hour(pd.read_csv(DATA_PATH))
     station_winds = load_station_winds(DATA_PATH, timestamp=hour)
 
@@ -190,7 +192,7 @@ def _init_pathfinding() -> None:
     )
 
     # Load terrain model and interpolate onto the same lattice
-    terrain_model = load_terrain(ROOT / "data" / "khorasan_terrain.csv")
+    terrain_model = load_terrain(ROOT / "data" / "iran_terrain.csv")
     lon_mesh, lat_mesh = np.meshgrid(lons, lats)
     ground = terrain_model.elevation_at(lat_mesh.ravel(), lon_mesh.ravel()).reshape(lat_mesh.shape)
 

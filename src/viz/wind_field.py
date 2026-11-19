@@ -49,6 +49,9 @@ __all__ = [
     "FLIGHT_LEVELS_MSL",
     "MIN_TERRAIN_CLEARANCE_M",
     "CORRIDOR_BBOX",
+    "IRAN_BBOX",
+    "DISPLAY_LAT_STEP",
+    "DISPLAY_LON_STEP",
     "DEMO_ORIGIN",
     "DEMO_DESTINATION",
     "VIZ_AIRCRAFT",
@@ -61,6 +64,7 @@ __all__ = [
     "interpolate_level_field",
     "build_level_fields",
     "corridor_lattice",
+    "display_lattice",
     "build_multi_layer_graph",
     "layer_dataframe",
     "lonlat_to_km",
@@ -79,6 +83,25 @@ __all__ = [
 # می‌شد. مرز عقب‌تر یعنی داده واقعی دشت جنوبی هم وارد می‌شود و مسیر آزادی دارد
 # که از پیشانی کوه فاصله بگیرد، نه اینکه به لبهٔ داده تکیه کند.
 CORRIDOR_BBOX = {"lat_min": 35.90, "lat_max": 36.45, "lon_min": 57.45, "lon_max": 59.85}
+
+# کادر سراسری ایران — **فقط برای نمایش** (نقشه، تصویر حرارتی، پیکان‌های باد).
+#
+# دو کادر داریم و این تفکیک عمدی است:
+#   * ``IRAN_BBOX`` دامنهٔ نمایش داده سراسری است؛ کاربر گفت «کل ایران، نه فقط
+#     خراسان» و پیکان‌های باد باید روی همهٔ کشور پخش شوند؛
+#   * ``CORRIDOR_BBOX`` دامنهٔ **گراف مسیریابی دمو** می‌ماند؛ گراف چندلایه روی
+#     کل کشور با گام فعلی میلیون‌ها گره می‌سازد و پاسخ مسیر را از چند ثانیه به
+#     دقیقه می‌برد، در حالی که مسیر نمایشی پروژه مشهد→سبزوار است.
+IRAN_BBOX = {"lat_min": 25.0, "lat_max": 40.0, "lon_min": 44.0, "lon_max": 63.5}
+
+# گام شبکهٔ نمایشی سراسری (درجه) — حدود ۵۰ کیلومتر روی عرض‌های ایران.
+#
+# «بهینه» یعنی به‌اندازه: با ۰٫۵ درجه، هر لایه ۳۱×۴۰ = ۱۲۴۰ بردار دارد و چهار
+# لایه روی هم ~۵۰۰۰ بردار (~۳۵۰ کیلوبایت JSON) است — همان تراکمی که پیکان‌ها
+# روی نمای سراسری خوانا می‌مانند و ذرات باد هم بی‌گره نمی‌شوند. ریزتر کردن گام
+# فقط حجم پاسخ را چند برابر می‌کند، چون در زوم سراسری پیکان‌ها روی هم می‌افتند.
+DISPLAY_LAT_STEP = 0.5
+DISPLAY_LON_STEP = 0.5
 
 # مسیر نمایشی: مشهد → سبزوار (۱۷۳.۱ کیلومتر، طولانی‌ترین جفت ایستگاه موجود).
 DEMO_ORIGIN = (36.297, 59.606)
@@ -327,6 +350,24 @@ def corridor_lattice(
     box = CORRIDOR_BBOX if bbox is None else bbox
     extra = stations[["lat", "lon"]].to_numpy(dtype=float)
     return _bbox_lattice(box, lat_step, lon_step, extra_coords=extra)
+
+
+def display_lattice(
+    bbox: dict[str, float] | None = None,
+    lat_step: float = DISPLAY_LAT_STEP,
+    lon_step: float = DISPLAY_LON_STEP,
+) -> tuple[np.ndarray, np.ndarray]:
+    """شبکهٔ **منظمِ نمایش** سراسری: ``(lats, lons)`` روی ``IRAN_BBOX``.
+
+    چرا جدا از ``corridor_lattice``؟ فرانت تصویر حرارتی و ذرات باد را روی شبکهٔ
+    منظم ردیف‌محور می‌سازد و گام را از دو محور اول حدس می‌زند
+    (``gridMeta`` در ``utils/windField``). تزریق مختصات ایستگاه‌ها به محورها —
+    کاری که برای *گراف* لازم است تا خودِ ایستگاه یک گره باشد — گام‌ها را
+    نایکنوا می‌کند و تصویر/ذرات جابه‌جا می‌افتند. برای نمایش، شبکهٔ یکنوا
+    می‌خواهیم؛ برای مسیریابی، گره‌های ایستگاهی.
+    """
+    box = IRAN_BBOX if bbox is None else bbox
+    return _bbox_lattice(box, lat_step, lon_step)
 
 
 def _bbox_lattice(

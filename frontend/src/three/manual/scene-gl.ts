@@ -416,7 +416,7 @@ export class Manual3DScene {
 
   /** CSV ارتفاع را می‌گیرد و زمین را آماده می‌کند — یک‌بار در mount. */
   async initTerrain(): Promise<void> {
-    const resp = await fetch('/data/khorasan_terrain.csv')
+    const resp = await fetch('/data/iran_terrain.csv')
     if (!resp.ok) throw new Error('CSV ارتفاع دریافت نشد')
     this.terrainData = parseTerrainCsv(await resp.text())
     const t = this.terrainData
@@ -685,7 +685,15 @@ export class Manual3DScene {
     ) {
       return c.mvp
     }
-    const proj = mat4Perspective(FOV_RAD, aspect, 0.5, Math.max(this.camDist * 6, 200))
+    const proj = mat4Perspective(
+      FOV_RAD,
+      aspect,
+      // صفحهٔ نزدیک با فاصلهٔ دوربین مقیاس می‌گیرد: با زمین سراسری ایران
+      // (camDist ~۱۷۰۰ km) نسبت far/near ثابت ۰٫۵ می‌شد ~۲۰٬۰۰۰ و زمین
+      // z-fighting می‌گرفت. وقتی نزدیک است همان ۰٫۵ قبلی می‌ماند.
+      Math.max(0.5, this.camDist * 0.001),
+      Math.max(this.camDist * 6, 200),
+    )
     const view = mat4LookAt(this.cameraEye(), this.camTarget, [0, 0, 1])
     const mvp = mat4Multiply(proj, view)
     this.mvpCache = {
@@ -1207,9 +1215,23 @@ export class Manual3DScene {
     }
   }
 
-  private onWheel = (e: WheelEvent): void => {    e.preventDefault()
+  /** کف/سقف فاصلهٔ دوربین (km) — نسبت به گسترهٔ زمین، نه عدد ثابت.
+   *
+   * سقف قبلی ۹۰۰ کیلومتر بود؛ با زمین سراسری ایران (گسترهٔ ~۱۸۰۰ کیلومتر)
+   * نمای اولیه ~۱۷۴۰ کیلومتر است و نخستین پینچ/اسکرول دوربین را یک‌باره به
+   * ۹۰۰ می‌پراند. سقف حالا با کادر مقیاس می‌شود و برای کریدور خراسان همان ۹۰۰
+   * قبلی می‌ماند (رفتار قبلی دست‌نخورده).
+   */
+  private camDistLimits(): { min: number; max: number } {
+    const span = this.frame ? Math.max(this.frame.widthKm, this.frame.heightKm) : 0
+    return { min: 15, max: Math.max(900, span * 2.5) }
+  }
+
+  private onWheel = (e: WheelEvent): void => {
+    e.preventDefault()
     const factor = Math.exp(e.deltaY * 0.0012)
-    this.camDist = Math.min(Math.max(this.camDist * factor, 15), 900)
+    const { min, max } = this.camDistLimits()
+    this.camDist = Math.min(Math.max(this.camDist * factor, min), max)
     this.userMoved = true
     // بازسازی فلش‌های گیمبال فقط با تغییرِ محسوسِ فاصله (٪۳) — قبلاً هر
     // رویدادِ wheel سه مش را از صفر می‌ساخت و دوباره در GPU می‌کاشت.

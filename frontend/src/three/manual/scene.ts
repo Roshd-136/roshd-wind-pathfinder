@@ -2,7 +2,7 @@
  * مدل دادهٔ صحنهٔ سه‌بعدی دست‌ساز — قرارداد همان `scene3d.py` (routing_scene):
  *
  *  ۱) مختصات صحنه بر حسب کیلومتر، مبدأ گوشهٔ جنوب‌غربی کادر (lonlat_to_km صحنه)؛
- *  ۲) زمین لندپالی از DEM پروژه (khorasan_terrain.csv) با رنگ‌های
+ *  ۲) زمین لندپالی از DEM پروژه (iran_terrain.csv) با رنگ‌های
  *     TERRAIN_COLORSCALE؛ اغراق عمودی VERTICAL_EXAGGERATION=8 فقط در ماتریس
  *     مدل اعمال می‌شود تا عدد ارتفاع‌ها دست‌نخورده بماند؛
  *  ۳) لایه‌های باد (۱۵۰۰/۲۲۰۰/۲۹۰۰/۳۶۰۰ متر) مثل FLIGHT_LEVELS_MSL با پالت
@@ -485,6 +485,15 @@ export function buildWindArrows(
   const targetRows = 9
   const rowStride = Math.max(1, Math.round(lats.length / targetRows))
   const colStride = Math.max(1, Math.round(lons.length / 14))
+  // — مقیاس اندازهٔ پیکان با گسترهٔ شبکه —
+  //
+  // طول پیکان در واحد کیلومتر صحنه است، نه پیکسل. با دادهٔ سراسری ایران
+  // (گام ۰٫۵° ≈ ۵۰ km) پیکان ۵ کیلومتری در نمای کشور ~۲ پیکسل می‌شد و
+  // عملاً دیده نمی‌شد. این ضریب از فاصلهٔ شبکه ساخته می‌شود و برای کریدور
+  // (گام چند کیلومتری) دقیقاً ۱ می‌ماند، پس ظاهر قبلی دست‌نخورده است.
+  const frameSpanKm = Math.max(frame.widthKm, frame.heightKm)
+  const gridSpacingKm = frameSpanKm / Math.max(Math.max(lats.length, lons.length) - 1, 1)
+  const arrowScale = Math.max(1, Math.min(gridSpacingKm / 8, 6))
   // هر پیکان = ۹ رأس مثلثی: بدنهٔ چهارگوش (۲ مثلث) + سر مثلثی (۱ مثلث)
   const verts: number[] = []
   const speeds: number[] = []
@@ -500,7 +509,9 @@ export function buildWindArrows(
       const elevM = Math.max(field.altitude_m, groundM + MIN_TERRAIN_CLEARANCE_M)
       const zKm = (elevM / 1000) * VERTICAL_EXAGGERATION
       // طول پیکان — خطی با کف و سقف؛ حتی باد ملایم هم دیده شود
-      const lenKm = Math.max(2.5, Math.min(v.speed_mps * ARROW_KM_PER_MS, ARROW_MAX_LENGTH_KM))
+      const lenKm =
+        Math.max(2.5, Math.min(v.speed_mps * ARROW_KM_PER_MS, ARROW_MAX_LENGTH_KM)) *
+        arrowScale
       // جهت جریان = direction + 180 (قرارداد هواشناسی «از کجا می‌وزد»)
       const flow = ((v.direction_deg + 180) * Math.PI) / 180
       const ux = Math.sin(flow)
