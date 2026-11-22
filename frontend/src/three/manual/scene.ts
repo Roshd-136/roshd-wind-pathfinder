@@ -27,10 +27,6 @@ export const ROUTE_TUBE_RADIUS_KM = 0.7
 export const ROUTE_TUBE_SIDES = 8
 /** نمونه‌های اسپلاین مسیر — ۶۰۰ نمونهٔ صحنه. */
 export const SPLINE_SAMPLES = 600
-/** طول پیکان باد: کیلومتر به‌ازای هر m/s — هم‌مقیاس پیکان‌های نمای ۲بعدی. */
-export const ARROW_KM_PER_MS = 0.3
-/** سقف طول پیکان (کیلومتر) — ARROW_MAX_LENGTH_KM صحنه. */
-export const ARROW_MAX_LENGTH_KM = 5.0
 /** حداقل فاصلهٔ مجاز لایهٔ باد از زمین (متر) — MIN_TERRAIN_CLEARANCE_M. */
 export const MIN_TERRAIN_CLEARANCE_M = 300
 /** رنگ‌های لایه‌های ارتفاعی — همان _LAYER_PALETTE صحنهٔ مسیریابی. */
@@ -468,8 +464,9 @@ function hexToRgb(hex: string): [number, number, number] {
 
 /**
  * پیکان‌های باد یک لایه — خط مرکزی + دو بال؛ جهت جریان (direction+180،
- * قرارداد هواشناسی «از کجا می‌وزد»). طول = سرعت×ARROW_KM_PER_MS با سقف.
- * هر پیکان ۳ قطعه (دُم + ۲ بال) = ۶ رأس خطی (GL_LINES).
+ * قرارداد هواشناسی «از کجا می‌وزد»). طول با فاصلهٔ شبکه مقیاس می‌گیرد تا
+ * پیکان‌ها در نمای سراسری هم به هم برسند. هر پیکان ۳ قطعه (دُم + ۲ بال) =
+ * ۹ رأس مثلثی.
  */
 export function buildWindArrows(
   field: WindField,
@@ -479,21 +476,31 @@ export function buildWindArrows(
 ): ArrowMesh {
   void layerIndex
   const vectors = field.vectors
-  // گام انتخاب پیکان‌ها — حدود ۱۲×۸ پیکان در صحنه (همان تراکم صحنهٔ مسیریابی)
   const lats = [...new Set(vectors.map((v) => v.lat))].sort((a, b) => a - b)
   const lons = [...new Set(vectors.map((v) => v.lon))].sort((a, b) => a - b)
-  const targetRows = 9
-  const rowStride = Math.max(1, Math.round(lats.length / targetRows))
-  const colStride = Math.max(1, Math.round(lons.length / 14))
+  // گام انتخاب پیکان‌ها — کل شبکهٔ نمایش کشیده می‌شود، نه زیرنمونهٔ ثابت.
+  //
+  // قبلاً صحنه به ۹×۱۴ پیکان زیرنمونه می‌رفت (تنظیم صحنهٔ کریدور). با زمین
+  // سراسری ایران همان تعداد روی ۱۸۰۰ کیلومتر پخش می‌شد: یکی هر ~۱۳۰ کیلومتر،
+  // یعنی پیکان‌ها گم بودند. حالا ۳۱×۴۰ = ۱۲۴۰ پیکانِ هر لایه کشیده می‌شود؛
+  // فقط میدان‌های خیلی ریز (بیش از ۲۵۰۰ نقطه در لایه) stride می‌خورند.
+  const maxArrowsPerLayer = 2500
+  const stride = Math.max(
+    1,
+    Math.ceil(Math.sqrt((lats.length * lons.length) / maxArrowsPerLayer)),
+  )
+  const rowStride = stride
+  const colStride = stride
   // — مقیاس اندازهٔ پیکان با گسترهٔ شبکه —
   //
-  // طول پیکان در واحد کیلومتر صحنه است، نه پیکسل. با دادهٔ سراسری ایران
-  // (گام ۰٫۵° ≈ ۵۰ km) پیکان ۵ کیلومتری در نمای کشور ~۲ پیکسل می‌شد و
-  // عملاً دیده نمی‌شد. این ضریب از فاصلهٔ شبکه ساخته می‌شود و برای کریدور
-  // (گام چند کیلومتری) دقیقاً ۱ می‌ماند، پس ظاهر قبلی دست‌نخورده است.
+  // طول پیکان در واحد کیلومتر صحنه است، نه پیکسل؛ با گام ۰٫۵° (~۵۰ km) یک
+  // پیکان ۵ کیلومتری در نمای کشور ~۲ پیکسل می‌شد. حالا طول به فاصلهٔ شبکه
+  // گره می‌خورد: کندترین باد ۳۵٪ و تندترین ۹۰٪ گام — نه گم می‌شود و نه از
+  // سلول خودش بیرون می‌زند.
   const frameSpanKm = Math.max(frame.widthKm, frame.heightKm)
   const gridSpacingKm = frameSpanKm / Math.max(Math.max(lats.length, lons.length) - 1, 1)
-  const arrowScale = Math.max(1, Math.min(gridSpacingKm / 8, 6))
+  const [minS, maxS] = fieldSpeedRange(field)
+  const speedSpan = Math.max(maxS - minS, 1e-6)
   // هر پیکان = ۹ رأس مثلثی: بدنهٔ چهارگوش (۲ مثلث) + سر مثلثی (۱ مثلث)
   const verts: number[] = []
   const speeds: number[] = []
@@ -516,16 +523,17 @@ export function buildWindArrows(
       if (field.altitude_m < groundM + MIN_TERRAIN_CLEARANCE_M) continue
       const elevM = Math.max(field.altitude_m, groundM + MIN_TERRAIN_CLEARANCE_M)
       const zKm = (elevM / 1000) * VERTICAL_EXAGGERATION
-      // طول پیکان — خطی با کف و سقف؛ حتی باد ملایم هم دیده شود
-      const lenKm =
-        Math.max(2.5, Math.min(v.speed_mps * ARROW_KM_PER_MS, ARROW_MAX_LENGTH_KM)) *
-        arrowScale
+      // طول پیکان — نسبت به فاصلهٔ شبکه، با نرمال‌سازی سرعت همان لایه:
+      // کندترین باد ۳۵٪ و تندترین ۹۰٪ گام. این‌طور پیکان‌ها در نمای سراسری
+      // به هم می‌رسند و میدان باد پیوسته خوانده می‌شود، نه نقطه‌نقطه.
+      const tSpeed = Math.min(Math.max((v.speed_mps - minS) / speedSpan, 0), 1)
+      const lenKm = gridSpacingKm * (0.35 + 0.55 * tSpeed)
       // جهت جریان = direction + 180 (قرارداد هواشناسی «از کجا می‌وزد»)
       const flow = ((v.direction_deg + 180) * Math.PI) / 180
       const ux = Math.sin(flow)
       const uy = Math.cos(flow)
-      // پهنای نوار — مستقل از دوربین، بر حسب کیلومتر صحنه
-      const wKm = Math.max(0.8, lenKm * 0.16)
+      // پهنای نوار — هم‌مقیاس با گام شبکه تا در نمای کشور هم دیده شود
+      const wKm = Math.max(gridSpacingKm * 0.09, lenKm * 0.16)
       const px = -uy * (wKm / 2)
       const py = ux * (wKm / 2)
       // نوک پیکان از مرکز تا جلو
@@ -550,11 +558,10 @@ export function buildWindArrows(
   const count = verts.length / 3
   const positions = new Float32Array(verts)
   const colors = new Float32Array(count * 3)
-  // بازهٔ سرعت این میدان — همان نرمال‌سازی نمای ۲بعدی (colorForFieldSpeed)
-  // تا رنگ پیکان‌ها در هر دو نما یکسان خوانده شود
-  const [minS, maxS] = fieldSpeedRange(field)
+  // رنگ پیکان‌ها از همان بازهٔ سرعت میدان (minS/maxS بالا) — یکسان با نمای
+  // دوبعدی. سرعت هر رأس قبلاً در `speeds` ذخیره شده است.
   for (let i = 0; i < count; i += 1) {
-    const t = Math.min(Math.max((speeds[i] - minS) / Math.max(maxS - minS, 1e-6), 0), 1)
+    const t = Math.min(Math.max((speeds[i] - minS) / speedSpan, 0), 1)
     const [sr, sg, sb] = colorForSpeed(t * 20)
     colors[i * 3] = sr / 255
     colors[i * 3 + 1] = sg / 255
