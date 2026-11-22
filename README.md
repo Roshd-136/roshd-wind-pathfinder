@@ -156,9 +156,10 @@ roshd-wind-pathfinder/
 
 > **داده سراسری در برابر فیکسچر:** برنامه (API و نقشه) از فایل‌های `iran_*`
 > می‌خواند؛ فایل‌های `khorasan_*` به‌عنوان فیکسچر آزمون‌های کریدور و اسناد
-> بازتولیدپذیر مرحله ۲ باقی مانده‌اند. روش ساخت هر دو یکی است:
-> `scripts/fetch_iran_data.py` و
-> `scripts/fetch_terrain_data.py --bbox iran --output data/iran_terrain.csv`
+> بازتولیدپذیر مرحله ۲ باقی مانده‌اند. باد با `scripts/fetch_iran_data.py` و
+> DEM با `scripts/fetch_terrain_tiles.py --bbox iran` (کاشی‌های Terrarium)
+> ساخته می‌شود؛ `scripts/fetch_terrain_data.py --bbox iran` همان خروجی را از
+> GLO-90 اوپن‌متیو می‌دهد وقتی سهمیهٔ روزانه آزاد است
 > (جزئیات: [`docs/task_iran_dataset.md`](docs/task_iran_dataset.md)).
 
 ### راهنمای مسیریابی کد
