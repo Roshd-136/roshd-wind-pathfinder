@@ -106,9 +106,14 @@ def test_station_series_is_hourly_and_long_enough(wind_frame: pd.DataFrame) -> N
         assert not gaps.empty
         assert (gaps >= 1.0).all(), f"{station}: گام زیر یک ساعت"
         assert gaps.median() == 1.0, f"{station}: سری ساعتی نیست ({gaps.unique()[:3]})"
-        assert len(group) >= 35, f"{station}: تنها {len(group)} مشاهده"
+        # خود Open-Meteo برای بعضی سلول‌های مدل چند ساعت null برمی‌گرداند؛ پس
+        # معیار «حداقل نیمی از پنجره» است، نه پیوستگی کامل ۴۸ ساعته.
+        assert len(group) >= 24, f"{station}: تنها {len(group)} مشاهده"
         span_hours = (stamps.iloc[-1] - stamps.iloc[0]).total_seconds() / 3600.0
         assert span_hours <= 49.0, f"{station}: گسترهٔ زمانی بیش از پنجرهٔ ۴۸ ساعته"
+
+    expected = wind_frame["station"].nunique() * 48
+    assert len(wind_frame) >= 0.9 * expected, "پوشش کل داده کمتر از ۹۰٪ پنجرهٔ ۴۸ ساعته است"
 
 
 def test_qc_report_matches_clean_csv(wind_frame: pd.DataFrame) -> None:

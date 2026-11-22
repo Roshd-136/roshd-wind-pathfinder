@@ -19,6 +19,7 @@
 
 import json
 import sys
+import time
 import urllib.request
 from pathlib import Path
 
@@ -88,9 +89,22 @@ def fetch_openmeteo_wind(lat: float, lon: float) -> pd.DataFrame:
         f"hourly=wind_speed_10m,wind_direction_10m&"
         f"forecast_days=2"
     )
-    req = urllib.request.Request(url, headers={"User-Agent": "AEROPATH/1.0"})
-    with urllib.request.urlopen(req, timeout=60) as response:
-        data = json.loads(response.read().decode())
+    last_error: Exception | None = None
+    for attempt in range(1, 5):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "AEROPATH/1.0"})
+            with urllib.request.urlopen(req, timeout=60) as response:
+                data = json.loads(response.read().decode())
+            break
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as error:
+            last_error = error
+            if attempt >= 4:
+                raise
+            # ۴۲۹/۵۰۳ = فشار سهمیه یا خطای موقت سرویس؛ مکث کوتاه و تلاش دوباره.
+            wait = float(getattr(error, "headers", {}).get("Retry-After", 0) or 0)
+            time.sleep(max(wait, 2.0 * attempt))
+    else:  # pragma: no cover - حلقه یا break می‌کند یا raise
+        raise RuntimeError(f"Open-Meteo request failed: {last_error}")
 
     hourly = data["hourly"]
     return pd.DataFrame(
@@ -112,6 +126,7 @@ def main() -> None:
         frame = fetch_openmeteo_wind(station["lat"], station["lon"])
         frame["station"] = station["name"]
         frames.append(frame)
+        time.sleep(0.7)
         print(f"  [{index:02d}/{len(IRAN_STATIONS)}] {station['name']} — {len(frame)} hours")
 
     raw_df = pd.concat(frames, ignore_index=True)
