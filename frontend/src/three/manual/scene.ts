@@ -15,6 +15,7 @@
  */
 
 import { colorForSpeed, fieldSpeedRange } from '../../utils/windField'
+import { isInsideIran } from '../../utils/iranMask'
 import type { WindField } from '../../types/routing'
 
 // ————— ثابت‌های صحنه — هم‌ارز scene3d.py —————
@@ -510,6 +511,12 @@ export function buildWindArrows(
       const lon = lons[c]
       const v = vectors.find((q) => q.lat === lat && q.lon === lon)
       if (!v) continue
+      // — فقط داخل مرز ایران —
+      //
+      // شبکهٔ باد مستطیلی است (برای درون‌یابی دوخطی)، ولی صحنهٔ سراسری نباید
+      // پیکان روی عراق/افغانستان/دریا بکشد. همان چندضلعی Natural Earth که
+      // تصویر حرارتی و ذرات را می‌برد، این‌جا هم پیکان‌ها را فیلتر می‌کند.
+      if (!isInsideIran(lat, lon)) continue
       const [x, y] = lonLatToKm(frame, lon, lat)
       // ارتفاع لایه: متر MSL → کیلومتر اغراق‌شده، با حداقل فاصله از زمین
       const groundM = terrainElevationAt(terrain, lat, lon)

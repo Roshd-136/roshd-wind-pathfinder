@@ -32,6 +32,7 @@ import {
 } from './scene'
 import type { Coordinate, Coordinate3D, WindField } from '../../types/routing'
 import { chaikinSmoothXYZ } from '../../utils/geometry'
+import { IRAN_BORDER_RINGS } from '../../data/iranBorder'
 // سقفِ ارتفاعِ پرواز — همان مرزِ بالاترین باندِ لایهٔ باد؛ موتور مسیر در
 // قفل‌های بالاتر از این «مسیر عبوری ندارد» (زمین ناهوار) رد می‌کند، پس
 // کشیدنِ محور ارتفاع را همین‌جا به قلمروِ معتبر محدود می‌کنیم.
@@ -51,18 +52,27 @@ const VS_MAIN = `
 attribute vec3 aPos;
 attribute vec3 aColor;
 uniform mat4 uMVP;
+uniform vec2 uFrameKm;
 varying vec3 vColor;
+varying vec2 vUV;
 void main() {
   gl_Position = uMVP * vec4(aPos, 1.0);
   vColor = aColor;
+  vUV = aPos.xy / uFrameKm;
 }
 `
 
 const FS_MAIN = `
 precision mediump float;
 varying vec3 vColor;
+varying vec2 vUV;
 uniform float uOpacity;
+uniform float uMaskOn;
+uniform sampler2D uMask;
 void main() {
+  // ماسک مرز فقط برای زمین روشن است؛ پیکان‌ها/مسیر/نشانگرها از این فیلتر
+  // عبور می‌کنند (uMaskOn=0) تا مسیر دمویی که به لبه می‌رسد ناپدید نشود.
+  if (uMaskOn > 0.5 && texture2D(uMask, vUV).a < 0.5) discard;
   gl_FragColor = vec4(vColor, uOpacity);
 }
 `
@@ -327,6 +337,11 @@ export class Manual3DScene {
   private program: WebGLProgram | null = null
   private uMVP: WebGLUniformLocation | null = null
   private uOpacity: WebGLUniformLocation | null = null
+  private uFrameKm: WebGLUniformLocation | null = null
+  private uMask: WebGLUniformLocation | null = null
+  private uMaskOn: WebGLUniformLocation | null = null
+  /** بافت ماسک مرز ایران برای برش زمین — فقط داخل کشور دیده شود. */
+  private maskTexture: WebGLTexture | null = null
   private aPos = -1
   private aColor = -1
   private terrain: GpuMesh | null = null
@@ -463,6 +478,58 @@ export class Manual3DScene {
       count: tile.end - tile.start,
       bounds: tile.bounds,
     }))
+    this.buildBorderMask()
+  }
+
+  /**
+   * بافت ماسک «داخل مرز ایران» برای زمین سه‌بعدی.
+   *
+   * زمین یک مش مستطیلی از DEM است؛ بدون ماسک، کشورهای همسایه هم به‌شکل یک
+   * سکوی خاکی دیده می‌شوند. این بافت در دستگاه مختصات کادر صحنه ساخته
+   * می‌شود و شیدر با `discard` هر پیکسل بیرون مرز را حذف می‌کند.
+   *
+   * نکتهٔ جهت: ردیف اول بوم (y=0) در بارگذاری بافت، مختصات t=0 می‌شود و
+   * `vUV.y=0` هم در صحنه یعنی لبهٔ جنوبی (lat0). پس بوم را «جنوب در بالا»
+   * می‌کشیم؛ وگرنه ماسک آینه‌ای می‌شود.
+   */
+  private buildBorderMask(): void {
+    const frame = this.frame
+    if (!frame) return
+    const gl = this.gl
+    const width = 512
+    const height = Math.max(64, Math.round((width * frame.heightKm) / frame.widthKm))
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.clearRect(0, 0, width, height)
+    const lonSpan = frame.widthKm / frame.kmPerLon
+    const latSpan = frame.heightKm / frame.kmPerLat
+    ctx.fillStyle = '#fff'
+    ctx.beginPath()
+    for (const ring of IRAN_BORDER_RINGS) {
+      ring.forEach(([lon, lat], i) => {
+        const x = ((lon - frame.lon0) / lonSpan) * width
+        const y = ((lat - frame.lat0) / latSpan) * height
+        if (i === 0) ctx.moveTo(x, y)
+        else ctx.lineTo(x, y)
+      })
+      ctx.closePath()
+    }
+    // even-odd: جزیره‌ها داخل، سوراخ‌ها (دریاچه) بیرون
+    ctx.fill('evenodd')
+
+    const tex = gl.createTexture()
+    if (!tex) return
+    gl.bindTexture(gl.TEXTURE_2D, tex)
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    this.maskTexture = tex
   }
 
   /** بازسازی مش‌های پویا (پیکان‌های باد + مسیر) — با هر تغییر داده. */
@@ -615,6 +682,10 @@ export class Manual3DScene {
       gl.deleteBuffer(m.mesh.ibo)
     }
     this.gizmoMeshes = []
+    if (this.maskTexture) {
+      gl.deleteTexture(this.maskTexture)
+      this.maskTexture = null
+    }
     if (this.program) gl.deleteProgram(this.program)
     this.program = null
   }
@@ -626,6 +697,9 @@ export class Manual3DScene {
     this.program = linkProgram(gl, VS_MAIN, FS_MAIN)
     this.uMVP = gl.getUniformLocation(this.program, 'uMVP')
     this.uOpacity = gl.getUniformLocation(this.program, 'uOpacity')
+    this.uFrameKm = gl.getUniformLocation(this.program, 'uFrameKm')
+    this.uMask = gl.getUniformLocation(this.program, 'uMask')
+    this.uMaskOn = gl.getUniformLocation(this.program, 'uMaskOn')
     this.aPos = gl.getAttribLocation(this.program, 'aPos')
     this.aColor = gl.getAttribLocation(this.program, 'aColor')
     gl.enable(gl.DEPTH_TEST)
@@ -733,7 +807,7 @@ export class Manual3DScene {
   }
 
   private renderFrame(): void {
-    if (!this.program || !this.terrain) return
+    if (!this.program || !this.terrain || !this.frame) return
     const gl = this.gl
     const canvas = this.canvas
     // کشِ جایگاهِ بوم — یکبار در قاب (projectToScreen/pick همه از این می‌خوانند)
@@ -751,6 +825,14 @@ export class Manual3DScene {
     gl.useProgram(this.program)
     gl.uniformMatrix4fv(this.uMVP, false, mvp)
     gl.uniform1f(this.uOpacity, 1)
+    gl.uniform2f(this.uFrameKm, this.frame.widthKm, this.frame.heightKm)
+    // ماسک مرز روی واحد بافت ۰ — فقط زمین آن را می‌خواند
+    if (this.maskTexture) {
+      gl.activeTexture(gl.TEXTURE0)
+      gl.bindTexture(gl.TEXTURE_2D, this.maskTexture)
+      gl.uniform1i(this.uMask, 0)
+    }
+    gl.uniform1f(this.uMaskOn, this.maskTexture ? 1 : 0)
     const bindAttribs = (vbo: WebGLBuffer): void => {
       gl.bindBuffer(gl.ARRAY_BUFFER, vbo)
       gl.enableVertexAttribArray(this.aPos)
@@ -767,6 +849,7 @@ export class Manual3DScene {
       gl.drawElements(gl.TRIANGLES, tile.count, indexType, tile.start * this.terrain.bytesPerIndex)
     }
     // — پیکان‌های باد لایه‌ها (مثلث‌های توپُر) —
+    gl.uniform1f(this.uMaskOn, 0)
     gl.uniform1f(this.uOpacity, 0.95)
     for (const mesh of this.arrowMeshes) {
       bindAttribs(mesh.vbo)

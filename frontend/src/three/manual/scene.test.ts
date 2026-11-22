@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { WindField } from '../../types/routing'
+import { isInsideIran } from '../../utils/iranMask'
 import { buildWindArrows, makeFrame, type TerrainData } from './scene'
 
 // کادر سراسری ایران و زمین تخت — همان چیزی که نمای کشور می‌بیند.
@@ -29,10 +30,33 @@ function nationwideField(): WindField {
 }
 
 describe('buildWindArrows — تراکم نمای سراسری', () => {
-  it('کل شبکهٔ نمایش را می‌کشد، نه زیرنمونهٔ ۹×۱۴', () => {
+  it('فقط پیکان‌های داخل مرز ایران را می‌کشد، نه کل مستطیل', () => {
     const mesh = buildWindArrows(nationwideField(), FRAME, FLAT_TERRAIN, 0)
-    // هر پیکان ۹ رأس است؛ ۱۲۴۰ پیکان یعنی ۱۱۱۶۰ رأس.
-    expect(mesh.count).toBe(31 * 40 * 9)
+    // انتظار را از همان چندضلعی می‌شماریم؛ تعداد باید *کمتر* از کل شبکه
+    // مستطیلی باشد (باد روی عراق/افغانستان/دریا کشیده نمی‌شود) ولی هنوز
+    // صدها پیکان سراسر کشور را بپوشاند.
+    let inside = 0
+    for (let row = 0; row < 31; row += 1) {
+      for (let col = 0; col < 40; col += 1) {
+        if (isInsideIran(25 + row * 0.5, 44 + col * 0.5)) inside += 1
+      }
+    }
+    expect(inside).toBeGreaterThan(550)
+    expect(inside).toBeLessThan(31 * 40)
+    // هر پیکان ۹ رأس است
+    expect(mesh.count).toBe(inside * 9)
+  })
+
+  it('سلول بیرون مرز (عراق) هیچ پیکانی نمی‌گیرد', () => {
+    const twoPoints: WindField = {
+      altitude_m: 3600,
+      vectors: [
+        { lat: 35.7, lon: 51.4, speed_mps: 8, direction_deg: 270 }, // تهران
+        { lat: 33.3, lon: 44.4, speed_mps: 8, direction_deg: 270 }, // بغداد
+      ],
+    }
+    const mesh = buildWindArrows(twoPoints, FRAME, FLAT_TERRAIN, 0)
+    expect(mesh.count).toBe(9) // فقط پیکان تهران
   })
 
   it('طول پیکان با فاصلهٔ شبکه مقیاس می‌گیرد (نه سقف ثابت ۵ کیلومتر)', () => {

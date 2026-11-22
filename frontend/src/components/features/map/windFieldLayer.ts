@@ -1,6 +1,8 @@
 import type { GeoJSONSource, ImageSource, Map as MapLibreMap } from 'maplibre-gl'
 import type { WindField } from '../../../types/routing'
 import { WIND_PARTICLE_CONFIG } from '../../../config/mapDisplay'
+import { IRAN_BORDER_RINGS } from '../../../data/iranBorder'
+import { isInsideIran } from '../../../utils/iranMask'
 import {
   colorForFieldSpeed,
   fieldSpeedRange,
@@ -39,8 +41,10 @@ const PARTICLE_LAYER = 'wind-particles-layer'
 export function buildFieldImage(field: WindField, width = 420): string {
   const range = fieldSpeedRange(field)
   const meta = gridMeta(field)
-  const latSpan = meta.lats[meta.lats.length - 1] - meta.lats[0]
-  const lonSpan = meta.lons[meta.lons.length - 1] - meta.lons[0]
+  const latMin = meta.lats[0]
+  const lonMin = meta.lons[0]
+  const latSpan = meta.lats[meta.lats.length - 1] - latMin
+  const lonSpan = meta.lons[meta.lons.length - 1] - lonMin
   const height = Math.max(64, Math.round((width * latSpan) / Math.max(lonSpan, 1e-6)))
   const canvas = document.createElement('canvas')
   canvas.width = width
@@ -90,6 +94,28 @@ export function buildFieldImage(field: WindField, width = 420): string {
     }
   }
   ctx.putImageData(image, 0, 0)
+  // — برش به مرز واقعی ایران —
+  //
+  // شبکهٔ باد مستطیلی است (برای درون‌یابی)، ولی تصویر حرارتی نباید روی
+  // کشورهای همسایه و دریا رنگ بپاشد. با `destination-in` فقط پیکسل‌های
+  // داخل چندضلعی باقی می‌مانند؛ لبهٔ برش هم با آنتی‌الیاس خود canvas نرم
+  // می‌شود. قاعدهٔ even-odd سوراخ‌ها/جزیره‌ها را هم درست می‌کند.
+  if (typeof Path2D !== 'undefined') {
+    const border = new Path2D()
+    for (const ring of IRAN_BORDER_RINGS) {
+      ring.forEach(([lon, lat], i) => {
+        const x = ((lon - lonMin) / Math.max(lonSpan, 1e-9)) * (width - 1)
+        const y = (1 - (lat - latMin) / Math.max(latSpan, 1e-9)) * (height - 1)
+        if (i === 0) border.moveTo(x, y)
+        else border.lineTo(x, y)
+      })
+      border.closePath()
+    }
+    ctx.globalCompositeOperation = 'destination-in'
+    ctx.fillStyle = '#fff'
+    ctx.fill(border, 'evenodd')
+    ctx.globalCompositeOperation = 'source-over'
+  }
   return canvas.toDataURL('image/png')
 }
 
@@ -124,6 +150,28 @@ function updateFieldImage(map: MapLibreMap, field: WindField): void {
 function unitDir(dx: number, dy: number): [number, number] {
   const len = Math.hypot(dx, dy)
   return len > 1e-12 ? [dx / len, dy / len] : [0, 1]
+}
+
+/**
+ * یک نقطهٔ تصادفی **داخل ایران** در کادر میدان (rejection sampling).
+ *
+ * کادر مستطیلی است و بخش بزرگی از آن بیرون مرز (عراق، افغانستان، خلیج فارس)
+ * است؛ اگر ذره همان‌جا متولد شود، بلافاصله باید بمیرد و جریان «سوراخ»
+ * دیده می‌شود. مرکز کادر به‌عنوان آخرین راه‌حل هم داخل ایران است.
+ */
+function randomPointInsideIran(
+  bbox: { lonMin: number; latMin: number; lonMax: number; latMax: number },
+  rand: () => number,
+): { lon: number; lat: number } {
+  for (let i = 0; i < 128; i += 1) {
+    const lon = bbox.lonMin + rand() * (bbox.lonMax - bbox.lonMin)
+    const lat = bbox.latMin + rand() * (bbox.latMax - bbox.latMin)
+    if (isInsideIran(lat, lon)) return { lon, lat }
+  }
+  return {
+    lon: (bbox.lonMin + bbox.lonMax) / 2,
+    lat: (bbox.latMin + bbox.latMax) / 2,
+  }
 }
 
 /**
@@ -165,17 +213,21 @@ export class WindArrow {
     dtMs: number,
     bbox: { lonMin: number; latMin: number; lonMax: number; latMax: number },
     trailPoints: number,
+    rand: () => number = Math.random,
   ): boolean {
     this.lon += Math.sin(headingRad) * distDeg
     this.lat += Math.cos(headingRad) * distDeg
     this.ageMs += dtMs
+    // خروج از کادر **یا از مرز ایران** = مرگ ذره؛ وگرنه ذرات روی کشورهای
+    // همسایه و دریا هم می‌رفتند (شکایت «فقط مرز ایران»).
     const outOfField =
       this.lon < bbox.lonMin ||
       this.lon > bbox.lonMax ||
       this.lat < bbox.latMin ||
-      this.lat > bbox.latMax
+      this.lat > bbox.latMax ||
+      !isInsideIran(this.lat, this.lon)
     if (outOfField || this.ageMs > this.lifetimeMs) {
-      this.respawn(bbox)
+      this.respawn(bbox, rand)
       return true
     }
     this.trail.push([this.lon, this.lat])
@@ -183,10 +235,14 @@ export class WindArrow {
     return false
   }
 
-  /** تولد دوبارهٔ بی‌سروصدا در جای تازه — ردّ از یک نقطه شروع می‌شود. */
-  respawn(bbox: { lonMin: number; latMin: number; lonMax: number; latMax: number }): void {
-    this.lon = bbox.lonMin + Math.random() * (bbox.lonMax - bbox.lonMin)
-    this.lat = bbox.latMin + Math.random() * (bbox.latMax - bbox.latMin)
+  /** تولد دوبارهٔ بی‌سروصدا در جای تازهٔ **داخل ایران** — ردّ از یک نقطه شروع می‌شود. */
+  respawn(
+    bbox: { lonMin: number; latMin: number; lonMax: number; latMax: number },
+    rand: () => number = Math.random,
+  ): void {
+    const p = randomPointInsideIran(bbox, rand)
+    this.lon = p.lon
+    this.lat = p.lat
     this.ageMs = 0
     this.trail = [[this.lon, this.lat]]
   }
@@ -373,8 +429,9 @@ function startParticleFlow(
     const bbox = fieldBbox(field)
     const arrows: WindArrow[] = []
     for (let i = 0; i < count; i += 1) {
-      const lon = bbox.lonMin + prng() * (bbox.lonMax - bbox.lonMin)
-      const lat = bbox.latMin + prng() * (bbox.latMax - bbox.latMin)
+      const p = randomPointInsideIran(bbox, prng)
+      const lon = p.lon
+      const lat = p.lat
       const lifetime = WIND_PARTICLE_CONFIG.lifetimeMs * (0.5 + prng() * 0.5)
       const widthPx = WIND_PARTICLE_CONFIG.trailWidth
       const arrow = new WindArrow(lon, lat, lifetime, widthPx)
