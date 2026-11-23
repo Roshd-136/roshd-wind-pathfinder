@@ -7,7 +7,12 @@
  * مسیرهای auth) یک‌بار با `/auth/refresh` تمدید و درخواست تکرار می‌شود.
  */
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
+// در حالت توسعه مسیرها **نسبی** میمانند تا پراکسی هم‌مبدأ Vite (`/v1` →
+// بک‌اند) کار کند. مقدار پیشفرض قبلی `http://localhost:8000` روی دسکتاپ
+// درست بود، ولی روی تلفن `localhost` یعنی خود تلفن: درخواست با Failed to
+// fetch میشکست و رابط به مسیر نمایشی مشهد–سبزوار سقوط میکرد.
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? '' : 'http://localhost:8000')
 const REFRESH_KEY = 'windpath-refresh-token'
 
 export class ApiError extends Error {
