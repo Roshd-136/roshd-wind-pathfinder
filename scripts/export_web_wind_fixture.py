@@ -15,9 +15,9 @@
 
 هشدار صداقت داده
 -----------------
-باد ایستگاه‌ها **واقعی** است (``data/khorasan_wind_qc_cleaned.csv``، ساعت با
-بیشینهٔ باد از ``select_scene_hour``) و درون‌یابی با همان IDW خط لولهٔ
-بصری‌سازی است (``viz.wind_field``). نمایهٔ عمودی (ضریب سرعت/چرخش جهت بر
+باد ایستگاه‌ها **واقعی** است (``data/iran_wind_qc_cleaned.csv``، ۳۷ ایستگاه
+سراسری، ساعت با بیشینهٔ باد از ``select_scene_hour``) و درون‌یابی با همان IDW
+خط لولهٔ بصری‌سازی است (``viz.wind_field``). نمایهٔ عمودی (ضریب سرعت/چرخش جهت بر
 حسب ارتفاع بالای زمین) «فرض مدل» اعلام‌شدهٔ همان ماژول است (``profile_at``)
 — نه اندازه‌گیری. مسیر نمایشی با ``WindRouter`` واقعی روی
 گراف چندلایهٔ سطوح پرواز MSL (با زمین‌مرجع DEM) محاسبه می‌شود؛ همان مسیری که
@@ -51,45 +51,25 @@ from viz.scene3d import (  # noqa: E402
     RouteSpec,
     build_routes,
 )
-from viz.terrain import TERRAIN_CSV_PATH, load_terrain  # noqa: E402
+from viz.terrain import IRAN_TERRAIN_CSV_PATH, load_terrain  # noqa: E402
 from viz.wind_field import (  # noqa: E402
-    CORRIDOR_BBOX,
     FLIGHT_LEVELS_MSL,
+    IRAN_BBOX,
     build_level_fields,
     build_multi_layer_graph,
     corridor_lattice,
+    display_lattice,
     interpolate_level_field,
     load_station_winds,
     select_scene_hour,
 )
 
-WIND_CSV_PATH = ROOT / "data" / "khorasan_wind_qc_cleaned.csv"
+WIND_CSV_PATH = ROOT / "data" / "iran_wind_qc_cleaned.csv"
 OUTPUT_DIR = ROOT / "frontend" / "public" / "mock"
 
 # ارتفاع لایه‌های نمایش باد = سطوح پرواز MSL بک‌اند (``FLIGHT_LEVELS_MSL``)
 # — منبع یگانه؛ اگر بک‌اند سطح پرواز تازه‌ای بیاورد، فقط همان ثابت عوض می‌شود.
 UI_LAYER_MSL_M: tuple[float, ...] = FLIGHT_LEVELS_MSL
-
-# شبکهٔ منظم خروجی وب — ریزتر از شبکهٔ گراف تا رنگ ملایم درآید. **بدون** نقطهٔ
-# ایستگاه‌ها (خلاف گراف) تا شبکه کاملاً منظم بماند؛ لایهٔ نقشهٔ فرانت با
-# درون‌یابی دوخطی روی همین نظم حساب می‌کند.
-FIELD_LAT_STEP = 0.03
-FIELD_LON_STEP = 0.05
-
-
-def _regular_lattice() -> tuple[np.ndarray, np.ndarray]:
-    """شبکهٔ کاملاً منظم روی کریدور (بدون نقطهٔ اضافهٔ ایستگاه‌ها)."""
-    lats = np.arange(
-        CORRIDOR_BBOX["lat_min"],
-        CORRIDOR_BBOX["lat_max"] + FIELD_LAT_STEP / 2,
-        FIELD_LAT_STEP,
-    )
-    lons = np.arange(
-        CORRIDOR_BBOX["lon_min"],
-        CORRIDOR_BBOX["lon_max"] + FIELD_LON_STEP / 2,
-        FIELD_LON_STEP,
-    )
-    return lats, lons
 
 
 def export_fields(stations: pd.DataFrame, output_dir: Path) -> None:
@@ -99,17 +79,15 @@ def export_fields(stations: pd.DataFrame, output_dir: Path) -> None:
     (``level_msl - elevation``) نمونه‌برداری می‌شود، نه ارتفاع ثابت AGL. پس روی
     قلهٔ کوه، سطح ۱۵۰۰ متری باد ارتفاع بالاتری را می‌بیند — دقیقاً مثل تولید.
     """
-    terrain = load_terrain(TERRAIN_CSV_PATH)
-    lats, lons = _regular_lattice()
+    terrain = load_terrain(IRAN_TERRAIN_CSV_PATH)
+    lats, lons = display_lattice()
     # زمین روی همان شبکهٔ منظمِ خروجی — ترتیب آرگومان‌ها (lat, lon) است.
     lon_mesh, lat_mesh = np.meshgrid(lons, lats)
-    corridor_ground = terrain.elevation_at(lat_mesh, lon_mesh).reshape(lat_mesh.shape)
+    ground = terrain.elevation_at(lat_mesh, lon_mesh).reshape(lat_mesh.shape)
     lat_flat, lon_flat = lat_mesh.ravel(), lon_mesh.ravel()
 
     for level_msl in UI_LAYER_MSL_M:
-        field = interpolate_level_field(
-            stations, float(level_msl), lats, lons, corridor_ground
-        )
+        field = interpolate_level_field(stations, float(level_msl), lats, lons, ground)
         payload = {
             "altitude_m": float(level_msl),
             "vectors": [
@@ -140,10 +118,10 @@ def export_layers(output_dir: Path) -> None:
             "altitude_m": float(level_msl),
             "unit": "mps",
             "bbox": [
-                CORRIDOR_BBOX["lon_min"],
-                CORRIDOR_BBOX["lat_min"],
-                CORRIDOR_BBOX["lon_max"],
-                CORRIDOR_BBOX["lat_max"],
+                IRAN_BBOX["lon_min"],
+                IRAN_BBOX["lat_min"],
+                IRAN_BBOX["lon_max"],
+                IRAN_BBOX["lat_max"],
             ],
             "last_updated": datetime.now(timezone.utc).isoformat(),
         }
@@ -157,7 +135,7 @@ def export_layers(output_dir: Path) -> None:
 
 def export_demo_route(stations: pd.DataFrame, output_dir: Path) -> None:
     """مسیر نمایشی R2 (سریع‌ترین، A*) را در قالب ``RouteResult`` می‌نویسد."""
-    terrain = load_terrain(TERRAIN_CSV_PATH)
+    terrain = load_terrain(IRAN_TERRAIN_CSV_PATH)
     graph_lats, graph_lons = corridor_lattice(stations)
     level_lon_mesh, level_lat_mesh = np.meshgrid(graph_lons, graph_lats)
     corridor_ground = terrain.elevation_at(level_lat_mesh, level_lon_mesh).reshape(

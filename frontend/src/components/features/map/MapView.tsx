@@ -2,7 +2,7 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEffect, useRef, useState } from 'react'
 import type { Coordinate, Coordinate3D, WindField } from '../../../types/routing'
-import type { ViewportSettings } from '../../../store/useUiStore'
+import { useUiStore, type ViewportSettings } from '../../../store/useUiStore'
 import { chaikinSmoothLine } from '../../../utils/geometry'
 import { ManualSceneView as ManualSceneView3D } from './ManualSceneView'
 import type { EditTarget, PickMissKind } from '../../../three/manual/scene-gl'
@@ -55,7 +55,7 @@ const EMPTY_LINE = {
 /** تصویر شفاف ۱×۱ — جای‌نگهدار منبع image تا اولین به‌روزرسانی میدان. */
 const TRANSPARENT_PIXEL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII='
-const Khorasan_CENTER: [number, number] = [58.65, 36.18]
+const IRAN_CENTER: [number, number] = [54.0, 32.5]
 
 /**
  * استایل نقشه — کاشی‌های آزاد OpenStreetMap و تصویر ماهواره‌ای Esri (هر دو
@@ -229,6 +229,9 @@ function MapLibreView({
   // ————— حالت ۲بعدی: MapLibre —————
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
+  // باز/بسته شدن شیت موبایل لایهٔ fixed جابهجا میکند؛ برخی مرورگرها بوم
+  // WebGL نقشه را بدون رنگ میگذارند. repaint صریح بعد از انیمیشن شیت.
+  const isMobileSheetOpen = useUiStore((s) => s.isMobileSheetOpen)
   // نقشه ساخته شد؟ — اثرهای بالادست که پیش از ساختِ map اجرا می‌شوند با این
   // کلید دوباره اجرا می‌شوند؛ وگرنه اولین اعمالِ باد/مسیر بی‌صدا از دست می‌رفت.
   const [mapCreated, setMapCreated] = useState(false)
@@ -287,12 +290,18 @@ function MapLibreView({
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: baseStyle(),
-      center: Khorasan_CENTER,
-      zoom: 7,
+      center: IRAN_CENTER,
+      zoom: 4.5,
       attributionControl: false, // فقط یک کنترل صریح (پایین) — بدون تکرار
     })
     // انتساب OSM (الزام مجوز) — گوشهٔ پایین
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right")
+    // بازگشت از دسترفتن context (معمولاً کمبود حافظهٔ GPU روی تلفن) — بوم
+    // بدون رنگ میماند تا رفرش؛ resize + repaint صریح آن را احیا میکند.
+    map.getCanvas()?.addEventListener?.('webglcontextrestored', () => {
+      map.resize()
+      map.triggerRepaint()
+    })
     onReadyRef.current?.(map)
     // دسترسی dev برای دیباگ زندهٔ لایه‌ها (مثلاً از طریق CDP)
     {
@@ -484,6 +493,29 @@ function MapLibreView({
   useEffect(() => {
     if (active) mapRef.current?.resize()
   }, [active])
+
+  // بیدار نگه داشتن بوم هنگام جابهجایی شیت/تغییر اندازهٔ کادر — بدون این،
+  // گاهی بوم نقشه (مخصوصاً روی تلفن) سفید/خالی میماند تا رفرش دستی.
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+    const repaint = () => {
+      const map = mapRef.current
+      if (!map) return
+      map.resize()
+      map.triggerRepaint()
+    }
+    const frame = requestAnimationFrame(repaint)
+    // انیمیشن ۳۰۰ms شیت تمام شد، دوباره بوم را بیدار میکند.
+    const timer = window.setTimeout(repaint, 380)
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(repaint)
+    observer?.observe(container)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.clearTimeout(timer)
+      observer?.disconnect()
+    }
+  }, [isMobileSheetOpen, mapCreated])
 
   return <div ref={containerRef} className="h-full w-full" role="application" aria-label="map" />
 }

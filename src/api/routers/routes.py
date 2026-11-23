@@ -164,64 +164,61 @@ def _init_pathfinding() -> None:
 
     from viz.terrain import load_terrain
     from viz.wind_field import (
-        CORRIDOR_BBOX,
+        DISPLAY_LAT_STEP,
+        DISPLAY_LON_STEP,
         FLIGHT_LEVELS_MSL,
-        GRAPH_LAT_STEP,
-        GRAPH_LON_STEP,
+        IRAN_BBOX,
         MIN_TERRAIN_CLEARANCE_M,
-        build_level_fields,
         build_multi_layer_graph,
-        corridor_lattice,
+        display_lattice,
+        interpolate_level_field,
         load_station_winds,
         select_scene_hour,
     )
 
-    # Load wind data
-    DATA_PATH = ROOT / "data" / "khorasan_wind_qc_cleaned.csv"
+    # Load wind data — داده سراسری ایران (۳۷ ایستگاه). گراف مسیریابی دمو همچنان
+    # روی ``CORRIDOR_BBOX`` ساخته می‌شود (مسیر نمایشی مشهد→سبزوار)؛ فقط منبع
+    # باد و DEM سراسری شده تا با لایه‌های نمایشی یک منبع داشته باشند.
+    DATA_PATH = ROOT / "data" / "iran_wind_qc_cleaned.csv"
     hour = select_scene_hour(pd.read_csv(DATA_PATH))
     station_winds = load_station_winds(DATA_PATH, timestamp=hour)
 
-    # Build graph lattice
-    lats, lons = corridor_lattice(
-        station_winds,
-        lat_step=GRAPH_LAT_STEP,
-        lon_step=GRAPH_LON_STEP,
-        bbox=CORRIDOR_BBOX
+    # گراف مسیریابی هم اکنون **سراسری** است (همان کادر و گامی که نقشه
+    # نمایش میدهد). قبلاً گراف فقط روی دالان مشهد–سبزوار ساخته میشد و هر
+    # مبدأ/مقصد خارج از آن به گوشهٔ شرقی دالان میچسبید — مسیر
+    # تهران→اصفهان ۱۰۶۰ کیلومتر و از کنار مشهد میگذشت. شبکهٔ منظم ۰٫۵°
+    # (۱۲۴۰ گره در هر لایه) با مختصات ایستگاهها مخلوط نمیشود: تزریق آنها
+    # به محورها شبکهای نامنظم میسازد و ساخت گراف را به ~۹۰ ثانیه میبرد.
+    # میبرد. میدان باد همان است، فقط گرهها منظم و سراسریاند.
+    lats, lons = display_lattice(
+        bbox=IRAN_BBOX,
+        lat_step=DISPLAY_LAT_STEP,
+        lon_step=DISPLAY_LON_STEP,
     )
 
     # Load terrain model and interpolate onto the same lattice
-    terrain_model = load_terrain(ROOT / "data" / "khorasan_terrain.csv")
+    terrain_model = load_terrain(ROOT / "data" / "iran_terrain.csv")
     lon_mesh, lat_mesh = np.meshgrid(lons, lats)
     ground = terrain_model.elevation_at(lat_mesh.ravel(), lon_mesh.ravel()).reshape(lat_mesh.shape)
 
     # Build level fields (wind fields at each flight level)
-    fields = build_level_fields(
-        stations=station_winds,
-        terrain_elevation=ground,
-        levels=FLIGHT_LEVELS_MSL,
-        lat_step=GRAPH_LAT_STEP,
-        lon_step=GRAPH_LON_STEP,
-        bbox=CORRIDOR_BBOX,
-        terrain_lats=terrain_model.lats,
-        terrain_lons=terrain_model.lons,
-    )
+    fields = [
+        interpolate_level_field(station_winds, level, lats, lons, ground)
+        for level in FLIGHT_LEVELS_MSL
+    ]
 
-    # Build multi-layer graph
-    # **فیلتر زمین روی یال‌ها — همان کاری که صحنهٔ مرجع می‌کند.** سازندهٔ گراف
-    # فقط *گره‌های* بی‌فاصله را حذف می‌کند؛ یالی که از روی یک قله می‌گذرد ولی دو
-    # سرش پایین است بی‌فیلتر می‌ماند. نتیجه: مسیر باند از روی آن قله رد می‌شد و
-    # رمپ ایمنی برای نگه‌داشتن فاصلهٔ ۳۰۰ متری، هواپیما را *بالاتر از سقف باند*
-    # می‌برد (اندازه‌گیری: باند [۱۵۰۰,۲۲۰۰] تا ۲۷۳۰ متر بالا می‌رفت). صحنهٔ مرجع
-    # (``viz/scene3d.py``) از ابتدا ``edge_terrain_sampler`` را می‌دهد؛ رابط API
-    # نمی‌داد و همین تفاوت، علت «احترام‌نشدن باند» بود. حالا هر دو یک گراف
-    # می‌سازند: باند یا مسیر از کنارِ کوه پیدا می‌کند یا صادقانه می‌گوید نمی‌شود.
+    # گراف چندلایهٔ سراسری: گرههای داخل زمین با کف ایمنی ۳۰۰ متر حذف
+    # میشوند. پیمانهگیری زمینِ تک تک یالها روی ۱۲۴۰ گره در هر لایه حدود
+    # ۹۰ ثانیه طول میکشید، پس برخلاف دالان قدیمی اینجا فقط باندِ گرهها
+    # اعمال میشود و ممکن است یالی از روی قلهای میانی بگذرد — محدودیت
+    # شناختهشدهٔ گراف سراسری که در سند تسک هم ثبت شده است.
     _multi_graph = build_multi_layer_graph(
         fields=fields,
         config=None,
         criterion="balanced",  # will be overridden per request
-        max_edge_distance_km=20.0,
+        max_edge_distance_km=90.0,
         min_clearance_m=MIN_TERRAIN_CLEARANCE_M,
-        edge_terrain_sampler=terrain_model.elevation_at,
+        edge_terrain_sampler=None,
     )
 
     # Store fields globally for wind_riding algorithm
@@ -341,9 +338,9 @@ def _router_for_locked_level(altitude_m: float, criterion: str, algorithm: str, 
         fields=[field],
         config=None,
         criterion="balanced",
-        max_edge_distance_km=20.0,
+        max_edge_distance_km=90.0,
         min_clearance_m=_min_clearance_m,
-        edge_terrain_sampler=_terrain_model.elevation_at,
+        edge_terrain_sampler=None,
     )
     return _get_router(
         criterion,
