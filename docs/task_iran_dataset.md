@@ -167,7 +167,7 @@ python scripts/export_web_wind_fixture.py
 ruff check .                   →  All checks passed!
 pytest                         →  228 passed, 1 warning in 96.52s
 frontend: typecheck + lint     →  clean
-frontend: vitest               →  85 passed (18 files)
+frontend: vitest               →  86 passed (19 files)
 frontend: build                →  ✓ built
 ```
 
