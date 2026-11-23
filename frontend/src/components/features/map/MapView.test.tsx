@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import { useUiStore } from '../../../store/useUiStore'
 import { MapView } from './MapView'
 
 // maplibre-gl only works in real browser (WebGL); even import fails in jsdom.
@@ -75,5 +76,31 @@ describe('MapView', () => {
       />,
     )
     expect(screen.getByRole('application', { name: 'map' })).toBeInTheDocument()
+  })
+
+  it('repaints the map when the mobile sheet opens', async () => {
+    const initial = useUiStore.getState().isMobileSheetOpen
+    render(
+      <MapView
+        mode="2d"
+        origin={null}
+        destination={null}
+        path={null}
+        viewport={{
+          mapStyle: 'simple',
+          showArrows: true,
+          showParticles: true,
+          showHeatmap: true,
+          showHillshade: true,
+          animateWind: true,
+        }}
+        onMapClick={() => {}}
+      />,
+    )
+    const map = (window as unknown as { __map: { triggerRepaint: ReturnType<typeof vi.fn> } }).__map
+    map.triggerRepaint.mockClear()
+    useUiStore.setState({ isMobileSheetOpen: !initial })
+    await waitFor(() => expect(map.triggerRepaint).toHaveBeenCalled())
+    useUiStore.setState({ isMobileSheetOpen: initial })
   })
 })
